@@ -1,0 +1,25 @@
+/* Global reset + dark background */
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+html,
+body {
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  background: #000;
+  color: #e0e8ff;
+  font-family: "Inter", system-ui, sans-serif;
+}
+
+/* Next.js root */
+#__next {
+  width: 100%;
+  height: 100%;
+}
