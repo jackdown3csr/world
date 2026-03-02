@@ -4,8 +4,8 @@
  *
  * Shows up to 6 significant decimals, minimum 3.
  */
-export function formatBalance(rawWei: string): string {
-  if (!rawWei || rawWei === "0") return "0 GNET";
+export function formatBalance(rawWei: string, unit = "GNET"): string {
+  if (!rawWei || rawWei === "0") return `0 ${unit}`;
 
   // Manual formatting to avoid pulling in ethers on the client bundle.
   // rawWei is a decimal string (no 0x prefix).
@@ -28,5 +28,5 @@ export function formatBalance(rawWei: string): string {
   // Thousands separator for whole part
   const wholeFormatted = whole.toLocaleString("en-US");
 
-  return `${wholeFormatted}.${trimmed} GNET`;
+  return `${wholeFormatted}.${trimmed} ${unit}`;
 }

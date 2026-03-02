@@ -17,6 +17,7 @@ interface WalletState {
   updatedAt: number;
   loading: boolean;
   error: string | null;
+  refetch: () => Promise<void>;
 }
 
 type Action =
@@ -29,6 +30,7 @@ const initialState: WalletState = {
   updatedAt: 0,
   loading: true,
   error: null,
+  refetch: () => Promise.resolve(),
 };
 
 function reducer(state: WalletState, action: Action): WalletState {
@@ -37,6 +39,7 @@ function reducer(state: WalletState, action: Action): WalletState {
       return { ...state, loading: true, error: null };
     case "FETCH_OK":
       return {
+        ...state,
         wallets: action.payload.wallets,
         updatedAt: action.payload.updatedAt,
         loading: false,
@@ -92,6 +95,8 @@ export function WalletProvider({ children }: { children: ReactNode }) {
   }, [fetchWallets]);
 
   return (
-    <WalletContext.Provider value={state}>{children}</WalletContext.Provider>
+    <WalletContext.Provider value={{ ...state, refetch: () => fetchWallets(false) }}>
+      {children}
+    </WalletContext.Provider>
   );
 }

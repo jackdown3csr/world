@@ -16,3 +16,15 @@ export const KEY_WALLETS_PAYLOAD = "wallets:payload";
 
 /** Stringified block number */
 export const KEY_LAST_PROCESSED_BLOCK = "scanner:lastProcessedBlock";
+
+/** Hash map: address(lowercase) -> custom planet name */
+export const KEY_PLANET_NAMES = "planet:names";
+
+/** Hash map: address(lowercase) -> JSON { tier, rank, planetSubtype? } */
+export const KEY_WALLET_TIERS = "wallet:tiers";
+
+/** Hash map: address(lowercase) -> orbit slot index (0-19). Persistent across refreshes. */
+export const KEY_PLANET_ORBITS = "planet:orbits";
+
+/** Prefix for temporary SIWE-like nonces: auth:nonce:<address> */
+export const KEY_AUTH_NONCE_PREFIX = "auth:nonce:";

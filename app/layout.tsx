@@ -5,9 +5,9 @@ import "./globals.css";
 const inter = Inter({ subsets: ["latin"] });
 
 export const metadata: Metadata = {
-  title: "Galactica World",
+  title: "Vescrow System Alpha",
   description:
-    "Visualize Galactica Cassiopeia testnet wallets as cities on a 3D globe.",
+    "Interactive 3D visualization of Galactica mainnet vEscrow wallets as a living solar system.",
 };
 
 export default function RootLayout({

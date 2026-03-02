@@ -1,0 +1,147 @@
+/**
+ * Rocky planet shader (rank 15–20).
+ * Mercury/Moon grey, Mars-like red/ochre, or Ceres-like brown/tan.
+ * Deep craters, ridged highlands, polar frost.
+ */
+
+import { PLANET_NOISE } from "./planetNoise";
+
+/* ── Height function (drives vertex displacement + bump normals) ── */
+
+const HEIGHT_FN = /* glsl */ `
+  float typeHeight(vec3 p, vec3 seed3, float seed) {
+    float h = 0.0;
+    h += craters(p, seed, 0.30, 4) * 0.5;
+    float ridge = 1.0 - abs(snoise(p * 4.0 + seed3));
+    h += ridge * ridge * 0.4;
+    h += fbm(p * 3.0 + seed3) * 0.25;
+    return h;
+  }
+`;
+
+/* ── Vertex shader ──────────────────────────────────────────── */
+
+export const VERT = /* glsl */ `
+  uniform float uSeed;
+
+  ${PLANET_NOISE}
+  ${HEIGHT_FN}
+
+  varying vec3 vPos;
+  varying vec3 vWorldPos;
+  varying vec3 vWorldNorm;
+
+  void main(){
+    vec3 p     = normalize(position);
+    vec3 seed3 = vec3(uSeed*13.7, uSeed*7.3, uSeed*5.1);
+    float h    = typeHeight(p, seed3, uSeed);
+    float rad  = length(position);
+
+    vec3 displaced = position + normal * h * rad * 0.06;
+
+    vPos       = position;
+    vec4 wp    = modelMatrix * vec4(displaced, 1.0);
+    vWorldPos  = wp.xyz;
+    vWorldNorm = normalize(mat3(modelMatrix) * normal);
+    gl_Position = projectionMatrix * viewMatrix * wp;
+  }
+`;
+
+/* ── Fragment shader ────────────────────────────────────────── */
+
+export const FRAG = /* glsl */ `
+  uniform float uHue;
+  uniform float uSeed;
+  uniform float uTime;
+  uniform float uVariant;
+  varying vec3 vPos;
+  varying vec3 vWorldPos;
+  varying vec3 vWorldNorm;
+
+  ${PLANET_NOISE}
+  ${HEIGHT_FN}
+
+  void main(){
+    vec3 p     = normalize(vPos);
+    float lat  = p.y;
+    vec3 seed3 = vec3(uSeed*13.7, uSeed*7.3, uSeed*5.1);
+
+    // ── Lighting ─────────────────────────────────────────
+    vec3 lightDir = normalize(-vWorldPos);
+    vec3 viewDir  = normalize(cameraPosition - vWorldPos);
+
+    // ── Bump normals ─────────────────────────────────────
+    float eps  = 0.02;
+    float h0   = typeHeight(p, seed3, uSeed);
+    float hx   = typeHeight(normalize(p + vec3(eps,0.,0.)), seed3, uSeed);
+    float hy   = typeHeight(normalize(p + vec3(0.,eps,0.)), seed3, uSeed);
+    vec3 grad  = vec3(hx-h0, hy-h0, 0.) / eps;
+    vec3 bumpN = normalize(vWorldNorm + grad * 2.0);
+
+    float NdotL_raw = dot(bumpN, lightDir);
+    float day       = smoothstep(-0.03, 0.03, NdotL_raw);
+    float NdotL     = max(NdotL_raw, 0.);
+
+    // ── Albedo ───────────────────────────────────────────
+    float n1 = fbm(p * 2.2 + seed3) * 0.65 + fbm(p * 7.0 + seed3.yzx) * 0.35;
+    float t  = smoothstep(0.2, 0.8, n1);
+
+    vec3 hiC, loC;
+    if (uVariant < 0.33) {
+      // Mercury/Moon — grey/silver regolith
+      hiC = hsv(vec3(0.07+uHue*0.03, 0.08, 0.62));
+      loC = hsv(vec3(0.08+uHue*0.02, 0.05, 0.28));
+    } else if (uVariant < 0.66) {
+      // Mars-like — rusty red/ochre
+      hiC = hsv(vec3(0.03+uHue*0.04, 0.65, 0.55));
+      loC = hsv(vec3(0.01+uHue*0.03, 0.55, 0.20));
+    } else {
+      // Ceres-like — dark brown/tan
+      hiC = hsv(vec3(0.08+uHue*0.04, 0.40, 0.50));
+      loC = hsv(vec3(0.06+uHue*0.03, 0.30, 0.18));
+    }
+    vec3 albedo = mix(loC, hiC, t);
+
+    // Craters
+    vec3 c0 = normalize(vec3(sin(uSeed*91.1), cos(uSeed*37.3), sin(uSeed*63.7)));
+    vec3 c1 = normalize(vec3(sin(uSeed*53.7), cos(uSeed*81.3), cos(uSeed*27.1)));
+    vec3 c2 = normalize(vec3(cos(uSeed*19.9), sin(uSeed*47.3), cos(uSeed*83.1)));
+
+    float cr = 0.0;
+    float d0 = acos(clamp(dot(p,c0),-1.,1.))/0.50;
+    if(d0<1.) cr += -smoothstep(0.,0.6,d0)*0.7+smoothstep(0.6,0.93,d0)*0.6;
+    float d1 = acos(clamp(dot(p,c1),-1.,1.))/0.34;
+    if(d1<1.) cr += -smoothstep(0.,0.6,d1)*0.7+smoothstep(0.6,0.93,d1)*0.6;
+    float d2 = acos(clamp(dot(p,c2),-1.,1.))/0.22;
+    if(d2<1.) cr += -smoothstep(0.,0.6,d2)*0.7+smoothstep(0.6,0.93,d2)*0.6;
+    cr = clamp(cr, -0.7, 0.6);
+    albedo = mix(albedo, loC*0.4, max(-cr,0.));
+    albedo = mix(albedo, hiC*1.3, max( cr,0.));
+
+    // Polar frost
+    if (uVariant < 0.5) {
+      float frost = smoothstep(0.76, 0.94, abs(lat));
+      albedo = mix(albedo, vec3(0.93,0.91,0.89), frost);
+    }
+
+    // ── Diffuse ──────────────────────────────────────────
+    vec3 color = albedo * (0.05 + NdotL*0.95);
+
+    // ── Specular ─────────────────────────────────────────
+    vec3 halfV = normalize(lightDir+viewDir);
+    float spec = pow(max(dot(bumpN,halfV),0.), 8.0);
+    color += vec3(1.,0.97,0.88) * spec * 0.12 * day;
+
+    // ── Atmosphere Fresnel rim ───────────────────────────
+    vec3  atmosCol = hsv(vec3(0.05+uHue*0.05, 0.25, 0.75));
+    float atmosStr = 0.05;
+    float vdn      = max(dot(bumpN,viewDir),0.);
+    float fres     = pow(1.-vdn, 3.5);
+    float hazeStr  = pow(1.-vdn, 1.2) * smoothstep(-0.3,0.6,dot(vWorldNorm,lightDir));
+    color += atmosCol*(fres*0.9+hazeStr*0.35)*atmosStr;
+
+    // ── Gamma ────────────────────────────────────────────
+    color = pow(max(color,vec3(0.001)), vec3(1./2.2));
+    gl_FragColor = vec4(color, 1.0);
+  }
+`;

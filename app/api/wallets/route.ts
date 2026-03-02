@@ -1,5 +1,10 @@
 import { NextResponse } from "next/server";
-import { redis, KEY_WALLETS_PAYLOAD } from "@/lib/redis";
+import {
+  redis,
+  KEY_WALLETS_PAYLOAD,
+  KEY_PLANET_NAMES,
+  KEY_PLANET_ORBITS,
+} from "@/lib/redis";
 import type { WalletsPayload } from "@/lib/types";
 
 /**
@@ -11,6 +16,10 @@ import type { WalletsPayload } from "@/lib/types";
 export async function GET() {
   try {
     const data = await redis.get<WalletsPayload>(KEY_WALLETS_PAYLOAD);
+    const [names, orbits] = await Promise.all([
+      redis.hgetall<Record<string, string>>(KEY_PLANET_NAMES),
+      redis.hgetall<Record<string, string>>(KEY_PLANET_ORBITS),
+    ]);
 
     if (!data) {
       return NextResponse.json(
@@ -22,7 +31,17 @@ export async function GET() {
       );
     }
 
-    return NextResponse.json(data, {
+    const wallets = data.wallets.map((w) => {
+      const key = w.address.toLowerCase();
+      const orbitSlot = orbits?.[key] != null ? Number(orbits[key]) : undefined;
+      return {
+        ...w,
+        customName: names?.[key] || w.customName,
+        ...(orbitSlot !== undefined ? { orbitSlot } : {}),
+      };
+    });
+
+    return NextResponse.json({ ...data, wallets }, {
       status: 200,
       headers: { "Cache-Control": "no-store" },
     });
