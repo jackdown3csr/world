@@ -13,13 +13,14 @@ interface MoonBodyProps {
   data:        MoonData;
   planetOrbit: number;   // parent planet orbit radius from sun
   selected:    boolean;
+  panelOpen?:  boolean;
   onSelect:    () => void;
   onDeselect:  () => void;
   showLabel?:  boolean;
   showRenamedOnly?: boolean;
 }
 
-export default function MoonBody({ data, planetOrbit, selected, onSelect, onDeselect, showLabel, showRenamedOnly }: MoonBodyProps) {
+export default function MoonBody({ data, planetOrbit, selected, panelOpen, onSelect, onDeselect, showLabel, showRenamedOnly }: MoonBodyProps) {
   const moonOrbitRef = useRef<THREE.Group>(null);
   const meshRef      = useRef<THREE.Mesh>(null);
   const [hovered, setHovered] = useState(false);
@@ -64,19 +65,19 @@ export default function MoonBody({ data, planetOrbit, selected, onSelect, onDese
           <primitive object={material} attach="material" />
         </mesh>
 
-        {(hovered || selected) && (
+        {(hovered || (selected && panelOpen)) && (
           <Html
             position={[data.orbitRadius, data.radius + 0.18, 0]}
             center
             zIndexRange={[10000, 0]}
-            style={{ pointerEvents: selected ? "auto" : "none" }}
+            style={{ pointerEvents: (selected && panelOpen) ? "auto" : "none" }}
           >
-            <WalletTooltip wallet={data.wallet} onClose={selected ? onDeselect : undefined} />
+            <WalletTooltip wallet={data.wallet} onClose={(selected && panelOpen) ? onDeselect : undefined} />
           </Html>
         )}
 
         {/* Persistent name label */}
-        {showLabel && (!showRenamedOnly || data.wallet.customName) && !hovered && !selected && (
+        {showLabel && (!showRenamedOnly || data.wallet.customName) && !hovered && !(selected && panelOpen) && (
           <Html
             position={[data.orbitRadius, data.radius + 0.15, 0]}
             center

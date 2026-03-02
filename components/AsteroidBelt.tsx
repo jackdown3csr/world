@@ -18,6 +18,7 @@ interface AsteroidBeltProps {
   selectedAddress: string | null;
   onSelectAddress: (address: string) => void;
   onDeselect: () => void;
+  panelOpen?: boolean;
   showAllNames?: boolean;
   showRenamedOnly?: boolean;
   showOrbits?: boolean;
@@ -30,6 +31,7 @@ export default function AsteroidBelt({
   selectedAddress,
   onSelectAddress,
   onDeselect,
+  panelOpen,
   showAllNames,
   showRenamedOnly,
   showOrbits = true,
@@ -157,10 +159,10 @@ export default function AsteroidBelt({
       )}
 
       {/* Tooltip on hover */}
-      {activeAsteroid && (
+      {activeAsteroid && (selectedIndex < 0 || panelOpen) && (
         <Html position={activeAsteroid.position} center zIndexRange={[10000, 0]}
-          style={{ pointerEvents: selectedIndex >= 0 ? "auto" : "none" }}>
-          <WalletTooltip wallet={activeAsteroid.wallet} onClose={selectedIndex >= 0 ? onDeselect : undefined} />
+          style={{ pointerEvents: (selectedIndex >= 0 && panelOpen) ? "auto" : "none" }}>
+          <WalletTooltip wallet={activeAsteroid.wallet} onClose={(selectedIndex >= 0 && panelOpen) ? onDeselect : undefined} />
         </Html>
       )}
 

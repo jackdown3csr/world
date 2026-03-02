@@ -49,10 +49,12 @@ export default function SolarSystem() {
   /* ── Selection state ── */
   const [selectedAddress, setSelectedAddress] = useState<string | null>(null);
   const [selectionVersion, setSelectionVersion] = useState(0);
+  const [panelOpen, setPanelOpen] = useState(false);
 
   const selectBody = useCallback((addr: string) => {
     setSelectedAddress(addr);
     setSelectionVersion((v) => v + 1);
+    setPanelOpen(true);
   }, []);
 
   /* ── Wallet connection ── */
@@ -118,7 +120,8 @@ export default function SolarSystem() {
                 p.wallet.address.toLowerCase()
               }
               onSelect={() => handleSceneSelect(p.wallet.address)}
-              onDeselect={() => setSelectedAddress(null)}
+              onDeselect={() => setPanelOpen(false)}
+              panelOpen={panelOpen}
               selectedAddress={selectedAddress}
               onSelectAddress={handleSceneSelect}
               showLabel={showAllNames}
@@ -135,7 +138,8 @@ export default function SolarSystem() {
           beltOuterRadius={solarData.beltOuterRadius}
           selectedAddress={selectedAddress}
           onSelectAddress={handleSceneSelect}
-          onDeselect={() => setSelectedAddress(null)}
+          onDeselect={() => setPanelOpen(false)}
+          panelOpen={panelOpen}
           showAllNames={showAllNames}
           showRenamedOnly={showRenamedOnly}
           showOrbits={showOrbits}
@@ -191,6 +195,7 @@ export default function SolarSystem() {
           onReset={() => {
             setResetRequested(true);
             setSelectedAddress(null);
+            setPanelOpen(false);
           }}
         />
 
@@ -205,6 +210,7 @@ export default function SolarSystem() {
           onDisconnect={() => {
             wc.disconnect();
             setSelectedAddress(null);
+            setPanelOpen(false);
           }}
           onSaveName={wc.savePlanetName}
           onNameChange={wc.setNameInput}

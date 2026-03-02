@@ -14,6 +14,7 @@ import WalletRing from "./WalletRing";
 interface PlanetWalletProps {
   data:     PlanetData;
   selected: boolean;
+  panelOpen?: boolean;
   onSelect: () => void;
   onDeselect: () => void;
   selectedAddress: string | null;
@@ -24,7 +25,7 @@ interface PlanetWalletProps {
   showRenamedOnly?: boolean;
 }
 
-export default function PlanetWallet({ data, selected, onSelect, onDeselect, selectedAddress, onSelectAddress, showLabel, showMoonLabels, showRingLabels, showRenamedOnly }: PlanetWalletProps) {
+export default function PlanetWallet({ data, selected, panelOpen, onSelect, onDeselect, selectedAddress, onSelectAddress, showLabel, showMoonLabels, showRingLabels, showRenamedOnly }: PlanetWalletProps) {
   const orbitRef = useRef<THREE.Group>(null);
   const meshRef  = useRef<THREE.Mesh>(null);
   const [hovered, setHovered] = useState(false);
@@ -146,19 +147,19 @@ export default function PlanetWallet({ data, selected, onSelect, onDeselect, sel
         )}
 
         {/* Tooltip */}
-        {(hovered || selected) && (
+        {(hovered || (selected && panelOpen)) && (
           <Html
             position={[data.orbitRadius, data.radius + 0.6, 0]}
             center
             zIndexRange={[10000, 0]}
-            style={{ pointerEvents: selected ? "auto" : "none" }}
+            style={{ pointerEvents: (selected && panelOpen) ? "auto" : "none" }}
           >
-            <WalletTooltip wallet={data.wallet} onClose={selected ? onDeselect : undefined} />
+            <WalletTooltip wallet={data.wallet} onClose={(selected && panelOpen) ? onDeselect : undefined} />
           </Html>
         )}
 
         {/* Persistent name label */}
-        {showLabel && !hovered && !selected && (
+        {showLabel && !hovered && !(selected && panelOpen) && (
           (!showRenamedOnly || data.wallet.customName) ? (
           <Html
             position={[data.orbitRadius, data.radius + 0.4, 0]}
@@ -190,6 +191,7 @@ export default function PlanetWallet({ data, selected, onSelect, onDeselect, sel
             data={moon}
             planetOrbit={data.orbitRadius}
             selected={selectedAddress?.toLowerCase() === moon.wallet.address.toLowerCase()}
+            panelOpen={panelOpen}
             onSelect={() => onSelectAddress(moon.wallet.address)}
             onDeselect={onDeselect}
             showLabel={showMoonLabels}
