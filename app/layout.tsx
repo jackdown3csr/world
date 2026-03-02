@@ -8,6 +8,11 @@ export const metadata: Metadata = {
   title: "Vescrow System Alpha",
   description:
     "Interactive 3D visualization of Galactica mainnet vEscrow wallets as a living solar system.",
+  icons: {
+    icon: "/icon.svg",
+    shortcut: "/icon.svg",
+    apple: "/icon.svg",
+  },
 };
 
 export default function RootLayout({
