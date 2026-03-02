@@ -59,7 +59,7 @@ export default function SolarSystem() {
   const wc = useWalletConnection(wallets, refetch, selectBody);
 
   /* ── UI toggles ── */
-  const [showAllNames, setShowAllNames] = useState(false);
+  const [showAllNames, setShowAllNames] = useState(true);
   const [showRenamedOnly, setShowRenamedOnly] = useState(false);
   const [showNamesList, setShowNamesList] = useState(false);
   const [showHelp, setShowHelp] = useState(false);
