@@ -21,13 +21,14 @@ export function buildRingParticles(
   const range  = logMax - logMin || 1;
 
   return ringEntries.map(({ w, vp }) => {
-    const t = Math.max(0, Math.min(1,
+    const t     = Math.max(0, Math.min(1,
       (Math.log10(Math.max(vp, 0.001)) - logMin) / range));
+    const noise = 0.55 + frac(w.address, 55) * 0.9;   // 0.55 – 1.45 random jitter
     return {
       wallet:  w,
       angle:   frac(w.address, 11) * Math.PI * 2,
       radialT: frac(w.address, 22),
-      size:    0.15 + Math.pow(t, 0.5) * 0.45,
+      size:    (0.04 + Math.pow(t, 0.65) * 0.12) * noise,   // base 0.04–0.16, with jitter → ~0.02–0.23
       hue:     frac(w.address, 33),
       seed:    frac(w.address, 44),
     };

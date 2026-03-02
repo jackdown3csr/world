@@ -54,6 +54,8 @@ export interface AsteroidData {
   position: [number, number, number];
   size:     number;
   hue:      number;
+  seed:     number;   // second independent hash [0,1] for per-instance deformation
+  variant:  number;   // 0..N_POTATO_VARIANTS-1, geometry shape bucket
 }
 
 /* ── Solar system (combined output) ───────────────────────── */

@@ -18,10 +18,13 @@ export function buildAsteroids(
   const beltWidth = beltOuterRadius - beltInnerRadius;
   const beltMid   = (beltInnerRadius + beltOuterRadius) / 2;
 
+  const N_VARIANTS = 12;
+
   return wallets.map(w => {
     const h1 = fnv1a(w.address, 0);
     const h2 = fnv1a(w.address, 1337);
     const h3 = fnv1a(w.address, 9999);
+    const h4 = fnv1a(w.address, 42);   // independent seed for deformation
 
     const angle   = (h1 / 0xffffffff) * Math.PI * 2;
     const rOffset = ((h2 / 0xffffffff) - 0.5) * beltWidth;
@@ -40,7 +43,9 @@ export function buildAsteroids(
         Math.sin(angle) * r,
       ] as [number, number, number],
       size,
-      hue: h2 / 0xffffffff,
+      hue:     h2 / 0xffffffff,
+      seed:    h4 / 0xffffffff,
+      variant: h1 % N_VARIANTS,
     };
   });
 }
