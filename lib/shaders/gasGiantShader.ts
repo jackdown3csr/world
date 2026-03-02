@@ -126,7 +126,7 @@ export const FRAG = /* glsl */ `
     float cloudAlpha = smoothstep(0.4,0.7,b1)*0.38;
 
     // ── Diffuse ──────────────────────────────────────────
-    vec3 color = albedo * (0.05 + NdotL*0.95);
+    vec3 color = albedo * NdotL;
 
     // ── Specular ─────────────────────────────────────────
     vec3 halfV = normalize(lightDir+viewDir);

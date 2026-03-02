@@ -104,7 +104,7 @@ export const FRAG = /* glsl */ `
     albedo = mix(albedo, hsv(vec3(hB-0.03,0.40,0.68)), smoothstep(0.58,0.92,abs(lat)));
 
     // ── Diffuse ──────────────────────────────────────────
-    vec3 color = albedo * (0.05 + NdotL*0.95);
+    vec3 color = albedo * NdotL;
 
     // ── Specular ─────────────────────────────────────────
     vec3 halfV = normalize(lightDir+viewDir);

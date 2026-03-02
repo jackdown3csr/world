@@ -15,7 +15,7 @@ export const RING_END_RANK = 190;   // ranks 61–190 → ring particles
 
 /* ── Planet sizing ────────────────────────────────────────── */
 export const SIZE_RANGES: Record<PlanetType, [number, number]> = {
-  gas_giant:   [7.0, 14.0],
+  gas_giant:   [9.0, 14.0],
   ice_giant:   [4.5, 7.0],
   terrestrial: [2.5, 4.5],
   rocky:       [1.4, 2.5],
@@ -25,19 +25,19 @@ export const SIZE_RANGES: Record<PlanetType, [number, number]> = {
 export const FIRST_ORBIT = SUN_RADIUS * 2.8;   // ~224 units
 export const SURFACE_GAP = 24.0;
 
-export const BASE_PLANET_SPEED = 0.035;
+export const BASE_PLANET_SPEED = 0.012;
 
 /* ── Moon sizing / orbits ─────────────────────────────────── */
 export const MIN_MOON_R       = 0.12;
-export const MAX_MOON_R       = 0.45;
-export const MOON_FIRST_GAP   = 2.5;
-export const MOON_SURFACE_GAP = 1.5;
+export const MAX_MOON_R       = 0.4;
+export const MOON_FIRST_GAP   = 3.0;   // gap between planet surface and first moon orbit
+export const MOON_SURFACE_GAP = 1.8;   // gap between moon orbit and moon surface
 
-export const BASE_MOON_SPEED       = 0.22;
+export const BASE_MOON_SPEED       = 0.08;
 export const MAX_MOONS_PER_PLANET  = 3;
 
 /* ── Asteroid belt ────────────────────────────────────────── */
 export const BELT_GAP   = 40;
-export const BELT_WIDTH = 36;
-export const BELT_MIN   = 0.20;
-export const BELT_MAX   = 0.55;
+export const BELT_WIDTH = 30;
+export const BELT_MIN   = 0.08;
+export const BELT_MAX   = 0.25;
