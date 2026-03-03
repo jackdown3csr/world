@@ -68,37 +68,11 @@ export default function DirectoryPanel({
           onClick={() => onSelect(p.wallet.address, p.wallet.customName)}
           style={rowStyle(sel === p.wallet.address.toLowerCase())}
         >
-          <span
-            style={{
-              width: 6,
-              height: 6,
-              flexShrink: 0,
-              background: `hsl(${p.hue * 360}, 45%, 50%)`,
-              boxShadow: `0 0 4px hsla(${p.hue * 360}, 50%, 50%, 0.4)`,
-            }}
-          />
-          <span
-            style={{
-              color: "#8a9bb0",
-              fontSize: 11,
-              flex: 1,
-              overflow: "hidden",
-              textOverflow: "ellipsis",
-              whiteSpace: "nowrap",
-            }}
-          >
+          <span style={{ width: 6, height: 6, flexShrink: 0, background: `hsl(${p.hue * 360}, 45%, 50%)`, boxShadow: `0 0 4px hsla(${p.hue * 360}, 50%, 50%, 0.4)` }} />
+          <span style={{ color: "#8a9bb0", fontSize: 11, flex: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
             {addrLabel(p.wallet)}
           </span>
-          <span
-            style={{
-              color: "#00e5ff",
-              fontSize: 9,
-              flexShrink: 0,
-              letterSpacing: "0.05em",
-              fontVariantNumeric: "tabular-nums",
-              opacity: 0.7,
-            }}
-          >
+          <span style={{ color: "#00e5ff", fontSize: 9, flexShrink: 0, fontVariantNumeric: "tabular-nums", opacity: 0.7 }}>
             {p.wallet.votingPowerFormatted}
           </span>
         </button>
@@ -115,35 +89,11 @@ export default function DirectoryPanel({
             onClick={() => onSelect(m.wallet.address, m.wallet.customName)}
             style={rowStyle(sel === m.wallet.address.toLowerCase(), true)}
           >
-            <span
-              style={{
-                width: 4,
-                height: 4,
-                flexShrink: 0,
-                background: `hsl(${m.hue * 360}, 30%, 42%)`,
-              }}
-            />
-            <span
-              style={{
-                color: "#8a9bb0",
-                fontSize: 10,
-                flex: 1,
-                overflow: "hidden",
-                textOverflow: "ellipsis",
-                whiteSpace: "nowrap",
-              }}
-            >
+            <span style={{ width: 4, height: 4, flexShrink: 0, background: `hsl(${m.hue * 360}, 30%, 42%)` }} />
+            <span style={{ color: "#8a9bb0", fontSize: 10, flex: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
               {addrLabel(m.wallet)}
             </span>
-            <span
-              style={{
-                color: "#00e5ff",
-                fontSize: 9,
-                flexShrink: 0,
-                fontVariantNumeric: "tabular-nums",
-                opacity: 0.6,
-              }}
-            >
+            <span style={{ color: "#00e5ff", fontSize: 9, flexShrink: 0, fontVariantNumeric: "tabular-nums", opacity: 0.6 }}>
               {m.wallet.votingPowerFormatted}
             </span>
           </button>
@@ -164,17 +114,11 @@ export default function DirectoryPanel({
                 onClick={() => onSelect(r.wallet.address, r.wallet.customName)}
                 style={rowStyle(sel === r.wallet.address.toLowerCase(), true)}
               >
-                <span
-                  style={{
-                    color: "#4a5a68",
-                    fontSize: 10,
-                    flex: 1,
-                    overflow: "hidden",
-                    textOverflow: "ellipsis",
-                    whiteSpace: "nowrap",
-                  }}
-                >
+                <span style={{ color: "#7a8e9e", fontSize: 10, flex: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
                   {addrLabel(r.wallet)}
+                </span>
+                <span style={{ color: "#00e5ff", fontSize: 9, flexShrink: 0, fontVariantNumeric: "tabular-nums", opacity: 0.6 }}>
+                  {r.wallet.votingPowerFormatted}
                 </span>
               </button>
             )),
@@ -194,38 +138,10 @@ export default function DirectoryPanel({
               onClick={() => onSelect(a.wallet.address, a.wallet.customName)}
               style={rowStyle(sel === a.wallet.address.toLowerCase(), true)}
             >
-              <span
-                  style={{
-                    color: "#7a8e9e",
-                    fontSize: 10,
-                    flex: 1,
-                    overflow: "hidden",
-                    textOverflow: "ellipsis",
-                    whiteSpace: "nowrap",
-                  }}
-                >
-                  {addrLabel(r.wallet)}
-                </span>
-                <span
-                  style={{
-                    color: "#00e5ff",
-                    fontSize: 9,
-                    flexShrink: 0,
-                    fontVariantNumeric: "tabular-nums",
-                    opacity: 0.6,
-                  }}
-                >
-                  {r.wallet.votingPowerFormatted}
-                </span>
-              <span
-                style={{
-                  color: "#00e5ff",
-                  fontSize: 9,
-                  flexShrink: 0,
-                  fontVariantNumeric: "tabular-nums",
-                  opacity: 0.6,
-                }}
-              >
+              <span style={{ color: "#7a8e9e", fontSize: 10, flex: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                {addrLabel(a.wallet)}
+              </span>
+              <span style={{ color: "#00e5ff", fontSize: 9, flexShrink: 0, fontVariantNumeric: "tabular-nums", opacity: 0.6 }}>
                 {a.wallet.votingPowerFormatted}
               </span>
             </button>
