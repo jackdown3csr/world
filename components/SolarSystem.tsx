@@ -249,25 +249,25 @@ export default function SolarSystem() {
           padding: "8px 12px",
         }}
       >
-        <div style={{ color: "#4a7a8a", fontSize: 9, letterSpacing: "0.18em", textTransform: "uppercase", marginBottom: 2 }}>
+        <div style={{ color: "#6a9aaa", fontSize: 9, letterSpacing: "0.18em", textTransform: "uppercase", marginBottom: 2 }}>
           vescrow system alpha
         </div>
         {wallets.length > 0 && (
           <>
             <div>
-              <span style={{ color: "#4a6070" }}>wallets </span>
+              <span style={{ color: "#6a8090" }}>wallets </span>
               <span style={{ color: "#8ab0c0" }}>{wallets.length.toLocaleString()}</span>
             </div>
             <div>
-              <span style={{ color: "#4a6070" }}>locked  </span>
+              <span style={{ color: "#6a8090" }}>locked  </span>
               <span style={{ color: "#8ab0c0" }}>{totalLocked}</span>
             </div>
             <div>
-              <span style={{ color: "#4a6070" }}>power   </span>
+              <span style={{ color: "#6a8090" }}>power   </span>
               <span style={{ color: "#8ab0c0" }}>{totalVotingPower}</span>
             </div>
             {updatedAt > 0 && (
-              <div style={{ marginTop: 4, fontSize: 9, color: "#2a4a58" }}>
+              <div style={{ marginTop: 4, fontSize: 9, color: "#5a7a8a" }}>
                 updated {new Date(updatedAt).toLocaleTimeString()}
               </div>
             )}

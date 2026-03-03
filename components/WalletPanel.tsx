@@ -47,7 +47,7 @@ export default function WalletPanel({
         >
           <span
             style={{
-              color: "#4a6278",
+              color: "#6a8a9a",
               fontSize: 9,
               letterSpacing: "0.15em",
               textTransform: "uppercase",
@@ -123,7 +123,7 @@ export default function WalletPanel({
         />
         <span
           style={{
-            color: "#5a7a90",
+            color: "#8a9bb0",
             fontSize: 11,
             flex: 1,
             fontFamily: "inherit",
@@ -191,7 +191,7 @@ export default function WalletPanel({
             {lockExpiry && (
               <div style={{ gridColumn: "1 / -1" }}>
                 <div style={labelStyle}>lock expires</div>
-                <div style={{ color: "#5a7a90", fontSize: 12 }}>{lockExpiry}</div>
+                <div style={{ color: "#7a9ab0", fontSize: 12 }}>{lockExpiry}</div>
               </div>
             )}
           </div>
@@ -271,7 +271,7 @@ export default function WalletPanel({
 /* ── Shared micro-styles ── */
 
 const labelStyle: React.CSSProperties = {
-  color: "#3a5068",
+  color: "#5a7a90",
   fontSize: 9,
   letterSpacing: "0.12em",
   textTransform: "uppercase",

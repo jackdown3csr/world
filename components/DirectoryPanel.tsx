@@ -13,7 +13,7 @@ interface DirectoryPanelProps {
 
 const sectionHeader: React.CSSProperties = {
   padding: "8px 10px 4px",
-  color: "#3a5068",
+  color: "#5a7a90",
   fontSize: 9,
   fontWeight: 600,
   letterSpacing: "0.15em",
@@ -91,13 +91,15 @@ export default function DirectoryPanel({
           </span>
           <span
             style={{
-              color: "#2a3a4a",
+              color: "#00e5ff",
               fontSize: 9,
               flexShrink: 0,
               letterSpacing: "0.05em",
+              fontVariantNumeric: "tabular-nums",
+              opacity: 0.7,
             }}
           >
-            {p.planetType.replace("_", " ")}
+            {p.wallet.votingPowerFormatted}
           </span>
         </button>
       ))}
@@ -123,7 +125,7 @@ export default function DirectoryPanel({
             />
             <span
               style={{
-                color: "#6a7a88",
+                color: "#8a9bb0",
                 fontSize: 10,
                 flex: 1,
                 overflow: "hidden",
@@ -183,7 +185,7 @@ export default function DirectoryPanel({
             >
               <span
                 style={{
-                  color: "#4a5a68",
+                  color: "#7a8e9e",
                   fontSize: 10,
                   flex: 1,
                   overflow: "hidden",
