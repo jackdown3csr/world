@@ -2,7 +2,7 @@ name: Scan blockchain & update Redis
 
 on:
   schedule:
-    - cron: "0 */1 * * *"   # every hour  (change to "*/30 * * * *" for every 30 min)
+    - cron: "*/10 * * * *"  # every 10 minutes  (change to "*/30 * * * *" for every 30 min)
   workflow_dispatch:         # allow manual trigger from GitHub UI
 
 jobs:
