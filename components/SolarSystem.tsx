@@ -28,7 +28,7 @@ import HelpPanel from "./HelpPanel";
  */
 export default function SolarSystem() {
   /* ── Data ── */
-  const { wallets, loading, refetch } = useWallets();
+  const { wallets, loading, refetch, updatedAt } = useWallets();
   const solarData = useMemo(() => buildSolarSystem(wallets), [wallets]);
 
   /* ── Aggregate stats for Sun label ── */
@@ -227,26 +227,52 @@ export default function SolarSystem() {
         {showHelp && <HelpPanel />}
       </div>
 
-      {/* Branding + debug */}
+      {/* ── Top-left stats overlay ── */}
       <div
         style={{
           position: "fixed",
           left: 16,
-          bottom: 16,
+          top: 16,
           zIndex: 20,
           fontFamily: "'JetBrains Mono', 'SF Mono', monospace",
+          fontSize: 11,
+          color: "#8a9bb0",
+          display: "flex",
+          flexDirection: "column",
+          gap: 3,
+          letterSpacing: "0.06em",
+          pointerEvents: "none",
+          background: "rgba(2, 6, 14, 0.88)",
+          border: "1px solid rgba(0,229,255,0.12)",
+          borderLeft: "2px solid rgba(0,229,255,0.4)",
+          borderRadius: 4,
+          padding: "8px 12px",
         }}
       >
-        <div
-          style={{
-            color: "#1a2a38",
-            fontSize: 10,
-            letterSpacing: "0.2em",
-            textTransform: "uppercase",
-          }}
-        >
+        <div style={{ color: "#4a7a8a", fontSize: 9, letterSpacing: "0.18em", textTransform: "uppercase", marginBottom: 2 }}>
           vescrow system alpha
         </div>
+        {wallets.length > 0 && (
+          <>
+            <div>
+              <span style={{ color: "#4a6070" }}>wallets </span>
+              <span style={{ color: "#8ab0c0" }}>{wallets.length.toLocaleString()}</span>
+            </div>
+            <div>
+              <span style={{ color: "#4a6070" }}>locked  </span>
+              <span style={{ color: "#8ab0c0" }}>{totalLocked}</span>
+            </div>
+            <div>
+              <span style={{ color: "#4a6070" }}>power   </span>
+              <span style={{ color: "#8ab0c0" }}>{totalVotingPower}</span>
+            </div>
+            {updatedAt > 0 && (
+              <div style={{ marginTop: 4, fontSize: 9, color: "#2a4a58" }}>
+                updated {new Date(updatedAt).toLocaleTimeString()}
+              </div>
+            )}
+          </>
+        )}
       </div>
     </>
   );

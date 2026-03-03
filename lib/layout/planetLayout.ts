@@ -4,7 +4,7 @@
 
 import type { WalletEntry } from "../types";
 import type { PlanetType } from "./types";
-import { SIZE_RANGES, FIRST_ORBIT, SURFACE_GAP } from "./constants";
+import { SIZE_RANGES, FIRST_ORBIT, SURFACE_GAP, SATURN_RING_OUTER_MULT, SATURN_RING_EXTRA_GAP } from "./constants";
 import { fnv1a, planetTypeByRank } from "./helpers";
 
 interface RankedEntry { w: WalletEntry; vp: number }
@@ -54,6 +54,7 @@ export function computeOrbits(
   planetEntries: RankedEntry[],
   radiusMap: Map<string, number>,
   typeMap:   Map<string, PlanetType>,
+  saturnEntryIdx = -1,   // index in planetEntries of the ring-host (Saturn)
 ): number[] {
   const N = planetEntries.length;
 
@@ -77,10 +78,14 @@ export function computeOrbits(
   const orbitByIdx = new Array<number>(N).fill(0);
   let cursor = FIRST_ORBIT;
   for (const planetIdx of slotOrder) {
-    const r = radiusMap.get(planetEntries[planetIdx].w.address)!;
-    cursor += r;
+    const r         = radiusMap.get(planetEntries[planetIdx].w.address)!;
+    const isSaturn  = planetIdx === saturnEntryIdx;
+    // Saturn's footprint = full ring outer radius; regular planet footprint = body radius
+    const footprint = isSaturn ? r * SATURN_RING_OUTER_MULT : r;
+    const gap       = isSaturn ? SURFACE_GAP + SATURN_RING_EXTRA_GAP : SURFACE_GAP;
+    cursor += footprint;
     orbitByIdx[planetIdx] = cursor;
-    cursor += r + SURFACE_GAP;
+    cursor += footprint + gap;
   }
 
   return orbitByIdx;

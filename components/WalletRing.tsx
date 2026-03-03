@@ -255,7 +255,7 @@ export default function WalletRing({
         const isSelected = selectedAddress?.toLowerCase() === rp.wallet.address.toLowerCase();
         const isNear     = nearIndices.has(i);
         const isRenamed  = !showRenamedOnly || !!rp.wallet.customName;
-        if (!isSelected && !isNear && !(showLabels && isRenamed)) return null;
+        if (!isSelected && !(showLabels && (isNear || isRenamed))) return null;
 
         const pos   = positions[i];
         const label = rp.wallet.customName

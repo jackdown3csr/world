@@ -46,14 +46,14 @@ export function buildSolarSystem(wallets: WalletEntry[]): SolarSystemData {
 
   /* 3. Planet sizing + orbits */
   const { radiusMap, typeMap } = computePlanetSizing(planetEntries);
-  const orbitByIdx = computeOrbits(planetEntries, radiusMap, typeMap);
+  const saturnIdx  = 0;   // ring-host is always rank-0 (highest VP) planet
+  const orbitByIdx = computeOrbits(planetEntries, radiusMap, typeMap, saturnIdx);
 
   /* 4. Moon distribution */
   const { moonGroups, overflowBelt } = distributeMoons(moonEntries, N);
   const moonStats = computeMoonVPStats(moonEntries);
 
   /* 5. Ring particles (assigned to Saturn = rank-0 planet) */
-  const saturnIdx     = 0;
   const ringParticles = buildRingParticles(ringEntries);
 
   /* 6. Assemble planets */
