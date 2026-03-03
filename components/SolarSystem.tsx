@@ -340,6 +340,12 @@ export default function SolarSystem() {
                 updated {new Date(updatedAt).toLocaleTimeString()}
               </div>
             )}
+            <div style={{ marginTop: 3, fontSize: 9, color: "#4a6575", lineHeight: 1.4 }}>
+              data read from vEscrow contract<br/>
+              ranked by veGNET voting power<br/>
+              locked GNET alone does not decide rank —<br/>
+              longer lock = higher power
+            </div>
           </>
         )}
       </div>
