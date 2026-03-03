@@ -7,6 +7,7 @@ import type { OrbitControls as OrbitControlsImpl } from "three-stdlib";
 
 import { useWallets } from "@/hooks/useWallets";
 import { useWalletConnection } from "@/hooks/useWalletConnection";
+import { useIsMobile } from "@/hooks/useIsMobile";
 import { buildSolarSystem } from "@/lib/layout";
 import { formatBalance } from "@/lib/formatBalance";
 
@@ -28,6 +29,9 @@ import HelpPanel from "./HelpPanel";
  * Purely a composition layer — all logic lives in hooks and child components.
  */
 export default function SolarSystem() {
+  /* ── Mobile detection ── */
+  const isMobile = useIsMobile();
+
   /* ── Data ── */
   const { wallets, loading, refetch, updatedAt } = useWallets();
   const solarData = useMemo(() => buildSolarSystem(wallets), [wallets]);
@@ -107,6 +111,7 @@ export default function SolarSystem() {
         camera={{ position: [0, 500, 1600], fov: 55, near: 0.1, far: 16000 }}
         style={{ width: "100%", height: "100%" }}
         gl={{ antialias: true, alpha: false }}
+        dpr={[1, isMobile ? 1.5 : 2]}
       >
         <ambientLight intensity={0.06} />
         <GalaxyBackground />
@@ -172,70 +177,123 @@ export default function SolarSystem() {
       </Canvas>
 
       {/* ── HUD overlay ── */}
-      <div
-        style={{
-          position: "fixed",
-          right: 16,
-          top: 16,
-          zIndex: 20,
-          width: 280,
-          fontFamily:
-            "'JetBrains Mono', 'SF Mono', 'Fira Code', Menlo, monospace",
-          fontSize: 12,
-          color: "#8a9bb0",
-          display: "flex",
-          flexDirection: "column",
-          gap: 6,
-        }}
-      >
-        <HudToolbar
-          showAllNames={showAllNames}
-          onToggleLabels={() => setShowAllNames((v) => !v)}
-          showRenamedOnly={showRenamedOnly}
-          onToggleRenamed={() => setShowRenamedOnly((v) => !v)}
-          showDirectory={showNamesList}
-          onToggleDirectory={() => setShowNamesList((v) => !v)}
-          showHelp={showHelp}
-          onToggleHelp={() => setShowHelp((v) => !v)}
-          showOrbits={showOrbits}
-          onToggleOrbits={() => setShowOrbits((v) => !v)}
-          onReset={() => {
-            setResetRequested(true);
-            setSelectedAddress(null);
-            setPanelOpen(false);
-          }}
-        />
-
-        <WalletPanel
-          connectedAddress={wc.connectedAddress}
-          myWallet={wc.myWallet}
-          nameInput={wc.nameInput}
-          isSaving={wc.isSaving}
-          status={wc.status}
-          lockExpiry={wc.lockExpiry}
-          onConnect={wc.connectWallet}
-          onDisconnect={() => {
-            wc.disconnect();
-            setSelectedAddress(null);
-            setPanelOpen(false);
-          }}
-          onSaveName={wc.savePlanetName}
-          onNameChange={wc.setNameInput}
-        />
-
-        {showNamesList && (
-          <DirectoryPanel
-            solarData={solarData}
-            selectedAddress={selectedAddress}
-            onSelect={handleDirectorySelect}
+      {isMobile ? (
+        /* ════ MOBILE: bottom sheet ════ */
+        <div style={{
+          position: "fixed", bottom: 0, left: 0, right: 0, zIndex: 20,
+          fontFamily: "'JetBrains Mono','SF Mono','Fira Code',Menlo,monospace",
+          fontSize: 12, color: "#8a9bb0",
+          display: "flex", flexDirection: "column",
+        }}>
+          {/* Expandable panels — slide up above toolbar */}
+          {(showNamesList || showHelp) && (
+            <div style={{
+              maxHeight: "55vh", overflowY: "auto",
+              background: "rgba(2,6,14,0.96)",
+              borderTop: "1px solid rgba(0,229,255,0.15)",
+            }}>
+              {showHelp    && <HelpPanel mobile />}
+              {showNamesList && <DirectoryPanel solarData={solarData} selectedAddress={selectedAddress} onSelect={handleDirectorySelect} />}
+            </div>
+          )}
+          {/* Wallet panel — always visible strip */}
+          <div style={{ borderTop: "1px solid rgba(0,229,255,0.08)" }}>
+            <WalletPanel
+              connectedAddress={wc.connectedAddress}
+              myWallet={wc.myWallet}
+              nameInput={wc.nameInput}
+              isSaving={wc.isSaving}
+              status={wc.status}
+              lockExpiry={wc.lockExpiry}
+              onConnect={wc.connectWallet}
+              onDisconnect={() => { wc.disconnect(); setSelectedAddress(null); setPanelOpen(false); }}
+              onSaveName={wc.savePlanetName}
+              onNameChange={wc.setNameInput}
+            />
+          </div>
+          {/* Toolbar always at very bottom */}
+          <HudToolbar
+            mobile
+            showAllNames={showAllNames}
+            onToggleLabels={() => setShowAllNames((v) => !v)}
+            showRenamedOnly={showRenamedOnly}
+            onToggleRenamed={() => setShowRenamedOnly((v) => !v)}
+            showDirectory={showNamesList}
+            onToggleDirectory={() => setShowNamesList((v) => !v)}
+            showHelp={showHelp}
+            onToggleHelp={() => setShowHelp((v) => !v)}
+            showOrbits={showOrbits}
+            onToggleOrbits={() => setShowOrbits((v) => !v)}
+            onReset={() => { setResetRequested(true); setSelectedAddress(null); setPanelOpen(false); }}
           />
-        )}
+        </div>
+      ) : (
+        /* ════ DESKTOP: right-side column ════ */
+        <div
+          style={{
+            position: "fixed",
+            right: 16,
+            top: 16,
+            zIndex: 20,
+            width: 280,
+            fontFamily:
+              "'JetBrains Mono', 'SF Mono', 'Fira Code', Menlo, monospace",
+            fontSize: 12,
+            color: "#8a9bb0",
+            display: "flex",
+            flexDirection: "column",
+            gap: 6,
+          }}
+        >
+          <HudToolbar
+            showAllNames={showAllNames}
+            onToggleLabels={() => setShowAllNames((v) => !v)}
+            showRenamedOnly={showRenamedOnly}
+            onToggleRenamed={() => setShowRenamedOnly((v) => !v)}
+            showDirectory={showNamesList}
+            onToggleDirectory={() => setShowNamesList((v) => !v)}
+            showHelp={showHelp}
+            onToggleHelp={() => setShowHelp((v) => !v)}
+            showOrbits={showOrbits}
+            onToggleOrbits={() => setShowOrbits((v) => !v)}
+            onReset={() => {
+              setResetRequested(true);
+              setSelectedAddress(null);
+              setPanelOpen(false);
+            }}
+          />
 
-        {showHelp && <HelpPanel />}
-      </div>
+          <WalletPanel
+            connectedAddress={wc.connectedAddress}
+            myWallet={wc.myWallet}
+            nameInput={wc.nameInput}
+            isSaving={wc.isSaving}
+            status={wc.status}
+            lockExpiry={wc.lockExpiry}
+            onConnect={wc.connectWallet}
+            onDisconnect={() => {
+              wc.disconnect();
+              setSelectedAddress(null);
+              setPanelOpen(false);
+            }}
+            onSaveName={wc.savePlanetName}
+            onNameChange={wc.setNameInput}
+          />
 
-      {/* ── Camera debug overlay ── */}
-      {camDebug && (
+          {showNamesList && (
+            <DirectoryPanel
+              solarData={solarData}
+              selectedAddress={selectedAddress}
+              onSelect={handleDirectorySelect}
+            />
+          )}
+
+          {showHelp && <HelpPanel />}
+        </div>
+      )}
+
+      {/* ── Camera debug overlay (desktop only) ── */}
+      {camDebug && !isMobile && (
         <div style={{
           position: "fixed", left: 16, bottom: 16, zIndex: 30,
           fontFamily: "'JetBrains Mono','SF Mono',monospace", fontSize: 10,
@@ -256,11 +314,11 @@ export default function SolarSystem() {
       <div
         style={{
           position: "fixed",
-          left: 16,
-          top: 16,
+          left: isMobile ? 8 : 16,
+          top: isMobile ? 8 : 16,
           zIndex: 20,
           fontFamily: "'JetBrains Mono', 'SF Mono', monospace",
-          fontSize: 11,
+          fontSize: isMobile ? 10 : 11,
           color: "#8a9bb0",
           display: "flex",
           flexDirection: "column",
@@ -271,18 +329,20 @@ export default function SolarSystem() {
           border: "1px solid rgba(0,229,255,0.12)",
           borderLeft: "2px solid rgba(0,229,255,0.4)",
           borderRadius: 4,
-          padding: "8px 12px",
+          padding: isMobile ? "5px 8px" : "8px 12px",
         }}
       >
         <div style={{ color: "#6a9aaa", fontSize: 9, letterSpacing: "0.18em", textTransform: "uppercase", marginBottom: 2 }}>
-          vescrow system alpha
+          vescrowα
         </div>
         {wallets.length > 0 && (
+          <div>
+            <span style={{ color: "#6a8090" }}>w </span>
+            <span style={{ color: "#8ab0c0" }}>{wallets.length.toLocaleString()}</span>
+          </div>
+        )}
+        {!isMobile && wallets.length > 0 && (
           <>
-            <div>
-              <span style={{ color: "#6a8090" }}>wallets </span>
-              <span style={{ color: "#8ab0c0" }}>{wallets.length.toLocaleString()}</span>
-            </div>
             <div>
               <span style={{ color: "#6a8090" }}>power   </span>
               <span style={{ color: "#00e5ff" }}>{totalVotingPower}</span>

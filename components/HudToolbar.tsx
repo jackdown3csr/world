@@ -33,6 +33,7 @@ interface HudToolbarProps {
   showOrbits: boolean;
   onToggleOrbits: () => void;
   onReset: () => void;
+  mobile?: boolean;
 }
 
 export default function HudToolbar({
@@ -47,43 +48,51 @@ export default function HudToolbar({
   showOrbits,
   onToggleOrbits,
   onReset,
+  mobile = false,
 }: HudToolbarProps) {
+  const btn = (active: boolean): React.CSSProperties => ({
+    ...hudBtn(active),
+    ...(mobile ? { padding: "10px 14px", fontSize: 12, minHeight: 44 } : {}),
+  });
+
   return (
     <div
       style={{
         background: "rgba(2, 6, 14, 0.88)",
         border: "1px solid rgba(0,229,255,0.12)",
-        borderLeft: "2px solid rgba(0,229,255,0.4)",
-        padding: "7px 10px",
+        borderLeft: mobile ? "none" : "2px solid rgba(0,229,255,0.4)",
+        borderTop: mobile ? "2px solid rgba(0,229,255,0.25)" : undefined,
+        padding: mobile ? "6px 8px" : "7px 10px",
         display: "flex",
         alignItems: "center",
         flexWrap: "wrap",
-        gap: 5,
+        gap: mobile ? 6 : 5,
+        justifyContent: mobile ? "space-evenly" : undefined,
       }}
     >
-      <button onClick={onToggleLabels} style={hudBtn(showAllNames)}>
+      <button onClick={onToggleLabels} style={btn(showAllNames)}>
         labels
       </button>
       <button
         onClick={onToggleRenamed}
         disabled={!showAllNames}
         style={{
-          ...hudBtn(showRenamedOnly && showAllNames),
+          ...btn(showRenamedOnly && showAllNames),
           ...(showAllNames ? {} : { opacity: 0.3, cursor: "not-allowed" }),
         }}
       >
         named
       </button>
-      <button onClick={onToggleDirectory} style={hudBtn(showDirectory)}>
+      <button onClick={onToggleDirectory} style={btn(showDirectory)}>
         dir
       </button>
-      <button onClick={onToggleOrbits} style={hudBtn(showOrbits)}>
+      <button onClick={onToggleOrbits} style={btn(showOrbits)}>
         orbit
       </button>
-      <button onClick={onToggleHelp} style={hudBtn(showHelp)}>
+      <button onClick={onToggleHelp} style={btn(showHelp)}>
         help
       </button>
-      <button onClick={onReset} title="Reset view" style={hudBtn(false)}>
+      <button onClick={onReset} title="Reset view" style={btn(false)}>
         rst
       </button>
     </div>

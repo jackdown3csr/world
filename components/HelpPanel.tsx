@@ -26,7 +26,7 @@ const s = {
   dim: { color: "#4a6278" },
 };
 
-export default function HelpPanel() {
+export default function HelpPanel({ mobile = false }: { mobile?: boolean }) {
   return (
     <div style={s.box}>
       <div style={{ ...s.h, marginTop: 0 }}>How it works</div>
@@ -69,10 +69,21 @@ export default function HelpPanel() {
 
       <div style={s.h}>Controls</div>
       <p style={{ margin: "4px 0" }}>
-        <span style={s.cyan}>Scroll</span> — zoom in/out<br />
-        <span style={s.cyan}>Drag</span> — rotate camera<br />
-        <span style={s.cyan}>Click</span> — select & fly to body<br />
-        <span style={s.cyan}>RST</span> — reset camera
+        {mobile ? (
+          <>
+            <span style={s.cyan}>Pinch</span> — zoom in/out<br />
+            <span style={s.cyan}>One finger</span> — rotate camera<br />
+            <span style={s.cyan}>Tap</span> — select &amp; fly to body<br />
+            <span style={s.cyan}>RST</span> — reset camera
+          </>
+        ) : (
+          <>
+            <span style={s.cyan}>Scroll</span> — zoom in/out<br />
+            <span style={s.cyan}>Drag</span> — rotate camera<br />
+            <span style={s.cyan}>Click</span> — select &amp; fly to body<br />
+            <span style={s.cyan}>RST</span> — reset camera
+          </>
+        )}
       </p>
 
       <div style={s.h}>HUD buttons</div>
