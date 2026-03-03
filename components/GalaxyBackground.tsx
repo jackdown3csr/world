@@ -144,6 +144,8 @@ const frag = /* glsl */ `
 `;
 
 export default function GalaxyBackground() {
+  const meshRef = React.useRef<THREE.Mesh>(null);
+
   const mat = useMemo(
     () =>
       new THREE.ShaderMaterial({
@@ -159,10 +161,17 @@ export default function GalaxyBackground() {
 
   useFrame((state) => {
     mat.uniforms.uTime.value = state.clock.elapsedTime;
+    // Follow camera so the sphere is always centred on it —
+    // the shader uses normalize(vDir) so the visual is purely directional,
+    // this just prevents the far-plane clipping the back face when the
+    // camera moves far from the world origin.
+    if (meshRef.current) {
+      meshRef.current.position.copy(state.camera.position);
+    }
   });
 
   return (
-    <mesh renderOrder={-1000}>
+    <mesh ref={meshRef} renderOrder={-1000}>
       <sphereGeometry args={[SKY_RADIUS, 64, 64]} />
       <primitive object={mat} attach="material" />
     </mesh>

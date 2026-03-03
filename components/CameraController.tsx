@@ -19,6 +19,13 @@ interface CameraControllerProps {
   selectionVersion: number;
   controlsRef: React.RefObject<OrbitControlsImpl | null>;
   onZoomChange?: (distance: number) => void;
+  onCameraDebug?: (info: {
+    pos: [number,number,number];
+    target: [number,number,number];
+    distTarget: number;
+    distOrigin: number;
+    tracking: string | null;
+  }) => void;
   resetRequested?: boolean;
   onResetDone?: () => void;
 }
@@ -87,6 +94,7 @@ export default function CameraController({
   selectionVersion,
   controlsRef,
   onZoomChange,
+  onCameraDebug,
   resetRequested,
   onResetDone,
 }: CameraControllerProps) {
@@ -123,6 +131,19 @@ export default function CameraController({
       }
     }
 
+    /* ── camera debug ── */
+    if (onCameraDebug) {
+      const p = camera.position;
+      const t = ctrl.target;
+      onCameraDebug({
+        pos: [p.x, p.y, p.z],
+        target: [t.x, t.y, t.z],
+        distTarget: p.distanceTo(t),
+        distOrigin: p.length(),
+        tracking: trackingAddr.current,
+      });
+    }
+
     /* ── stop tracking if selection was cleared ── */
     if (!selectedAddress && trackingAddr.current) {
       trackingAddr.current = null;
@@ -153,6 +174,9 @@ export default function CameraController({
           break;
         case "ring":
           dist = Math.max(body.bodyRadius * 12, 8);
+          break;
+        case "comet":
+          dist = 55;   // wide enough to see coma + tail base
           break;
         default:
           dist = Math.max(body.bodyRadius * 12, 8);

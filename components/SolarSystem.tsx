@@ -16,6 +16,7 @@ import OrbitRing from "./OrbitRing";
 import AsteroidBelt from "./AsteroidBelt";
 import GalaxyBackground from "./GalaxyBackground";
 import CameraController from "./CameraController";
+import Comet from "./Comet";
 import SplashScreen from "./SplashScreen";
 import HudToolbar from "./HudToolbar";
 import WalletPanel from "./WalletPanel";
@@ -42,7 +43,7 @@ export default function SolarSystem() {
     }
     return {
       totalVotingPower: formatBalance(vp.toString(), "veGNET"),
-      totalLocked: formatBalance(lk.toString(), "GNET locked"),
+      totalLocked: formatBalance(lk.toString(), "GNET"),
     };
   }, [wallets]);
 
@@ -68,6 +69,10 @@ export default function SolarSystem() {
   const [showOrbits, setShowOrbits] = useState(true);
   const [zoomLevel, setZoomLevel] = useState(1700);
   const [resetRequested, setResetRequested] = useState(false);
+
+  /* ── Camera debug ── */
+  interface CamDebug { pos: [number,number,number]; target: [number,number,number]; distTarget: number; distOrigin: number; tracking: string | null; }
+  const [camDebug, setCamDebug] = useState<CamDebug | null>(null);
 
   /* ── Camera ── */
   const controlsRef = useRef<OrbitControlsImpl>(null);
@@ -105,6 +110,7 @@ export default function SolarSystem() {
       >
         <ambientLight intensity={0.06} />
         <GalaxyBackground />
+        <Comet onSelect={handleSceneSelect} />
         <Sun totalVotingPower={showAllNames ? totalVotingPower : undefined} totalLocked={showAllNames ? totalLocked : undefined} />
 
         {solarData.planets.map((p) => (
@@ -159,6 +165,7 @@ export default function SolarSystem() {
           selectionVersion={selectionVersion}
           controlsRef={controlsRef}
           onZoomChange={setZoomLevel}
+          onCameraDebug={setCamDebug}
           resetRequested={resetRequested}
           onResetDone={() => setResetRequested(false)}
         />
@@ -226,6 +233,24 @@ export default function SolarSystem() {
 
         {showHelp && <HelpPanel />}
       </div>
+
+      {/* ── Camera debug overlay ── */}
+      {camDebug && (
+        <div style={{
+          position: "fixed", left: 16, bottom: 16, zIndex: 30,
+          fontFamily: "'JetBrains Mono','SF Mono',monospace", fontSize: 10,
+          color: "#8af", pointerEvents: "none",
+          background: "rgba(0,0,0,0.80)", border: "1px solid rgba(100,180,255,0.25)",
+          borderRadius: 4, padding: "7px 11px", display: "flex", flexDirection: "column", gap: 2,
+        }}>
+          <div style={{ color: "#5af", fontSize: 9, letterSpacing: "0.18em", marginBottom: 3 }}>CAMERA DEBUG</div>
+          <div><span style={{color:"#5af"}}>pos    </span>{camDebug.pos.map(v=>v.toFixed(1)).join("  ")}</div>
+          <div><span style={{color:"#5af"}}>target </span>{camDebug.target.map(v=>v.toFixed(1)).join("  ")}</div>
+          <div><span style={{color:"#5af"}}>d-tgt  </span><span style={{color:"#ff9"}}>{camDebug.distTarget.toFixed(2)}</span></div>
+          <div><span style={{color:"#5af"}}>d-orig </span><span style={{color:"#fa5"}}>{camDebug.distOrigin.toFixed(1)}</span></div>
+          <div><span style={{color:"#5af"}}>track  </span><span style={{color:camDebug.tracking?"#5f5":"#555"}}>{camDebug.tracking ? camDebug.tracking.slice(0,10)+"…" : "none"}</span></div>
+        </div>
+      )}
 
       {/* ── Top-left stats overlay ── */}
       <div
