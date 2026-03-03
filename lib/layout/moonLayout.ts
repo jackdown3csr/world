@@ -89,7 +89,7 @@ export function buildMoonList(
       initialAngle: frac(mw.address, 11) * Math.PI * 2,
       hue:          frac(mw.address, 22),
       seed:         frac(mw.address, 33),
-      tilt:         0,
+      tilt:         (frac(mw.address, 44) - 0.5) * 0.25,
       moonType:     (Math.floor(frac(mw.address, 66) * 6) % 6) as 0 | 1 | 2 | 3 | 4 | 5,
     };
   });
