@@ -214,8 +214,8 @@ async function main() {
         const lockEnd: bigint = lockedResult[1];       // uint256 → BigInt
         const vp: bigint = votingPower as bigint;
 
-        // Skip addresses with zero locked and zero voting power
-        if (lockedAmount <= 0n && vp <= 0n) {
+        // Skip addresses with zero voting power
+        if (vp <= 0n) {
           checked++;
           return;
         }
@@ -256,9 +256,9 @@ async function main() {
     QUERY_CONCURRENCY,
   );
 
-  /* ─ Sort by locked amount descending ──────────────────── */
+  /* ─ Sort by voting power descending ───────────────────── */
   wallets.sort((a, b) => {
-    const diff = BigInt(b.lockedGnet) - BigInt(a.lockedGnet);
+    const diff = BigInt(b.votingPower) - BigInt(a.votingPower);
     return diff > 0n ? 1 : diff < 0n ? -1 : 0;
   });
 
