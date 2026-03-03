@@ -8,7 +8,7 @@ const s = {
     border: "1px solid rgba(0,229,255,0.12)",
     borderLeft: "2px solid rgba(0,229,255,0.25)",
     padding: "12px 14px",
-    maxHeight: 340,
+    maxHeight: 480,
     overflowY: "auto" as const,
     fontSize: 10,
     lineHeight: 1.7,
@@ -81,6 +81,7 @@ export default function HelpPanel({ mobile = false }: { mobile?: boolean }) {
             <span style={s.cyan}>Scroll</span> — zoom in/out<br />
             <span style={s.cyan}>Drag</span> — rotate camera<br />
             <span style={s.cyan}>Click</span> — select &amp; fly to body<br />
+            <span style={s.cyan}>Shift+click</span> — inspect raw contract storage slot<br />
             <span style={s.cyan}>RST</span> — reset camera
           </>
         )}
@@ -91,7 +92,24 @@ export default function HelpPanel({ mobile = false }: { mobile?: boolean }) {
         <span style={s.cyan}>LABELS</span> — show all wallet labels<br />
         <span style={s.cyan}>NAMED</span> — show only renamed wallets<br />
         <span style={s.cyan}>DIR</span> — open wallet directory<br />
+        <span style={s.cyan}>ORBIT</span> — toggle orbit rings<br />
+        <span style={s.cyan}>TRAILS</span> — toggle orbit history trails<br />
         <span style={s.cyan}>HELP</span> — this panel
+      </p>
+
+      <div style={s.h}>Visual indicators</div>
+      <p style={{ margin: "4px 0" }}>
+        <span style={{ color: "#ff4422" }}>Red pulse</span> — lock expires in &lt;30 days<br />
+        <span style={{ color: "#f08822" }}>Amber pulse</span> — lock expires in 30–90 days<br />
+        <span style={s.cyan}>blk N</span> — latest block from chain (stats overlay)<br />
+        Sun flashes briefly each new block
+      </p>
+
+      <div style={s.h}>Easter eggs</div>
+      <p style={{ margin: "4px 0" }}>
+        <span style={s.cyan}>CASCOPEA</span> — a comet drifting through the system<br />
+        <span style={{ color: "#5a3535" }}>Something else</span>{" "}
+        <span style={s.dim}>wanders the outer field…</span>
       </p>
     </div>
   );

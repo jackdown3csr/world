@@ -1,120 +1,37 @@
-# Galactica World
+# vescrow · world
 
-Visualize wallet addresses from the **Galactica Cassiopeia testnet** (chain 843843) as procedurally placed "cities" on an interactive 3D globe.
+An interactive 3D solar system that visualises all wallets locked in the **Galactica veGNET VotingEscrow** contract. Every locker becomes a celestial body — rank and type determined purely by on-chain voting power.
 
-![stack](https://img.shields.io/badge/Next.js_14-black?logo=next.js) ![three](https://img.shields.io/badge/three.js-black?logo=three.js) ![upstash](https://img.shields.io/badge/Upstash_Redis-teal)
-
----
-
-## Quick start
-
-### 1. Install dependencies
-
-```bash
-npm install
-```
-
-### 2. Set up Upstash Redis
-
-The easiest path on Vercel:
-
-1. Open your Vercel project → **Storage** tab → **Create Database** → **Upstash Redis**.
-2. Vercel automatically injects `UPSTASH_REDIS_REST_URL` and `UPSTASH_REDIS_REST_TOKEN` into your environment.
-
-For local development, copy the values into `.env.local`:
-
-```bash
-cp .env.example .env.local
-# Edit .env.local with your Upstash credentials
-```
-
-### 3. Seed initial wallet data
-
-Pick a block range on Galactica Cassiopeia and run the scanner in **seed mode**:
-
-```bash
-# Windows (PowerShell)
-$env:SEED="true"; $env:START_BLOCK="1"; $env:END_BLOCK="5000"; npx tsx scripts/scan-and-update.ts
-
-# macOS / Linux
-SEED=true START_BLOCK=1 END_BLOCK=5000 npx tsx scripts/scan-and-update.ts
-
-# Or use the npm script (reads env from .env.local / shell)
-npm run scan:seed
-```
-
-This scans blocks, discovers addresses, fetches balances, and writes `wallets:payload` to Redis.
-
-### 4. Run the app
-
-```bash
-npm run dev
-```
-
-Open [http://localhost:3000](http://localhost:3000) — you should see the dark globe with glowing city towers.
-
-### 5. Incremental scanning
-
-After seeding, run the scanner in **incremental mode** to pick up new blocks:
-
-```bash
-npm run scan
-```
-
-This reads `scanner:lastProcessedBlock` from Redis, scans forward up to `MAX_BLOCKS_PER_RUN` blocks, and merges any newly funded wallets into the payload. Run it on a cron (e.g. every 5 min) to keep data fresh.
+![Next.js](https://img.shields.io/badge/Next.js_14-black?logo=next.js) ![Three.js](https://img.shields.io/badge/Three.js-black?logo=three.js) ![R3F](https://img.shields.io/badge/React_Three_Fiber-black) ![Upstash](https://img.shields.io/badge/Upstash_Redis-teal)
 
 ---
 
-## How polling works
+## What you see
 
-- The frontend fetches `GET /api/wallets` on page load and every 30 s (configurable via `NEXT_PUBLIC_POLL_INTERVAL_MS`).
-- The API response includes an `updatedAt` timestamp (unix ms).
-- When `updatedAt` changes, the frontend updates its wallet state, and city sizes animate smoothly from old → new scales using per-frame lerp in the `useFrame` loop.
-- Instance ordering is stable (wallets sorted by checksummed address) so indices don't shuffle between updates.
+| Body | Who |
+|---|---|
+| **Gas Giant** | Rank 1–4 by veGNET |
+| **Ice Giant** | Rank 5–8 |
+| **Terrestrial** | Rank 9–14 |
+| **Rocky / Mars** | Rank 15–20 |
+| **Moon** | Rank 21–60, orbit their host planet |
+| **Ring particle** | Rank 61–190, form Saturn's rings around rank #1 |
+| **Asteroid** | Rank 191+, outer belt |
 
-## Deploy to Vercel
-
-1. Push to GitHub.
-2. Import the repo in Vercel.
-3. Add **Upstash Redis** from the Storage tab (auto-injects env vars).
-4. Deploy — done.
-
-The API route (`app/api/wallets/route.ts`) only reads Redis. It never calls the blockchain RPC, so it's fast and safe for serverless.
+Voting power = `locked GNET × remaining lock time` — longer lock → higher rank, not just more tokens.
 
 ---
 
-## Architecture
+## Features
 
-```
-Browser                  Vercel                    Upstash Redis
-  │                        │                            │
-  │  GET /api/wallets      │                            │
-  │───────────────────────>│  redis.get(wallets:payload) │
-  │                        │───────────────────────────>│
-  │  { updatedAt, wallets }│<───────────────────────────│
-  │<───────────────────────│                            │
-  │                        │                            │
-  │  3D Globe renders      │                            │
-  │  cities from wallets   │                            │
-
-Local machine (scanner)                    Galactica RPC
-  │                                             │
-  │  getBlock(n, true)                          │
-  │────────────────────────────────────────────>│
-  │  getBalance(address)                        │
-  │────────────────────────────────────────────>│
-  │                                             │
-  │  redis.set(wallets:payload, ...)            │
-  │────────────────────────────> Upstash Redis  │
-```
-
-## Limitations
-
-- **Local-only scanning** — the scanner runs on your machine, not on Vercel. You need to run it manually or via cron.
-- **RPC rate limits** — the public Galactica RPC may throttle requests. Large seed ranges (>10 k blocks) can take a while. The scanner adds retries and concurrency limits to mitigate.
-- **No balance refresh** — incremental mode only fetches balances for *newly discovered* addresses. Existing wallets keep their balance from the last scan. A full re-seed updates everyone.
-- **Max 5,000 cities** — the instanced mesh caps at 5,000 for performance. If more wallets exist, only the first 5,000 (sorted by address) are shown.
-
-## License
-
-MIT
+- Procedural GLSL shaders per planet type (gas giant, ice giant, terrestrial, rocky, Mars)
+- Saturn ring system with moon transits casting real shadow on planet surface
+- Orbit rings, toggleable **orbit trails** showing recent path history
+- **Lock expiry warning** — planets with locks expiring soon pulse red/amber
+- **Comet CASCOPEA** — a 67P-shaped bilobed nucleus drifting through the system
+- **Solar wind** particle stream from the sun
+- **Live block clock** — block number from chain appears in stats overlay; Sun flashes each new block
+- **Shift+click** any planet to inspect raw vEscrow contract storage slot data
+- **Wallet connection** via MetaMask — name your own planet, see your position
+- **Directory panel** — searchable list of all named wallets
+- Mobile-responsive layout
