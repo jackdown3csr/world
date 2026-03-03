@@ -34,7 +34,7 @@ export const MOON_FIRST_GAP   = 3.0;   // gap between planet surface and first m
 export const MOON_SURFACE_GAP = 1.8;   // gap between moon orbit and moon surface
 
 export const BASE_MOON_SPEED       = 0.08;
-export const MAX_MOONS_PER_PLANET  = 3;
+export const MAX_MOONS_PER_PLANET  = 6;
 
 /* ── Saturn ring layout ───────────────────────────────────── */
 /** Outer edge of Saturn ring = planet radius × this (must match RING_OUTER_MULT in WalletRing.tsx) */
