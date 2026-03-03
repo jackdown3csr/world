@@ -149,8 +149,8 @@ export default function AsteroidBelt({
   }, [asteroids, variantGroups]);
 
   /* ── Slow belt rotation ─────────────────────────────────── */
-  useFrame((_, delta) => {
-    if (groupRef.current) groupRef.current.rotation.y += 0.002 * delta;
+  useFrame((state) => {
+    if (groupRef.current) groupRef.current.rotation.y = 0.002 * state.clock.elapsedTime;
   });
 
   /* ── Event handlers (per variant) ───────────────────────── */

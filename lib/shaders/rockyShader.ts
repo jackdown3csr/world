@@ -11,10 +11,15 @@ import { PLANET_NOISE } from "./planetNoise";
 const HEIGHT_FN = /* glsl */ `
   float typeHeight(vec3 p, vec3 seed3, float seed) {
     float h = 0.0;
-    h += craters(p, seed, 0.30, 4) * 0.5;
-    float ridge = 1.0 - abs(snoise(p * 4.0 + seed3));
-    h += ridge * ridge * 0.4;
-    h += fbm(p * 3.0 + seed3) * 0.25;
+    // Large-scale terrain variation
+    h += fbm(p * 2.5 + seed3) * 0.35;
+    // Medium craters — gentler than before
+    h += craters(p, seed, 0.25, 4) * 0.30;
+    // Subtle ridge lines (not the dominant feature)
+    float ridge = 1.0 - abs(snoise(p * 3.5 + seed3));
+    h += ridge * ridge * 0.12;
+    // Fine detail noise
+    h += snoise(p * 8.0 + seed3.yzx) * 0.08;
     return h;
   }
 `;
@@ -37,7 +42,7 @@ export const VERT = /* glsl */ `
     float h    = typeHeight(p, seed3, uSeed);
     float rad  = length(position);
 
-    vec3 displaced = position + normal * h * rad * 0.06;
+    vec3 displaced = position + normal * h * rad * 0.025;
 
     vPos       = position;
     vec4 wp    = modelMatrix * vec4(displaced, 1.0);
@@ -76,7 +81,7 @@ export const FRAG = /* glsl */ `
     float hx   = typeHeight(normalize(p + vec3(eps,0.,0.)), seed3, uSeed);
     float hy   = typeHeight(normalize(p + vec3(0.,eps,0.)), seed3, uSeed);
     vec3 grad  = vec3(hx-h0, hy-h0, 0.) / eps;
-    vec3 bumpN = normalize(vWorldNorm + grad * 2.0);
+    vec3 bumpN = normalize(vWorldNorm + grad * 0.9);
 
     float NdotL_raw = dot(bumpN, lightDir);
     float day       = smoothstep(-0.03, 0.03, NdotL_raw);
@@ -129,16 +134,21 @@ export const FRAG = /* glsl */ `
 
     // ── Specular ─────────────────────────────────────────
     vec3 halfV = normalize(lightDir+viewDir);
-    float spec = pow(max(dot(bumpN,halfV),0.), 8.0);
-    color += vec3(1.,0.97,0.88) * spec * 0.12 * day;
+    float spec = pow(max(dot(bumpN,halfV),0.), 16.0);
+    color += vec3(1.,0.97,0.88) * spec * 0.05 * day;
 
     // ── Atmosphere Fresnel rim ───────────────────────────
-    vec3  atmosCol = hsv(vec3(0.05+uHue*0.05, 0.25, 0.75));
-    float atmosStr = 0.05;
-    float vdn      = max(dot(bumpN,viewDir),0.);
-    float fres     = pow(1.-vdn, 3.5);
-    float hazeStr  = pow(1.-vdn, 1.2) * smoothstep(-0.3,0.6,dot(vWorldNorm,lightDir));
-    color += atmosCol*(fres*0.9+hazeStr*0.35)*atmosStr;
+    // Rocky worlds: very thin — only visible on sunlit side
+    vec3  atmosCol  = hsv(vec3(0.05+uHue*0.05, 0.25, 0.75));
+    float atmosStr  = 0.05;
+    float vdn       = max(dot(bumpN, viewDir), 0.);
+    float sunFacing = smoothstep(-0.1, 0.3, dot(vWorldNorm, lightDir));
+    float fres      = pow(1.-vdn, 3.5) * sunFacing;
+    float hazeStr   = pow(1.-vdn, 1.2) * smoothstep(0.0, 0.6, dot(vWorldNorm, lightDir));
+    color += atmosCol * (fres*0.9 + hazeStr*0.35) * atmosStr;
+
+    // ── Ambient floor so night side isn't pure black ─────
+    color += albedo * 0.008;
 
     // ── Gamma ────────────────────────────────────────────
     color = pow(max(color,vec3(0.001)), vec3(1./2.2));

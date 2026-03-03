@@ -127,13 +127,27 @@ const FRAG = /* glsl */ `
     // Subtle per-seed tint
     col += vec3(uSeed * 0.04, uSeed * 0.02, -uSeed * 0.03);
 
-    // ── Simple sun-facing illumination ──
-    // Sun is at origin; ring position is vWorldPos; normal is ring-plane normal
-    // The ring geometry is rotated to XZ, so local normal is (0,1,0) after rotation.
-    // For a flat disc we just darken the back-facing side slightly.
-    vec3 sunDir = normalize(-vWorldPos);
-    float lit = 0.55 + 0.45 * abs(sunDir.y);  // both sides lit, back slightly darker
+    // ── Illumination + forward scattering ──
+    // Sun is at origin; ring lives at vWorldPos
+    vec3 sunDir  = normalize(-vWorldPos);
+    vec3 viewDir = normalize(cameraPosition - vWorldPos);
+
+    // Basic diffuse — both sides lit, back slightly dimmer
+    float lit = 0.55 + 0.45 * abs(sunDir.y);
     col *= lit;
+
+    // Forward-scatter: when the viewer looks *through* the ring toward the
+    // sun, translucent ice grains scatter light forward (Henyey-Greenstein
+    // approximation).  cosTheta ≈ 1 means sun is behind ring from viewer.
+    float cosTheta = dot(viewDir, sunDir);
+    float g  = 0.75;                     // asymmetry parameter (strong forward peak)
+    float g2 = g * g;
+    float hg = (1.0 - g2) / pow(1.0 + g2 - 2.0 * g * cosTheta, 1.5);
+    // Normalise so hg≈1 at perpendicular, peaks when backlit
+    hg = hg / ((1.0 - g2) / pow(1.0 + g2, 1.5));
+    // Thin rings scatter more; dense B-ring scatters less
+    float scatterStrength = mix(0.8, 0.15, density);
+    col += col * scatterStrength * (hg - 1.0) * 0.60;
 
     // ── Edge fade ──
     float edge = smoothstep(0.0, 0.015, t) * smoothstep(1.0, 0.985, t);

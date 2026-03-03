@@ -17,13 +17,13 @@ export const RING_END_RANK = 190;   // ranks 61–190 → ring particles
 export const SIZE_RANGES: Record<PlanetType, [number, number]> = {
   gas_giant:   [9.0, 14.0],
   ice_giant:   [4.5, 7.0],
-  terrestrial: [2.5, 4.5],
-  rocky:       [1.4, 2.5],
+  terrestrial: [3.0, 5.0],
+  rocky:       [2.2, 3.2],
 };
 
 /* ── Planet orbits ────────────────────────────────────────── */
 export const FIRST_ORBIT = SUN_RADIUS * 2.8;   // ~224 units
-export const SURFACE_GAP = 24.0;
+export const SURFACE_GAP = 40.0;
 
 export const BASE_PLANET_SPEED = 0.012;
 

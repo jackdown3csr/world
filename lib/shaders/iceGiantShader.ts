@@ -120,12 +120,16 @@ export const FRAG = /* glsl */ `
     color += aCol * aurora;
 
     // ── Atmosphere Fresnel rim ───────────────────────────
-    vec3  atmosCol = hsv(vec3(hB+0.02, 0.72, 0.94));
-    float atmosStr = 0.65;
-    float vdn      = max(dot(bumpN,viewDir),0.);
-    float fres     = pow(1.-vdn, 3.5);
-    float hazeStr  = pow(1.-vdn, 1.2) * smoothstep(-0.3,0.6,dot(vWorldNorm,lightDir));
-    color += atmosCol*(fres*0.9+hazeStr*0.35)*atmosStr;
+    vec3  atmosCol  = hsv(vec3(hB+0.02, 0.72, 0.94));
+    float atmosStr  = 0.65;
+    float vdn       = max(dot(bumpN, viewDir), 0.);
+    float sunFacing = smoothstep(-0.15, 0.35, dot(vWorldNorm, lightDir));
+    float fres      = pow(1.-vdn, 3.5) * sunFacing;
+    float hazeStr   = pow(1.-vdn, 1.2) * smoothstep(0.0, 0.6, dot(vWorldNorm, lightDir));
+    color += atmosCol * (fres*0.9 + hazeStr*0.35) * atmosStr;
+
+    // ── Ambient floor ────────────────────────────────────
+    color += albedo * 0.010;
 
     // ── Gamma ────────────────────────────────────────────
     color = pow(max(color,vec3(0.001)), vec3(1./2.2));

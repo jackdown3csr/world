@@ -48,27 +48,26 @@ const SHARED_GLSL = /* glsl */ `
     float h = 0.0;
 
     if (moonType < 0.5) {
-      // ── CRATERED: deep basins + highland ridges + small craters ──
-      h += fbm(p * 3.5 + seed3) * 0.3;
-      h += craters(p, seed, 0.20, 6) * 0.6;
-      h += craters(p, seed + 3.0, 0.08, 6) * 0.25;
-      // Ridged mountains: sharp peaks from folded noise
+      // ── CRATERED: gentle basins + highland ridges + small craters ──
+      h += fbm(p * 3.5 + seed3) * 0.25;
+      h += craters(p, seed, 0.20, 6) * 0.35;
+      h += craters(p, seed + 3.0, 0.08, 6) * 0.15;
       float ridge = 1.0 - abs(snoise(p * 5.0 + seed3));
-      h += ridge * ridge * 0.35;
+      h += ridge * ridge * 0.15;
     }
     else if (moonType < 1.5) {
-      // ── ICY: smooth plains with sharp crack trenches ──
-      h += fbm(p * 2.0 + seed3) * 0.15;
+      // ── ICY: smooth plains with subtle crack trenches ──
+      h += fbm(p * 2.0 + seed3) * 0.12;
       float crack = abs(fbm(p * 12.0 + seed3 * 2.0));
-      h -= smoothstep(0.04, 0.0, crack) * 0.6;        // deep cracks
-      h += smoothstep(0.08, 0.04, crack) * 0.3;        // ridge walls
-      h += craters(p, seed + 10.0, 0.10, 3) * 0.2;
+      h -= smoothstep(0.04, 0.0, crack) * 0.30;
+      h += smoothstep(0.08, 0.04, crack) * 0.15;
+      h += craters(p, seed + 10.0, 0.10, 3) * 0.12;
     }
     else if (moonType < 2.5) {
       // ── VOLCANIC: calderas + volcanic peaks ──
-      h += fbm(p * 2.0 + seed3) * 0.25;
+      h += fbm(p * 2.0 + seed3) * 0.20;
       float peak = 1.0 - abs(snoise(p * 3.0 + seed3.yzx));
-      h += pow(peak, 3.0) * 0.8;                       // sharp peaks
+      h += pow(peak, 3.0) * 0.35;
       for (int i = 0; i < 4; i++) {
         float fi = float(i);
         vec3 hotspot = normalize(vec3(
@@ -77,24 +76,24 @@ const SHARED_GLSL = /* glsl */ `
           sin(seed * 78.9  + fi * 34.5)
         ));
         float d = acos(clamp(dot(p, hotspot), -1.0, 1.0));
-        h -= smoothstep(0.18, 0.02, d) * 0.7;          // caldera pit
-        h += smoothstep(0.22, 0.18, d) * 0.3;          // rim
+        h -= smoothstep(0.18, 0.02, d) * 0.35;
+        h += smoothstep(0.22, 0.18, d) * 0.15;
       }
     }
     else if (moonType < 3.5) {
-      // ── DUSTY: ancient, multi-scale heavy cratering ──
-      h += craters(p, seed, 0.22, 6) * 0.55;
-      h += craters(p, seed + 5.0, 0.10, 6) * 0.3;
-      h += craters(p, seed + 10.0, 0.05, 6) * 0.15;
-      h += fbm(p * 2.8 + seed3) * 0.2;
+      // ── DUSTY: ancient, multi-scale cratering ──
+      h += craters(p, seed, 0.22, 6) * 0.30;
+      h += craters(p, seed + 5.0, 0.10, 6) * 0.18;
+      h += craters(p, seed + 10.0, 0.05, 6) * 0.10;
+      h += fbm(p * 2.8 + seed3) * 0.18;
     }
     else if (moonType < 4.5) {
-      // ── METALLIC: crystalline ridges + angular plateaus ──
+      // ── METALLIC: subtle angular plateaus ──
       float facets = snoise(p * 4.0 + seed3);
-      h += abs(facets) * 0.5;                           // angular plateaus
+      h += abs(facets) * 0.25;
       float ridge1 = 1.0 - abs(snoise(p * 7.0 + seed3.zyx));
-      h += pow(ridge1, 4.0) * 0.6;                     // sharp crystal ridges
-      h += fbm(p * 6.0 + seed3) * 0.15;
+      h += pow(ridge1, 4.0) * 0.25;
+      h += fbm(p * 6.0 + seed3) * 0.12;
     }
     else {
       // ── HAZE: nearly smooth, gentle undulations ──
@@ -125,12 +124,12 @@ const VERT = /* glsl */ `
 
     // Per-type displacement amplitude
     float dispScale;
-    if      (uMoonType < 0.5) dispScale = 0.12;   // cratered — deep basins
-    else if (uMoonType < 1.5) dispScale = 0.05;   // icy — crack ridges only
-    else if (uMoonType < 2.5) dispScale = 0.10;   // volcanic — calderas + peaks
-    else if (uMoonType < 3.5) dispScale = 0.10;   // dusty — pitted
-    else if (uMoonType < 4.5) dispScale = 0.08;   // metallic — angular
-    else                       dispScale = 0.025;  // haze — nearly smooth
+    if      (uMoonType < 0.5) dispScale = 0.045;  // cratered — visible basins
+    else if (uMoonType < 1.5) dispScale = 0.025;  // icy — subtle crack ridges
+    else if (uMoonType < 2.5) dispScale = 0.040;  // volcanic — calderas + peaks
+    else if (uMoonType < 3.5) dispScale = 0.040;  // dusty — pitted
+    else if (uMoonType < 4.5) dispScale = 0.035;  // metallic — angular
+    else                       dispScale = 0.015;  // haze — nearly smooth
 
     vec3 displaced = position + normal * h * radius * dispScale;
 
@@ -147,6 +146,8 @@ const FRAG = /* glsl */ `
   uniform float uHue;        // 0–1 per-wallet colour shift
   uniform float uSeed;       // 0–1 per-wallet noise seed
   uniform float uTime;
+  uniform vec3  uHostPos;    // planet world position (for shadow)
+  uniform float uHostRadius; // planet radius (0 = no shadow)
 
   varying vec3 vPos;
   varying vec3 vWorldPos;
@@ -177,12 +178,12 @@ const FRAG = /* glsl */ `
 
     // Strong bump for rocky types, mild for atmospheric
     float bumpStr;
-    if      (uMoonType < 0.5) bumpStr = 2.5;   // cratered
-    else if (uMoonType < 1.5) bumpStr = 1.5;   // icy
-    else if (uMoonType < 2.5) bumpStr = 2.2;   // volcanic
-    else if (uMoonType < 3.5) bumpStr = 2.5;   // dusty
-    else if (uMoonType < 4.5) bumpStr = 2.0;   // metallic
-    else                       bumpStr = 0.5;   // haze
+    if      (uMoonType < 0.5) bumpStr = 1.2;   // cratered
+    else if (uMoonType < 1.5) bumpStr = 0.8;   // icy
+    else if (uMoonType < 2.5) bumpStr = 1.0;   // volcanic
+    else if (uMoonType < 3.5) bumpStr = 1.2;   // dusty
+    else if (uMoonType < 4.5) bumpStr = 1.0;   // metallic
+    else                       bumpStr = 0.3;   // haze
 
     vec3 bumpN = normalize(vWorldNorm + grad * bumpStr);
 
@@ -373,14 +374,41 @@ const FRAG = /* glsl */ `
     }
 
     // ── Atmosphere / fresnel rim ──────────────────────────
-    float vdn  = max(dot(bumpN, viewDir), 0.0);
-    float fres = pow(1.0 - vdn, 3.5);
+    float vdn      = max(dot(bumpN, viewDir), 0.0);
+    float fres     = pow(1.0 - vdn, 3.5);
+    float sunFace  = smoothstep(-0.1, 0.3, dot(bumpN, lightDir));
     if (rimStr > 0.0) {
-      color += rimCol * fres * rimStr;
+      color += rimCol * fres * rimStr * sunFace;
     }
     // Subtle edge darkening for all types
     float edgeDark = pow(1.0 - vdn, 2.0) * 0.08;
     color = mix(color, vec3(0.0), edgeDark);
+
+    // ── Shadow from host planet ───────────────────────────
+    // Ray from fragment toward sun (origin); check if planet sphere blocks the light.
+    if (uHostRadius > 0.0) {
+      vec3 toSun = normalize(-vWorldPos);
+      vec3 oc    = vWorldPos - uHostPos;
+      float b    = dot(oc, toSun);
+      float c    = dot(oc, oc) - uHostRadius * uHostRadius;
+      float disc = b * b - c;
+      if (disc > 0.0) {
+        float sqrtDisc = sqrt(disc);
+        float t1 = -b - sqrtDisc;
+        // t1 > small eps means planet is ahead of us toward sun → in shadow
+        if (t1 > 0.01) {
+          // Soft penumbra: angular radius of planet from fragment vs angular offset
+          float distToHost = length(oc);
+          float angularR   = uHostRadius / distToHost;
+          // How far off-axis are we from the shadow cylinder center?
+          // Project oc onto plane perpendicular to toSun → offset
+          vec3  onAxis = toSun * dot(oc, toSun);
+          float offset = length(oc - onAxis) / distToHost;
+          float penumbra = smoothstep(angularR * 1.15, angularR * 0.7, offset);
+          color *= mix(1.0, 0.06, penumbra);
+        }
+      }
+    }
 
     // ── Gamma ─────────────────────────────────────────────
     color = pow(max(color, vec3(0.001)), vec3(1.0 / 2.2));
@@ -398,10 +426,12 @@ export function createMoonMaterial(
     vertexShader: VERT,
     fragmentShader: FRAG,
     uniforms: {
-      uMoonType: { value: moonType },
-      uHue:      { value: hue },
-      uSeed:     { value: seed },
-      uTime:     { value: 0 },
+      uMoonType:   { value: moonType },
+      uHue:        { value: hue },
+      uSeed:       { value: seed },
+      uTime:       { value: 0 },
+      uHostPos:    { value: new THREE.Vector3() },
+      uHostRadius: { value: 0.0 },
     },
   });
 }

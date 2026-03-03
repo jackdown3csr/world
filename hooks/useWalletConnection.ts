@@ -4,6 +4,23 @@ import { useState, useCallback } from "react";
 import { BrowserProvider } from "ethers";
 import type { WalletEntry } from "@/lib/types";
 
+/* ── Prefer MetaMask when several wallet extensions coexist ──── */
+function getPreferredProvider(): Record<string, unknown> | null {
+  const win = window as Window & { ethereum?: Record<string, unknown> };
+  let eth = win.ethereum;
+  if (!eth) return null;
+
+  // EIP-5749: providers array (Coinbase + MetaMask etc.)
+  const providers = eth.providers as Record<string, unknown>[] | undefined;
+  if (Array.isArray(providers)) {
+    eth = providers.find((p) => p.isMetaMask) ?? eth;
+  } else if (!eth.isMetaMask && eth.providerMap) {
+    const map = eth.providerMap as Map<string, unknown>;
+    if (map instanceof Map) eth = (map.get("MetaMask") as Record<string, unknown>) ?? eth;
+  }
+  return eth;
+}
+
 export interface WalletConnectionState {
   connectedAddress: string | null;
   nameInput: string;
@@ -51,9 +68,9 @@ export function useWalletConnection(
 
   const connectWallet = useCallback(async () => {
     try {
-      const eth = (window as Window & { ethereum?: unknown }).ethereum;
+      const eth = getPreferredProvider();
       if (!eth) {
-        setStatus("No wallet found (install MetaMask or Rabby).");
+        setStatus("No wallet found — install MetaMask.");
         return;
       }
       const provider = new BrowserProvider(eth as never);
@@ -102,7 +119,7 @@ export function useWalletConnection(
         throw new Error(nonceData?.error || "Failed to fetch nonce");
       }
 
-      const eth = (window as Window & { ethereum?: unknown }).ethereum;
+      const eth = getPreferredProvider();
       if (!eth) throw new Error("Wallet provider missing");
       const provider = new BrowserProvider(eth as never);
       const signer = await provider.getSigner();

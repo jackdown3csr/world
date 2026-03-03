@@ -36,20 +36,20 @@ export default function PlanetWallet({ data, selected, panelOpen, onSelect, onDe
     [data.planetType, data.hue, data.seed, data.ringWallets.length],
   );
 
-  // Atmosphere glow shell — skip for rocky and for planets with wallet rings (Saturn)
-  const atmosMaterial = useMemo(() => {
+  // ── Outer rim-glow shell (BackSide) — all non-rocky, non-Saturn planets ──
+  const atmosRimMat = useMemo(() => {
     if (data.planetType === "rocky") return null;
-    if (data.ringWallets.length > 0) return null;  // Saturn has its own disc
+    if (data.ringWallets.length > 0) return null;
     const colorMap: Record<string, THREE.Color> = {
       gas_giant:   new THREE.Color(0.75, 0.65, 0.50),
       ice_giant:   new THREE.Color(0.45, 0.75, 1.0),
-      terrestrial: new THREE.Color(0.40, 0.65, 1.0),
+      terrestrial: new THREE.Color(0.30, 0.58, 1.0),
     };
     const intensityMap: Record<string, number> = {
-      gas_giant: 0.25, ice_giant: 0.50, terrestrial: 0.45,
+      gas_giant: 0.25, ice_giant: 0.50, terrestrial: 0.55,
     };
     const falloffMap: Record<string, number> = {
-      gas_giant: 5.5, ice_giant: 4.5, terrestrial: 4.0,
+      gas_giant: 5.5, ice_giant: 4.5, terrestrial: 3.8,
     };
     return new THREE.ShaderMaterial({
       vertexShader: /* glsl */ `
@@ -69,11 +69,12 @@ export default function PlanetWallet({ data, selected, panelOpen, onSelect, onDe
         varying vec3 vNorm;
         varying vec3 vWorldPos;
         void main() {
-          vec3 viewDir = normalize(cameraPosition - vWorldPos);
-          float rim = 1.0 - max(dot(vNorm, viewDir), 0.0);
-          float glow = pow(rim, uFalloff) * uIntensity;
-          // Fade out the very outermost edge to avoid a hard ring
-          float edgeFade = smoothstep(1.0, 0.7, rim);
+          vec3 viewDir  = normalize(cameraPosition - vWorldPos);
+          vec3 sunDir   = normalize(-vWorldPos);
+          float sunFace = smoothstep(-0.1, 0.35, dot(vNorm, sunDir));
+          float rim  = 1.0 - max(dot(vNorm, viewDir), 0.0);
+          float glow = pow(rim, uFalloff) * uIntensity * sunFace;
+          float edgeFade = smoothstep(1.0, 0.72, rim);
           glow *= edgeFade;
           gl_FragColor = vec4(uColor * glow, glow);
         }
@@ -90,11 +91,75 @@ export default function PlanetWallet({ data, selected, panelOpen, onSelect, onDe
     });
   }, [data.planetType, data.ringWallets.length]);
 
-  useFrame((state, delta) => {
-    if (orbitRef.current) orbitRef.current.rotation.y += data.orbitSpeed * delta;
-    if (meshRef.current)  meshRef.current.rotation.y  += 0.04 * delta;
+  // ── Inner Rayleigh haze shell (FrontSide) — terrestrial planets only ──
+  // Simulates the visible semi-transparent atmosphere layer above the surface.
+  const atmosHazeMat = useMemo(() => {
+    if (data.planetType !== "terrestrial") return null;
+    if (data.ringWallets.length > 0) return null;
+    return new THREE.ShaderMaterial({
+      vertexShader: /* glsl */ `
+        varying vec3 vNorm;
+        varying vec3 vWorldPos;
+        void main() {
+          vNorm = normalize(mat3(modelMatrix) * normal);
+          vec4 wp = modelMatrix * vec4(position, 1.0);
+          vWorldPos = wp.xyz;
+          gl_Position = projectionMatrix * viewMatrix * wp;
+        }
+      `,
+      fragmentShader: /* glsl */ `
+        uniform vec3  uColorLow;   // horizon colour
+        uniform vec3  uColorHigh;  // zenith colour (from camera pov)
+        uniform float uHue;
+        varying vec3  vNorm;
+        varying vec3  vWorldPos;
+
+        void main() {
+          vec3 viewDir = normalize(cameraPosition - vWorldPos);
+          vec3 sunDir  = normalize(-vWorldPos);
+          float NdotS  = dot(vNorm, sunDir);
+
+          // sunFacing: 1 on day side, 0 on night, smooth terminator
+          float sunFacing = smoothstep(-0.15, 0.3, NdotS);
+
+          // Fresnel: 0 face-on, 1 at grazing edge
+          float fresnel = 1.0 - max(dot(vNorm, viewDir), 0.0);
+
+          // Rayleigh scattering at limb
+          float rayleigh = pow(fresnel, 2.2);
+
+          // Haze alpha — day side only
+          float alpha = (rayleigh * 0.38 + fresnel * fresnel * fresnel * 0.24) * sunFacing;
+
+          // Colour gradient
+          vec3 col = mix(uColorHigh, uColorLow, pow(fresnel, 1.5));
+
+          // Day-side warm tint near terminator
+          float sunDot = max(NdotS, 0.0);
+          col += vec3(0.06, 0.05, 0.02) * sunDot * (1.0 - fresnel);
+          alpha += sunDot * 0.06 * (1.0 - fresnel * fresnel);
+
+          gl_FragColor = vec4(col, clamp(alpha, 0.0, 0.55));
+        }
+      `,
+      uniforms: {
+        uColorLow:  { value: new THREE.Color(0.22, 0.52, 1.0) },   // limb — deep blue
+        uColorHigh: { value: new THREE.Color(0.55, 0.78, 1.0) },   // zenith — azure
+        uHue:       { value: data.hue },
+      },
+      transparent: true,
+      side: THREE.FrontSide,
+      depthWrite: false,
+      blending: THREE.AdditiveBlending,
+    });
+  }, [data.planetType, data.ringWallets.length, data.hue]);
+
+  useFrame((state) => {
+    const t = state.clock.elapsedTime;
+    if (orbitRef.current) orbitRef.current.rotation.y = data.initialAngle + data.orbitSpeed * t;
+    if (meshRef.current)  meshRef.current.rotation.y  = 0.04 * t;
     // Animate clouds / bands
-    material.uniforms.uTime.value = state.clock.elapsedTime;
+    material.uniforms.uTime.value = t;
   });
 
   const onPointerEnter = useCallback((e: ThreeEvent<PointerEvent>) => {
@@ -109,7 +174,7 @@ export default function PlanetWallet({ data, selected, panelOpen, onSelect, onDe
 
   return (
     <group rotation={[data.tilt, 0, 0]}>
-      <group ref={orbitRef} rotation-y={data.initialAngle}>
+      <group ref={orbitRef}>
 
         {/* Planet sphere */}
         <mesh
@@ -124,11 +189,19 @@ export default function PlanetWallet({ data, selected, panelOpen, onSelect, onDe
           <primitive object={material} attach="material" />
         </mesh>
 
-        {/* Atmosphere glow shell */}
-        {atmosMaterial && (
+        {/* Inner Rayleigh haze — terrestrial only (semi-transparent atmosphere above surface) */}
+        {atmosHazeMat && (
           <mesh position={[data.orbitRadius, 0, 0]}>
-            <sphereGeometry args={[data.radius * 1.03, 48, 48]} />
-            <primitive object={atmosMaterial} attach="material" />
+            <sphereGeometry args={[data.radius * 1.018, 64, 64]} />
+            <primitive object={atmosHazeMat} attach="material" />
+          </mesh>
+        )}
+
+        {/* Outer rim glow — all non-rocky non-Saturn planets */}
+        {atmosRimMat && (
+          <mesh position={[data.orbitRadius, 0, 0]}>
+            <sphereGeometry args={[data.radius * 1.06, 48, 48]} />
+            <primitive object={atmosRimMat} attach="material" />
           </mesh>
         )}
 
@@ -192,6 +265,7 @@ export default function PlanetWallet({ data, selected, panelOpen, onSelect, onDe
             key={moon.wallet.address + i}
             data={moon}
             planetOrbit={data.orbitRadius}
+            hostRadius={data.radius}
             selected={selectedAddress?.toLowerCase() === moon.wallet.address.toLowerCase()}
             panelOpen={panelOpen}
             onSelect={() => onSelectAddress(moon.wallet.address)}

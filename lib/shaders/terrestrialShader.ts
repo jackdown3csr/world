@@ -138,15 +138,20 @@ export const FRAG = /* glsl */ `
     color += aCol * aurora;
 
     // ── Atmosphere Fresnel rim ───────────────────────────
-    vec3  atmosCol = hsv(vec3(0.59+uHue*0.03, 0.60, 0.98));
-    float atmosStr = 0.55;
-    float vdn      = max(dot(bumpN,viewDir),0.);
-    float fres     = pow(1.-vdn, 3.5);
-    float hazeStr  = pow(1.-vdn, 1.2) * smoothstep(-0.3,0.6,dot(vWorldNorm,lightDir));
-    color += atmosCol*(fres*0.9+hazeStr*0.35)*atmosStr;
+    // Only visible on the lit side — multiply by sunFacing so night stays dark
+    vec3  atmosCol  = hsv(vec3(0.59+uHue*0.03, 0.60, 0.98));
+    float atmosStr  = 0.55;
+    float vdn       = max(dot(bumpN, viewDir), 0.);
+    float sunFacing = smoothstep(-0.25, 0.35, dot(vWorldNorm, lightDir));
+    float fres      = pow(1.-vdn, 3.5) * sunFacing;
+    float hazeStr   = pow(1.-vdn, 1.2) * smoothstep(0.0, 0.6, dot(vWorldNorm, lightDir));
+    color += atmosCol * (fres*0.9 + hazeStr*0.35) * atmosStr;
+
+    // ── Ambient floor: very faint so night side isn't pure black ──
+    color += albedo * 0.012;
 
     // ── Gamma ────────────────────────────────────────────
-    color = pow(max(color,vec3(0.001)), vec3(1./2.2));
+    color = pow(max(color, vec3(0.001)), vec3(1./2.2));
     gl_FragColor = vec4(color, 1.0);
   }
 `;

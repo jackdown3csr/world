@@ -119,9 +119,13 @@ export default function SaturnSystem({
 
   /* ── Refs ── */
   const ringGroupRef  = useRef<THREE.Group>(null);       // slow rotation for ring + particles
+  const hostGroupRef  = useRef<THREE.Group>(null);       // for tracking planet world position (shadow)
   const moonOrbitRefs = useRef<(THREE.Group | null)[]>([]); // per-moon orbit group
   const moonMeshRefs  = useRef<(THREE.Mesh | null)[]>([]);  // per-moon mesh (self-rotation)
   const rockMeshRefs  = useRef<(THREE.InstancedMesh | null)[]>([]);
+
+  /** Reusable vector for world-pos extraction */
+  const hostWorldPos = useMemo(() => new THREE.Vector3(), []);
 
   /* ── Hover / selection state ── */
   const [hoveredRingIdx, setHoveredRingIdx]   = useState(-1);
@@ -190,21 +194,27 @@ export default function SaturnSystem({
   const LABEL_DIST = 35;
 
   /* ── Animation frame ── */
-  useFrame((state, delta) => {
+  useFrame((state) => {
+    const t = state.clock.elapsedTime;
     // Ring disc + particles: slow rotation
-    if (ringGroupRef.current) ringGroupRef.current.rotation.y += 0.008 * delta;
+    if (ringGroupRef.current) ringGroupRef.current.rotation.y = 0.008 * t;
 
     // Moon orbits + self-rotation
     moons.forEach((moon, i) => {
       const orbitGrp = moonOrbitRefs.current[i];
-      if (orbitGrp) orbitGrp.rotation.y += moon.orbitSpeed * delta;
+      if (orbitGrp) orbitGrp.rotation.y = moon.initialAngle + moon.orbitSpeed * t;
       const mesh = moonMeshRefs.current[i];
-      if (mesh) mesh.rotation.y += 0.06 * delta;
+      if (mesh) mesh.rotation.y = moon.seed * 6.28 + 0.06 * t;
     });
 
-    // Moon materials time
+    // Moon materials time + host shadow uniforms
+    if (hostGroupRef.current) {
+      hostGroupRef.current.getWorldPosition(hostWorldPos);
+    }
     moonMaterials.forEach(mat => {
       mat.uniforms.uTime.value = state.clock.elapsedTime;
+      mat.uniforms.uHostPos.value.copy(hostWorldPos);
+      mat.uniforms.uHostRadius.value = hostR;
     });
 
     // Ring disc time
@@ -275,6 +285,9 @@ export default function SaturnSystem({
   return (
     /* Single axial tilt for the entire ring + moon system */
     <group rotation={[SATURN_AXIAL_TILT, 0, 0]}>
+
+      {/* Invisible anchor at planet center — used to extract world position for shadow */}
+      <group ref={hostGroupRef} />
 
       {/* ═══════════════  RING DISC + PARTICLES  ═══════════════ */}
       <group ref={ringGroupRef}>
@@ -377,7 +390,6 @@ export default function SaturnSystem({
           <group
             key={moon.wallet.address + i}
             ref={el => { moonOrbitRefs.current[i] = el; }}
-            rotation-y={moon.initialAngle}
           >
             <mesh
               ref={el => { moonMeshRefs.current[i] = el; }}

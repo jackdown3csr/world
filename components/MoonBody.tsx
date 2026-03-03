@@ -12,6 +12,7 @@ import WalletTooltip from "./WalletTooltip";
 interface MoonBodyProps {
   data:        MoonData;
   planetOrbit: number;   // parent planet orbit radius from sun
+  hostRadius:  number;   // parent planet body radius (for shadow)
   selected:    boolean;
   panelOpen?:  boolean;
   onSelect:    () => void;
@@ -20,10 +21,14 @@ interface MoonBodyProps {
   showRenamedOnly?: boolean;
 }
 
-export default function MoonBody({ data, planetOrbit, selected, panelOpen, onSelect, onDeselect, showLabel, showRenamedOnly }: MoonBodyProps) {
+export default function MoonBody({ data, planetOrbit, hostRadius, selected, panelOpen, onSelect, onDeselect, showLabel, showRenamedOnly }: MoonBodyProps) {
+  const hostGroupRef = useRef<THREE.Group>(null);
   const moonOrbitRef = useRef<THREE.Group>(null);
   const meshRef      = useRef<THREE.Mesh>(null);
   const [hovered, setHovered] = useState(false);
+
+  // Reusable vector for world-pos extraction
+  const hostWorldPos = useMemo(() => new THREE.Vector3(), []);
 
   // Each moon gets its own procedural type (icy, volcanic, cratered, etc.)
   const material = useMemo(
@@ -31,12 +36,20 @@ export default function MoonBody({ data, planetOrbit, selected, panelOpen, onSel
     [data.moonType, data.hue, data.seed],
   );
 
-  useFrame((state, delta) => {
+  useFrame((state) => {
+    const t = state.clock.elapsedTime;
     if (moonOrbitRef.current)
-      moonOrbitRef.current.rotation.y += data.orbitSpeed * delta;
+      moonOrbitRef.current.rotation.y = data.initialAngle + data.orbitSpeed * t;
     if (meshRef.current)
-      meshRef.current.rotation.y += 0.06 * delta;
-    material.uniforms.uTime.value = state.clock.elapsedTime;
+      meshRef.current.rotation.y = data.seed * 6.28 + 0.06 * t;
+    material.uniforms.uTime.value = t;
+
+    // Track host planet world position for shadow casting
+    if (hostGroupRef.current) {
+      hostGroupRef.current.getWorldPosition(hostWorldPos);
+      material.uniforms.uHostPos.value.copy(hostWorldPos);
+      material.uniforms.uHostRadius.value = hostRadius;
+    }
   });
 
   const onPointerEnter = useCallback((e: ThreeEvent<PointerEvent>) => {
@@ -51,8 +64,8 @@ export default function MoonBody({ data, planetOrbit, selected, panelOpen, onSel
 
   return (
     /* Moon orbit centre is at the host planet position */
-    <group position={[planetOrbit, 0, 0]} rotation={[data.tilt, 0, 0]}>
-      <group ref={moonOrbitRef} rotation-y={data.initialAngle}>
+    <group ref={hostGroupRef} position={[planetOrbit, 0, 0]} rotation={[data.tilt, 0, 0]}>
+      <group ref={moonOrbitRef}>
         <mesh
           ref={meshRef}
           position={[data.orbitRadius, 0, 0]}
