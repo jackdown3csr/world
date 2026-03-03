@@ -115,7 +115,7 @@ export default function SolarSystem() {
       >
         <ambientLight intensity={0.06} />
         <GalaxyBackground />
-        <Comet onSelect={handleSceneSelect} />
+        <Comet onSelect={handleSceneSelect} showLabel={showAllNames} />
         <Sun totalVotingPower={showAllNames ? totalVotingPower : undefined} totalLocked={showAllNames ? totalLocked : undefined} />
 
         {solarData.planets.map((p) => (
@@ -292,23 +292,7 @@ export default function SolarSystem() {
         </div>
       )}
 
-      {/* ── Camera debug overlay (desktop only) ── */}
-      {camDebug && !isMobile && (
-        <div style={{
-          position: "fixed", left: 16, bottom: 16, zIndex: 30,
-          fontFamily: "'JetBrains Mono','SF Mono',monospace", fontSize: 10,
-          color: "#8af", pointerEvents: "none",
-          background: "rgba(0,0,0,0.80)", border: "1px solid rgba(100,180,255,0.25)",
-          borderRadius: 4, padding: "7px 11px", display: "flex", flexDirection: "column", gap: 2,
-        }}>
-          <div style={{ color: "#5af", fontSize: 9, letterSpacing: "0.18em", marginBottom: 3 }}>CAMERA DEBUG</div>
-          <div><span style={{color:"#5af"}}>pos    </span>{camDebug.pos.map(v=>v.toFixed(1)).join("  ")}</div>
-          <div><span style={{color:"#5af"}}>target </span>{camDebug.target.map(v=>v.toFixed(1)).join("  ")}</div>
-          <div><span style={{color:"#5af"}}>d-tgt  </span><span style={{color:"#ff9"}}>{camDebug.distTarget.toFixed(2)}</span></div>
-          <div><span style={{color:"#5af"}}>d-orig </span><span style={{color:"#fa5"}}>{camDebug.distOrigin.toFixed(1)}</span></div>
-          <div><span style={{color:"#5af"}}>track  </span><span style={{color:camDebug.tracking?"#5f5":"#555"}}>{camDebug.tracking ? camDebug.tracking.slice(0,10)+"…" : "none"}</span></div>
-        </div>
-      )}
+      {/* Camera debug overlay hidden */}
 
       {/* ── Top-left stats overlay ── */}
       <div

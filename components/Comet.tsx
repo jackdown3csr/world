@@ -70,20 +70,68 @@ function getOrbitalState(t: number, outPos: THREE.Vector3, outVel: THREE.Vector3
   ).normalize();
 }
 
-// ── Nucleus shader ────────────────────────────────────────────────────
+// ── Nucleus shader (irregular potato-shape via vertex displacement) ───
 const NUCLEUS_VERT = /* glsl */`
+  uniform vec3 uSunDir;
   varying vec3 vNormal;
   varying vec3 vPos;
+  varying vec3 vDisplacedPos;
+
+  // Hash & value noise
+  float h13(vec3 p){p=fract(p*0.1031);p+=dot(p,p.zyx+31.32);return fract((p.x+p.y)*p.z);}
+  float vn(vec3 p){
+    vec3 i=floor(p),f=fract(p);f=f*f*(3.-2.*f);
+    return mix(mix(mix(h13(i),h13(i+vec3(1,0,0)),f.x),mix(h13(i+vec3(0,1,0)),h13(i+vec3(1,1,0)),f.x),f.y),
+               mix(mix(h13(i+vec3(0,0,1)),h13(i+vec3(1,0,1)),f.x),mix(h13(i+vec3(0,1,1)),h13(i+vec3(1,1,1)),f.x),f.y),f.z);
+  }
+  float fbm3(vec3 p){
+    return vn(p)*0.55 + vn(p*2.03 + 1.7)*0.28 + vn(p*4.01 + 3.1)*0.17;
+  }
+
+  // Displacement function — lumpy bilobed potato
+  float displace(vec3 n) {
+    // Base lumpiness — low-freq lobes
+    float lump  = fbm3(n * 1.4 + 0.5) * 0.45;
+    // Medium bumps & ridges
+    float ridge = fbm3(n * 3.2 + 7.3) * 0.20;
+    // Bilobed concavity (67P-style neck between two lobes)
+    float neck  = 1.0 - smoothstep(0.15, 0.55, abs(n.y - 0.05));
+    float pinch = neck * 0.30;
+    // Deep concavity / pit on one side
+    float pit = smoothstep(0.80, 0.98, dot(n, normalize(vec3(0.5,-0.3,0.7))));
+    // Crag outcrops
+    float crag = max(0.0, vn(n * 6.0 + 2.1) - 0.55) * 0.5;
+    return lump + ridge + crag - pinch - pit * 0.25;
+  }
+
   void main() {
-    vNormal = normalize(normalMatrix * normal);
-    vPos    = position;
-    gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+    vec3 n = normalize(normal);
+    vec3 p = normalize(position);
+    float disp = displace(p);
+    // Displace vertex along normal
+    vec3 displaced = position + n * (disp - 0.25) * 0.55;
+
+    // Compute displaced normal via finite differences
+    float eps = 0.015;
+    vec3 t1 = normalize(abs(n.y) < 0.99 ? cross(n, vec3(0,1,0)) : cross(n, vec3(1,0,0)));
+    vec3 t2 = cross(n, t1);
+    float d0 = displace(normalize(p + t1 * eps));
+    float d1 = displace(normalize(p - t1 * eps));
+    float d2 = displace(normalize(p + t2 * eps));
+    float d3 = displace(normalize(p - t2 * eps));
+    vec3 dispN = normalize(n + t1 * (d0-d1) * 8.0 + t2 * (d2-d3) * 8.0);
+
+    vNormal = normalize(normalMatrix * dispN);
+    vPos    = p;
+    vDisplacedPos = displaced;
+    gl_Position = projectionMatrix * modelViewMatrix * vec4(displaced, 1.0);
   }
 `;
 const NUCLEUS_FRAG = /* glsl */`
   uniform vec3 uSunDir;
   varying vec3 vNormal;
   varying vec3 vPos;
+  varying vec3 vDisplacedPos;
 
   float h13(vec3 p){p=fract(p*0.1031);p+=dot(p,p.zyx+31.32);return fract((p.x+p.y)*p.z);}
   float vn(vec3 p){
@@ -96,41 +144,36 @@ const NUCLEUS_FRAG = /* glsl */`
     vec3 n = normalize(vNormal);
     vec3 p = normalize(vPos);
 
-    // Dark charcoal base (real comets are very dark, ~4% albedo)
-    float rough = vn(p*4.2)*0.5 + vn(p*9.7)*0.35 + vn(p*20.0)*0.15;
-    vec3 base = mix(vec3(0.025,0.025,0.030), vec3(0.11,0.10,0.08), rough);
+    // Very dark charcoal base (~4% albedo like real comets)
+    float rough = vn(p*4.2)*0.50 + vn(p*9.7)*0.30 + vn(p*22.0)*0.20;
+    vec3 base = mix(vec3(0.020,0.020,0.025), vec3(0.09,0.085,0.07), rough);
 
-    // Ice patches — bright blue-white sublimating surface
-    float ice = smoothstep(0.60,0.70, vn(p*3.1+0.7))
-              + smoothstep(0.64,0.72, vn(p*5.8+2.3)) * 0.5;
+    // Fine surface dust / regolith variation
+    float dust = vn(p*14.0 + 5.3) * 0.12;
+    base += vec3(0.06,0.05,0.03) * dust;
+
+    // Ice patches — bright blue-white sublimating areas
+    float ice = smoothstep(0.58,0.68, vn(p*3.1+0.7))
+              + smoothstep(0.62,0.70, vn(p*5.8+2.3)) * 0.5;
     ice = clamp(ice, 0.0, 1.0);
-    base = mix(base, vec3(0.80,0.88,0.98), ice * 0.75);
+    base = mix(base, vec3(0.75,0.85,0.95), ice * 0.70);
 
     // Diffuse (sun)
     float NdotL = max(dot(n, uSunDir), 0.0);
-    vec3 color  = base * (NdotL * 0.95 + 0.015);
+    // Slightly warm terminator
+    float wrap = max(dot(n, uSunDir) * 0.5 + 0.5, 0.0);
+    vec3 color = base * (NdotL * 0.85 + wrap * 0.08 + 0.015);
 
     // Active jets / outgassing on sunlit face
-    float jet = smoothstep(0.58,0.92, vn(p*7.3)) * smoothstep(0.0,0.3, dot(n,uSunDir));
-    color += vec3(0.35,0.60,0.45) * jet * (1.0-ice) * 0.20;
+    float jet = smoothstep(0.55,0.90, vn(p*7.3)) * smoothstep(0.0,0.3, dot(n,uSunDir));
+    color += vec3(0.30,0.55,0.40) * jet * (1.0-ice) * 0.18;
+
+    // Subtle rim light
+    float rim = pow(1.0 - max(dot(n, uSunDir), 0.0), 3.0) * 0.04;
+    color += vec3(0.4,0.5,0.7) * rim;
 
     color = pow(max(color, vec3(0.0)), vec3(1.0/2.2));
     gl_FragColor = vec4(color, 1.0);
-  }
-`;
-
-// ── Coma shader ───────────────────────────────────────────────────────
-const COMA_VERT = /* glsl */`
-  varying vec3 vP;
-  void main() { vP = position; gl_Position = projectionMatrix * modelViewMatrix * vec4(position,1.0); }
-`;
-const COMA_FRAG = /* glsl */`
-  varying vec3 vP;
-  void main() {
-    float d = length(vP); // 0=centre, ≤1 inside sphere
-    float a = pow(1.0 - clamp(d, 0.0, 1.0), 2.2) * 0.50;
-    vec3 col = mix(vec3(0.65,0.85,1.0), vec3(0.95,0.97,0.75), d * 0.6);
-    gl_FragColor = vec4(col, a);
   }
 `;
 
@@ -143,7 +186,7 @@ const TAIL_VERT = /* glsl */`
     vAlpha = aAlpha;
     vec4 mv = modelViewMatrix * vec4(position, 1.0);
     gl_Position  = projectionMatrix * mv;
-    gl_PointSize = aSize * (250.0 / -mv.z);
+    gl_PointSize = max(aSize * (800.0 / -mv.z), 1.5);
   }
 `;
 const ION_FRAG = /* glsl */`
@@ -165,22 +208,34 @@ const DUST_FRAG = /* glsl */`
   }
 `;
 
-const ION_N  = 320;
-const DUST_N = 220;
-const NUCLEUS_R = 1.8;
-const COMA_R    = 13;
-const TAIL_VIS_DIST = 580;   // beyond this solar distance the tail fades out
+const SPRAY_FRAG = /* glsl */`
+  varying float vAlpha;
+  void main() {
+    float d = length(gl_PointCoord - 0.5);
+    if (d > 0.5) discard;
+    float a = pow(1.0 - d*2.0, 1.5) * vAlpha;
+    gl_FragColor = vec4(0.78, 0.91, 1.0, a);
+  }
+`;
+
+const ION_N   = 400;
+const DUST_N  = 280;
+const SPRAY_N = 120;
+const NUCLEUS_R    = 1.8;
+const TAIL_VIS_DIST = 800;   // tail starts fading beyond this distance
+const TAIL_MIN     = 0.15;   // minimum tail strength (always faintly visible)
 
 /** Seeded pseudo-random (deterministic, no Math.random) */
 function sr(s: number): number { const x = Math.sin(s * 127.1 + 311.7) * 43758.5; return x - Math.floor(x); }
 
 export const COMET_ADDRESS = "cascopea";
 
-export default function Comet({ onSelect }: { onSelect?: (addr: string) => void }) {
-  const groupRef  = useRef<THREE.Group>(null);
-  const nucMatRef = useRef<THREE.ShaderMaterial | null>(null);
-  const ionGeoRef  = useRef<THREE.BufferGeometry>(null!);
-  const dustGeoRef = useRef<THREE.BufferGeometry>(null!);
+export default function Comet({ onSelect, showLabel = true }: { onSelect?: (addr: string) => void; showLabel?: boolean }) {
+  const groupRef    = useRef<THREE.Group>(null);
+  const nucMatRef   = useRef<THREE.ShaderMaterial | null>(null);
+  const ionGeoRef   = useRef<THREE.BufferGeometry>(null!);
+  const dustGeoRef  = useRef<THREE.BufferGeometry>(null!);
+  const sprayGeoRef = useRef<THREE.BufferGeometry>(null!);
 
   // ── Nucleus mat ──
   const nucleusMat = useMemo(() => {
@@ -192,13 +247,6 @@ export default function Comet({ onSelect }: { onSelect?: (addr: string) => void 
     return m;
   }, []);
 
-  // ── Coma mat ──
-  const comaMat = useMemo(() => new THREE.ShaderMaterial({
-    vertexShader: COMA_VERT, fragmentShader: COMA_FRAG,
-    transparent: true, depthWrite: false, side: THREE.FrontSide,
-    blending: THREE.AdditiveBlending,
-  }), []);
-
   // ── Ion tail mat ──
   const ionMat = useMemo(() => new THREE.ShaderMaterial({
     vertexShader: TAIL_VERT, fragmentShader: ION_FRAG,
@@ -208,6 +256,12 @@ export default function Comet({ onSelect }: { onSelect?: (addr: string) => void 
   // ── Dust tail mat ──
   const dustMat = useMemo(() => new THREE.ShaderMaterial({
     vertexShader: TAIL_VERT, fragmentShader: DUST_FRAG,
+    transparent: true, depthWrite: false, blending: THREE.AdditiveBlending,
+  }), []);
+
+  // ── Spray/jet mat (inner coma particles) ──
+  const sprayMat = useMemo(() => new THREE.ShaderMaterial({
+    vertexShader: TAIL_VERT, fragmentShader: SPRAY_FRAG,
     transparent: true, depthWrite: false, blending: THREE.AdditiveBlending,
   }), []);
 
@@ -227,6 +281,21 @@ export default function Comet({ onSelect }: { onSelect?: (addr: string) => void 
     sz:    sr(i * 0.4 + 0.2),
   })), []);
 
+  // ── Spray/jet seeds (outgassing from surface, drifting anti-sunward) ──
+  const spraySeeds = useMemo(() => Array.from({ length: SPRAY_N }, (_, i) => {
+    const theta = sr(i * 2.1 + 0.3) * Math.PI * 2;
+    const phi   = Math.acos(2 * sr(i * 1.7 + 0.9) - 1);
+    return {
+      dx:      Math.sin(phi) * Math.cos(theta),
+      dy:      Math.sin(phi) * Math.sin(theta),
+      dz:      Math.cos(phi),
+      t:       sr(i * 3.3 + 0.1),
+      sz:      0.3 + sr(i * 0.8 + 0.5) * 0.5,
+      speed:   0.04 + sr(i * 1.5 + 0.2) * 0.08,   // slow drift
+      sunHeat: 0.4 + sr(i * 2.5 + 0.7) * 0.6,
+    };
+  }), []);
+
   // ── Ion geometry ──
   const ionGeo = useMemo(() => {
     const g = new THREE.BufferGeometry();
@@ -244,6 +313,16 @@ export default function Comet({ onSelect }: { onSelect?: (addr: string) => void 
     g.setAttribute("aAlpha",   new THREE.BufferAttribute(new Float32Array(DUST_N),     1).setUsage(THREE.DynamicDrawUsage));
     g.setAttribute("aSize",    new THREE.BufferAttribute(new Float32Array(DUST_N),     1).setUsage(THREE.DynamicDrawUsage));
     dustGeoRef.current = g;
+    return g;
+  }, []);
+
+  // ── Spray geometry ──
+  const sprayGeo = useMemo(() => {
+    const g = new THREE.BufferGeometry();
+    g.setAttribute("position", new THREE.BufferAttribute(new Float32Array(SPRAY_N * 3), 3).setUsage(THREE.DynamicDrawUsage));
+    g.setAttribute("aAlpha",   new THREE.BufferAttribute(new Float32Array(SPRAY_N),     1).setUsage(THREE.DynamicDrawUsage));
+    g.setAttribute("aSize",    new THREE.BufferAttribute(new Float32Array(SPRAY_N),     1).setUsage(THREE.DynamicDrawUsage));
+    sprayGeoRef.current = g;
     return g;
   }, []);
 
@@ -277,9 +356,9 @@ export default function Comet({ onSelect }: { onSelect?: (addr: string) => void 
     _up.crossVectors(_rt, _anti).normalize();
 
     // Tail length & brightness scale with proximity to sun
-    const proximity  = Math.pow(Math.max(0, 1 - dist / TAIL_VIS_DIST), 1.3);
-    const ionLength  = 45  + proximity * 240;
-    const dustLength = 35  + proximity * 170;
+    const proximity  = Math.max(TAIL_MIN, Math.pow(Math.max(0, 1 - dist / TAIL_VIS_DIST), 0.7));
+    const ionLength  = 60  + proximity * 300;
+    const dustLength = 45  + proximity * 200;
 
     // ── Ion tail ──
     const iPos = ionGeoRef.current.attributes.position as THREE.BufferAttribute;
@@ -293,8 +372,8 @@ export default function Comet({ onSelect }: { onSelect?: (addr: string) => void 
       const cy = _rt.y * Math.cos(s.ang) + _up.y * Math.sin(s.ang);
       const cz = _rt.z * Math.cos(s.ang) + _up.z * Math.sin(s.ang);
       iPos.setXYZ(i, _anti.x * d + cx * cr, _anti.y * d + cy * cr, _anti.z * d + cz * cr);
-      iAlp.setX(i,  (1.0 - s.t * 0.85) * 0.40 * proximity);
-      iSz.setX(i,   (0.4 + s.sz * 0.7 + (1 - s.t) * 0.9) * Math.max(proximity, 0.1));
+      iAlp.setX(i,  (1.0 - s.t * 0.75) * 0.65 * proximity);
+      iSz.setX(i,   (1.2 + s.sz * 1.5 + (1 - s.t) * 2.0) * proximity);
     }
     iPos.needsUpdate = true; iAlp.needsUpdate = true; iSz.needsUpdate = true;
 
@@ -316,10 +395,36 @@ export default function Comet({ onSelect }: { onSelect?: (addr: string) => void 
         _anti.y * d + cy * cr + _vel.y * bc,
         _anti.z * d + cz * cr + _vel.z * bc,
       );
-      dAlp.setX(i,  (1.0 - s.t * 0.75) * 0.32 * proximity);
-      dSz.setX(i,   (0.5 + s.sz * 0.8 + (1 - s.t) * 0.7) * Math.max(proximity, 0.1));
+      dAlp.setX(i,  (1.0 - s.t * 0.65) * 0.50 * proximity);
+      dSz.setX(i,   (1.5 + s.sz * 1.8 + (1 - s.t) * 1.6) * proximity);
     }
     dPos.needsUpdate = true; dAlp.needsUpdate = true; dSz.needsUpdate = true;
+
+    // ── Spray / jet particles (outgassing, drifting tailward) ──
+    const sPos = sprayGeoRef.current.attributes.position as THREE.BufferAttribute;
+    const sAlp = sprayGeoRef.current.attributes.aAlpha   as THREE.BufferAttribute;
+    const sSz  = sprayGeoRef.current.attributes.aSize    as THREE.BufferAttribute;
+    const JET_LEN = 12;    // tight coma, stays close to nucleus
+    // sunDir = -_anti (toward sun), used to bias which jets are active
+    const sunX = -_anti.x, sunY = -_anti.y, sunZ = -_anti.z;
+    for (let i = 0; i < SPRAY_N; i++) {
+      const s = spraySeeds[i];
+      const sunFacing = s.dx * sunX + s.dy * sunY + s.dz * sunZ;
+      const activity  = Math.max(0.1, sunFacing * s.sunHeat + (1 - s.sunHeat) * 0.35);
+      const at = ((s.t + t * s.speed) % 1);
+      const d  = NUCLEUS_R + at * JET_LEN;
+      // Gentle tailward drift as particle ages
+      const drift = at * at * 4.0;
+      sPos.setXYZ(i,
+        s.dx * d + _anti.x * drift,
+        s.dy * d + _anti.y * drift,
+        s.dz * d + _anti.z * drift,
+      );
+      const fadeout = Math.pow(1.0 - at, 1.8);    // steep fade, bright only near nucleus
+      sAlp.setX(i, fadeout * activity * 0.30 * proximity);
+      sSz.setX(i,  (s.sz * 2.0 + fadeout * 2.5) * Math.max(proximity, 0.3));
+    }
+    sPos.needsUpdate = true; sAlp.needsUpdate = true; sSz.needsUpdate = true;
   });
 
   return (
@@ -329,24 +434,22 @@ export default function Comet({ onSelect }: { onSelect?: (addr: string) => void 
         userData={{ walletAddress: COMET_ADDRESS, bodyRadius: NUCLEUS_R, bodyType: "comet" }}
         onClick={(e) => { e.stopPropagation(); onSelect?.(COMET_ADDRESS); }}
       >
-        <sphereGeometry args={[NUCLEUS_R, 24, 18]} />
+        <sphereGeometry args={[NUCLEUS_R, 64, 48]} />
         <primitive object={nucleusMat} attach="material" />
       </mesh>
 
-      {/* Coma glow */}
-      <mesh>
-        <sphereGeometry args={[COMA_R, 20, 16]} />
-        <primitive object={comaMat} attach="material" />
-      </mesh>
+      {/* Spray / jet particles — active outgassing */}
+      <points geometry={sprayGeo} material={sprayMat} frustumCulled={false} />
 
       {/* Ion tail — straight, blue-white */}
-      <points geometry={ionGeo} material={ionMat} />
+      <points geometry={ionGeo} material={ionMat} frustumCulled={false} />
 
       {/* Dust tail — curved, golden */}
-      <points geometry={dustGeo} material={dustMat} />
+      <points geometry={dustGeo} material={dustMat} frustumCulled={false} />
 
       {/* Label */}
-      <Html position={[0, COMA_R + 4, 0]} center style={{ pointerEvents: "none", whiteSpace: "nowrap" }}>
+      {showLabel && (
+      <Html position={[0, NUCLEUS_R + 6, 0]} center style={{ pointerEvents: "none", whiteSpace: "nowrap" }}>
         <div style={{
           fontFamily: "'JetBrains Mono','SF Mono',monospace",
           fontSize: 9,
@@ -358,6 +461,7 @@ export default function Comet({ onSelect }: { onSelect?: (addr: string) => void 
           cascopea
         </div>
       </Html>
+      )}
     </group>
   );
 }

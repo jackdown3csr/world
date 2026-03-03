@@ -104,7 +104,8 @@ export default function CameraController({
   const prevReset = useRef(false);
 
   /* Tracking state */
-  const trackingAddr = useRef<string | null>(null);
+  const trackingAddr   = useRef<string | null>(null);
+  const lastBodyPos    = useRef(new THREE.Vector3());   // body world pos last frame
 
   useFrame(() => {
     const ctrl = controlsRef.current;
@@ -200,6 +201,7 @@ export default function CameraController({
 
       /* Start tracking */
       trackingAddr.current = addr;
+      lastBodyPos.current.copy(body.position);   // seed delta tracker
       return;
     }
 
@@ -213,13 +215,22 @@ export default function CameraController({
     }
 
     /*
-     * Preserve the user's current orbit angle + zoom by keeping the
-     * camera's offset from the controls target unchanged.
-     * We simply teleport both target and camera so that target = body.
+     * Delta-based tracking: compute how far the body moved since last frame
+     * and apply the exact same translation to both camera and target.
+     * This avoids reading a damping-modified camera position each frame,
+     * which was the root cause of jitter at close zoom (d-tgt < 2).
+     * A deadband (0.0001) skips trivially small deltas to avoid FP drift.
      */
-    const offset = camera.position.clone().sub(ctrl.target);
-    ctrl.target.copy(body.position);
-    camera.position.copy(body.position).add(offset);
+    const dx = body.position.x - lastBodyPos.current.x;
+    const dy = body.position.y - lastBodyPos.current.y;
+    const dz = body.position.z - lastBodyPos.current.z;
+    lastBodyPos.current.copy(body.position);
+
+    const moved = dx * dx + dy * dy + dz * dz;
+    if (moved < 1e-8) return;   // deadband — skip if body barely moved
+
+    ctrl.target.x += dx; ctrl.target.y += dy; ctrl.target.z += dz;
+    camera.position.x += dx; camera.position.y += dy; camera.position.z += dz;
     ctrl.update();
   });
 
