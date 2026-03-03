@@ -51,7 +51,7 @@ export default function MoonBody({ data, planetOrbit, selected, panelOpen, onSel
 
   return (
     /* Moon orbit centre is at the host planet position */
-    <group position={[planetOrbit, 0, 0]} rotation={[data.tilt, 0, 0]}>
+    <group position={[planetOrbit, 0, 0]}>
       <group ref={moonOrbitRef} rotation-y={data.initialAngle}>
         <mesh
           ref={meshRef}
