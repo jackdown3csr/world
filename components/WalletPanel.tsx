@@ -179,14 +179,14 @@ export default function WalletPanel({
           {/* Stats grid */}
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "8px 16px" }}>
             <div>
-              <div style={labelStyle}>locked gnet</div>
-              <div style={valueStyle}>{myWallet.lockedFormatted}</div>
-            </div>
-            <div>
               <div style={labelStyle}>vegnet power</div>
               <div style={{ ...valueStyle, color: "#00e5ff" }}>
                 {myWallet.votingPowerFormatted}
               </div>
+            </div>
+            <div>
+              <div style={labelStyle}>locked gnet</div>
+              <div style={valueStyle}>{myWallet.lockedFormatted}</div>
             </div>
             {lockExpiry && (
               <div style={{ gridColumn: "1 / -1" }}>

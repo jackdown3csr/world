@@ -259,12 +259,12 @@ export default function SolarSystem() {
               <span style={{ color: "#8ab0c0" }}>{wallets.length.toLocaleString()}</span>
             </div>
             <div>
-              <span style={{ color: "#6a8090" }}>locked  </span>
-              <span style={{ color: "#8ab0c0" }}>{totalLocked}</span>
+              <span style={{ color: "#6a8090" }}>power   </span>
+              <span style={{ color: "#00e5ff" }}>{totalVotingPower}</span>
             </div>
             <div>
-              <span style={{ color: "#6a8090" }}>power   </span>
-              <span style={{ color: "#8ab0c0" }}>{totalVotingPower}</span>
+              <span style={{ color: "#6a8090" }}>locked  </span>
+              <span style={{ color: "#8ab0c0" }}>{totalLocked}</span>
             </div>
             {updatedAt > 0 && (
               <div style={{ marginTop: 4, fontSize: 9, color: "#5a7a8a" }}>

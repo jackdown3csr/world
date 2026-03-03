@@ -84,12 +84,12 @@ export default function WalletTooltip({ wallet, onClose }: { wallet: WalletEntry
 
       {/* Data rows */}
       <div style={{ display: "flex", justifyContent: "space-between", gap: 16 }}>
-        <span style={{ color: "#5a7a90", fontSize: 9, letterSpacing: "0.1em", textTransform: "uppercase" }}>locked</span>
-        <span style={{ color: "#c0a050", fontVariantNumeric: "tabular-nums" }}>{wallet.lockedFormatted}</span>
-      </div>
-      <div style={{ display: "flex", justifyContent: "space-between", gap: 16 }}>
         <span style={{ color: "#5a7a90", fontSize: 9, letterSpacing: "0.1em", textTransform: "uppercase" }}>power</span>
         <span style={{ color: "#00e5ff", fontVariantNumeric: "tabular-nums" }}>{wallet.votingPowerFormatted}</span>
+      </div>
+      <div style={{ display: "flex", justifyContent: "space-between", gap: 16 }}>
+        <span style={{ color: "#5a7a90", fontSize: 9, letterSpacing: "0.1em", textTransform: "uppercase" }}>locked</span>
+        <span style={{ color: "#c0a050", fontVariantNumeric: "tabular-nums" }}>{wallet.lockedFormatted}</span>
       </div>
       <div style={{ display: "flex", justifyContent: "space-between", gap: 16 }}>
         <span style={{ color: "#5a7a90", fontSize: 9, letterSpacing: "0.1em", textTransform: "uppercase" }}>unlock</span>
