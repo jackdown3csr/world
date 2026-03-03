@@ -34,6 +34,10 @@ export function createPlanetMaterial(
       uTime:    { value: 0    },
       uVariant: { value: seed },
       uHasRing: { value: hasRing ? 1.0 : 0.0 },
+      // Moon transit shadow uniforms (updated per frame by PlanetWallet)
+      uMoonPos:   { value: Array.from({ length: 6 }, () => new THREE.Vector3()) },
+      uMoonRad:   { value: [0, 0, 0, 0, 0, 0] },
+      uMoonCount: { value: 0 },
     },
   });
 }

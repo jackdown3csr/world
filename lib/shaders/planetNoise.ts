@@ -74,3 +74,40 @@ export const PLANET_NOISE = /* glsl */ `
     return c.z*mix(K.xxx,clamp(p-K.xxx,0.,1.),c.y);
   }
 `;
+
+/**
+ * Moon-transit shadow uniforms + function.
+ * Include this in each planet FRAG shader to cast moon shadows onto the surface.
+ */
+export const MOON_SHADOW_GLSL = /* glsl */ `
+  uniform vec3  uMoonPos[6];
+  uniform float uMoonRad[6];
+  uniform float uMoonCount;
+
+  // Returns shadow intensity [0..1] from any moon transiting in front of sun.
+  float moonTransitShadow(vec3 fragPos) {
+    vec3 toSun = normalize(-fragPos);
+    float shadow = 0.0;
+    for (int i = 0; i < 6; i++) {
+      if (float(i) >= uMoonCount) break;
+      vec3  oc   = fragPos - uMoonPos[i];
+      float b    = dot(oc, toSun);
+      float c    = dot(oc, oc) - uMoonRad[i] * uMoonRad[i];
+      float disc = b * b - c;
+      if (disc > 0.0) {
+        // t1 > 0 means moon is between fragment and sun
+        float t1 = -b - sqrt(disc);
+        if (t1 > 0.01) {
+          float dist   = length(oc);
+          float angR   = uMoonRad[i] / max(dist, 0.001);
+          // Perpendicular distance from shadow axis (normalised)
+          vec3  onAxis = toSun * b;
+          float offset = length(oc - onAxis) / max(dist, 0.001);
+          // Soft umbra/penumbra transition
+          shadow = max(shadow, smoothstep(angR * 1.15, angR * 0.65, offset));
+        }
+      }
+    }
+    return shadow;
+  }
+`;

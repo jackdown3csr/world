@@ -158,8 +158,41 @@ export default function PlanetWallet({ data, selected, panelOpen, onSelect, onDe
     const t = state.clock.elapsedTime;
     if (orbitRef.current) orbitRef.current.rotation.y = data.initialAngle + data.orbitSpeed * t;
     if (meshRef.current)  meshRef.current.rotation.y  = 0.04 * t;
-    // Animate clouds / bands
     material.uniforms.uTime.value = t;
+
+    // Analytically compute moon world positions for transit shadow uniforms.
+    // Transform chain: Rx(planet.tilt) → Ry(planetAngle) → T(orbitR) → Rx(moon.tilt) → Ry(moonAngle) → T(moon.orbitR)
+    if (data.moons.length > 0) {
+      const planetAngle = data.initialAngle + data.orbitSpeed * t;
+      const cp = Math.cos(planetAngle), sp = Math.sin(planetAngle);
+      const cpt = Math.cos(data.tilt),  spt = Math.sin(data.tilt);
+      const moonPositions = material.uniforms.uMoonPos.value as THREE.Vector3[];
+      const moonRadii     = material.uniforms.uMoonRad.value as number[];
+
+      data.moons.forEach((moon, i) => {
+        if (i >= 6) return;
+        const moonAngle = moon.initialAngle + moon.orbitSpeed * t;
+        const cmoon = Math.cos(moonAngle), smoon = Math.sin(moonAngle);
+        const cm = Math.cos(moon.tilt), sm = Math.sin(moon.tilt);
+
+        // Moon orbit rotation (in moonOrbit local frame)
+        const lx = moon.orbitRadius * cmoon;
+        const lz = moon.orbitRadius * smoon;
+        // Apply moon orbital tilt Rx(moon.tilt)
+        const ly2 =  -lz * sm;
+        const lz2 =   lz * cm;
+        // Add planet-centre offset
+        const ox = lx + data.orbitRadius, oy = ly2, oz = lz2;
+        // Apply planet orbit rotation Ry(planetAngle)
+        const wx = ox * cp - oz * sp;
+        const wy = oy;
+        const wz = ox * sp + oz * cp;
+        // Apply planet axial tilt Rx(planet.tilt)
+        moonPositions[i].set(wx, wy * cpt - wz * spt, wy * spt + wz * cpt);
+        moonRadii[i] = moon.radius;
+      });
+      material.uniforms.uMoonCount.value = Math.min(data.moons.length, 6);
+    }
   });
 
   const onPointerEnter = useCallback((e: ThreeEvent<PointerEvent>) => {

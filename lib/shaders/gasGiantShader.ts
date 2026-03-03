@@ -4,7 +4,7 @@
  * white oval storms, polar darkening.
  */
 
-import { PLANET_NOISE } from "./planetNoise";
+import { PLANET_NOISE, MOON_SHADOW_GLSL } from "./planetNoise";
 
 /* ── Height function ──────────────────────────────────────── */
 
@@ -56,6 +56,7 @@ export const FRAG = /* glsl */ `
 
   ${PLANET_NOISE}
   ${HEIGHT_FN}
+  ${MOON_SHADOW_GLSL}
 
   void main(){
     vec3 p     = normalize(vPos);
@@ -144,6 +145,9 @@ export const FRAG = /* glsl */ `
 
     // ── Ambient floor ────────────────────────────────────
     color += albedo * 0.010;
+
+    // ── Moon transit shadows ──────────────────────────────
+    color *= 1.0 - moonTransitShadow(vWorldPos) * 0.85;
 
     // ── Gamma ────────────────────────────────────────────
     color = pow(max(color,vec3(0.001)), vec3(1./2.2));
