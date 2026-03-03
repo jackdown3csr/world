@@ -143,9 +143,6 @@ export const FRAG = /* glsl */ `
     float hazeStr   = pow(1.-vdn, 1.2) * smoothstep(0.0, 0.6, dot(vWorldNorm, lightDir));
     color += atmosCol * (fres*0.9 + hazeStr*0.35) * atmosStr;
 
-    // ── Ambient floor ────────────────────────────────────
-    color += albedo * 0.010;
-
     // ── Moon transit shadows ──────────────────────────────
     color *= 1.0 - moonTransitShadow(vWorldPos) * 0.85;
 

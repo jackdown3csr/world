@@ -21,7 +21,7 @@ import {
   BELT_GAP,
   BELT_WIDTH,
 } from "./constants";
-import { weiToFloat, frac } from "./helpers";
+import { weiToFloat, frac, planetTypeByRank } from "./helpers";
 import { computePlanetSizing, computeOrbits } from "./planetLayout";
 import { distributeMoons, computeMoonVPStats, buildMoonList, buildSaturnMoonList } from "./moonLayout";
 import { buildRingParticles } from "./ringLayout";
@@ -47,6 +47,8 @@ export function buildSolarSystem(wallets: WalletEntry[]): SolarSystemData {
   /* 3. Planet sizing + orbits */
   const { radiusMap, typeMap } = computePlanetSizing(planetEntries);
   const saturnIdx  = 0;   // ring-host is always rank-0 (highest VP) planet
+  // Mars = highest-ranked rocky planet (first entry with type "rocky" = rank 14)
+  const marsIdx    = planetEntries.findIndex((_, i) => planetTypeByRank(i) === "rocky");
   const orbitByIdx = computeOrbits(planetEntries, radiusMap, typeMap, saturnIdx);
 
   /* 4. Moon distribution */
@@ -76,9 +78,11 @@ export function buildSolarSystem(wallets: WalletEntry[]): SolarSystemData {
       initialAngle: frac(w.address, 0) * Math.PI * 2,
       hue:          frac(w.address, 42),
       seed:         frac(w.address, 99),
-      tilt:         (frac(w.address, 77) - 0.5) * 0.28,
+      // Mars gets a 25.2° tilt (like real Mars); others use address-derived tilt
+      tilt:         i === marsIdx ? 0.44 : (frac(w.address, 77) - 0.5) * 0.28,
       moons,
       ringWallets:  i === saturnIdx ? ringParticles : [],
+      isMars:       i === marsIdx,
     };
   });
 

@@ -6,7 +6,7 @@ import { Html } from "@react-three/drei";
 import * as THREE from "three";
 
 import type { PlanetData } from "@/lib/layout";
-import { createPlanetMaterial } from "@/lib/shaders/planetMaterial";
+import { createPlanetMaterial, createMarsMaterial } from "@/lib/shaders/planetMaterial";
 import WalletTooltip from "./WalletTooltip";
 import MoonBody from "./MoonBody";
 import SaturnSystem from "./SaturnSystem";
@@ -32,24 +32,32 @@ export default function PlanetWallet({ data, selected, panelOpen, onSelect, onDe
 
   // One ShaderMaterial per planet — unique uniforms (hue, seed, type, time)
   const material = useMemo(
-    () => createPlanetMaterial(data.planetType, data.hue, data.seed, data.ringWallets.length > 0),
-    [data.planetType, data.hue, data.seed, data.ringWallets.length],
+    () => data.isMars
+      ? createMarsMaterial(data.hue, data.seed)
+      : createPlanetMaterial(data.planetType, data.hue, data.seed, data.ringWallets.length > 0),
+    [data.planetType, data.hue, data.seed, data.ringWallets.length, data.isMars],
   );
 
-  // ── Outer rim-glow shell (BackSide) — all non-rocky, non-Saturn planets ──
+  // ── Outer rim-glow shell (BackSide) — non-rocky (except Mars), non-Saturn planets ──
   const atmosRimMat = useMemo(() => {
-    if (data.planetType === "rocky") return null;
+    // Mars gets its own dusty orange-pink glow even though it's rocky
+    const isMarsGlow = data.isMars;
+    if (data.planetType === "rocky" && !isMarsGlow) return null;
     if (data.ringWallets.length > 0) return null;
     const colorMap: Record<string, THREE.Color> = {
       gas_giant:   new THREE.Color(0.75, 0.65, 0.50),
       ice_giant:   new THREE.Color(0.45, 0.75, 1.0),
       terrestrial: new THREE.Color(0.30, 0.58, 1.0),
+      // Mars: dusty salmon/orange atmosphere
+      rocky:       new THREE.Color(0.82, 0.40, 0.18),
     };
     const intensityMap: Record<string, number> = {
       gas_giant: 0.25, ice_giant: 0.50, terrestrial: 0.55,
+      rocky: 0.30,   // Mars — subtle but visible
     };
     const falloffMap: Record<string, number> = {
       gas_giant: 5.5, ice_giant: 4.5, terrestrial: 3.8,
+      rocky: 4.2,    // Mars
     };
     return new THREE.ShaderMaterial({
       vertexShader: /* glsl */ `
@@ -89,7 +97,7 @@ export default function PlanetWallet({ data, selected, panelOpen, onSelect, onDe
       depthWrite: false,
       blending: THREE.AdditiveBlending,
     });
-  }, [data.planetType, data.ringWallets.length]);
+  }, [data.planetType, data.ringWallets.length, data.isMars]);
 
   // ── Inner Rayleigh haze shell (FrontSide) — terrestrial planets only ──
   // Simulates the visible semi-transparent atmosphere layer above the surface.

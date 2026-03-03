@@ -70,7 +70,7 @@ export function buildMoonList(
 ): MoonData[] {
   let moonCursor = hostRadius + MOON_FIRST_GAP;
 
-  return wallets.map(mw => {
+  return wallets.map((mw, idx) => {
     const mvp = weiToFloat(mw.votingPower);
     const mt  = Math.max(0, Math.min(1,
       (Math.log10(Math.max(mvp, 0.001)) - stats.mlogMin) / stats.mvpRange));
@@ -81,6 +81,11 @@ export function buildMoonList(
     const mo    = moonCursor;
     moonCursor += mr + MOON_SURFACE_GAP;
 
+    // Offset each moon's type by idx*2 (mod 6) so moons on the same planet
+    // always get distinct types: offsets 0, +2, +4 cover 3 unique slots.
+    const baseType = Math.floor(frac(mw.address, 66) * 6) % 6;
+    const moonType = ((baseType + idx * 2) % 6) as 0 | 1 | 2 | 3 | 4 | 5;
+
     return {
       wallet:       mw,
       radius:       mr,
@@ -90,7 +95,7 @@ export function buildMoonList(
       hue:          frac(mw.address, 22),
       seed:         frac(mw.address, 33),
       tilt:         0,
-      moonType:     (Math.floor(frac(mw.address, 66) * 6) % 6) as 0 | 1 | 2 | 3 | 4 | 5,
+      moonType,
     };
   });
 }

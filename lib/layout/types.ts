@@ -20,6 +20,8 @@ export interface PlanetData {
   tilt:         number;
   moons:        MoonData[];
   ringWallets:  RingParticleData[];
+  /** True for the highest-ranked rocky planet (the "Mars" of this system) */
+  isMars?:      boolean;
 }
 
 /* ── Moon ──────────────────────────────────────────────────── */

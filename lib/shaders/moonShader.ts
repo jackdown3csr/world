@@ -2,15 +2,15 @@
  * Procedural moon shader — 6 distinct moon types, each unique per wallet.
  *
  * Types:
- *   0 = Cratered   (Luna / Mercury — grey regolith, impact craters, ridges)
- *   1 = Icy        (Europa / Enceladus — white-blue, crack trenches, smooth plains)
- *   2 = Volcanic   (Io — yellow-orange, calderas, lava, volcanic peaks)
- *   3 = Dusty      (Callisto — ancient dark-brown, heavy multi-scale craters)
- *   4 = Metallic   (iron-nickel — silver-grey, crystalline ridges, angular facets)
- *   5 = Haze       (Titan — orange-amber, thick atmosphere, gentle dunes)
+ *   0 = Luna      (our Moon — grey highlands + dark maria basins, large craters)
+ *   1 = Europa    (smooth white-blue ice, distinctive red-brown crack linea)
+ *   2 = Io        (sulfur yellow-orange, dark calderas, volcanic plains)
+ *   3 = Callisto  (ancient dark surface, saturated heavy cratering, sparse highlights)
+ *   4 = Ganymede  (mixed terrain — dark grooved regions + icy bright patches)
+ *   5 = Titan     (smooth orange-amber, hazy atmosphere, subtle dune banding)
  *
- * Vertex displacement + matching fragment bump normals give visible topology.
- * All deterministic from uSeed + uHue so same wallet = same look.
+ * Design principle: LARGE features only. No brain-frequency noise.
+ * Surfaces are mostly smooth; topology comes from craters and large structures.
  */
 
 import * as THREE from "three";
@@ -23,24 +23,46 @@ export const MOON_TYPE_COUNT = 6;
 const SHARED_GLSL = /* glsl */ `
   ${NOISE_GLSL}
 
-  /* Procedural craters — returns depth (-1..1) */
-  float craters(vec3 p, float seed, float scale, int count) {
-    float cr = 0.0;
-    for (int i = 0; i < 6; i++) {
+  /* Low-frequency smooth fbm — only 2 octaves to avoid brainy noise */
+  float smoothFbm(vec3 p) {
+    return snoise(p) * 0.6 + snoise(p * 2.1) * 0.4;
+  }
+
+  /*
+   * Single clean crater:
+   *   d = normalised angular distance (0=centre, 1=rim edge)
+   *   Returns height contribution — flat floor, raised rim, ejecta.
+   */
+  float craterShape(float d) {
+    if (d >= 1.0) return 0.0;
+    // flat floor slightly below surface
+    float floor  = -smoothstep(0.0, 0.55, d) * 0.65;
+    // raised rim
+    float rim    =  smoothstep(0.50, 0.78, d) * smoothstep(1.0, 0.78, d) * 0.55;
+    // ejecta blanket fading outside
+    float ejecta =  smoothstep(1.0, 0.80, d) * 0.12;
+    return floor + rim + ejecta;
+  }
+
+  /*
+   * Multiple craters at deterministic positions.
+   * maxR controls how large each crater can be (radians).
+   */
+  float craterField(vec3 p, float seed, float maxR, int count) {
+    float h = 0.0;
+    for (int i = 0; i < 8; i++) {
       if (i >= count) break;
       float fi = float(i);
-      vec3 center = normalize(vec3(
-        sin(seed * 91.1 + fi * 47.3),
-        cos(seed * 37.3 + fi * 83.1),
-        sin(seed * 63.7 + fi * 19.9)
+      vec3 c = normalize(vec3(
+        sin(seed * 73.1 + fi * 41.7),
+        cos(seed * 29.3 + fi * 67.9),
+        sin(seed * 57.8 + fi * 13.3)
       ));
-      float r = 0.12 + fract(seed * 7.7 + fi * 0.37) * scale;
-      float d = acos(clamp(dot(p, center), -1.0, 1.0)) / r;
-      if (d < 1.0) {
-        cr += -smoothstep(0.0, 0.55, d) * 0.8 + smoothstep(0.55, 0.95, d) * 0.5;
-      }
+      float r = 0.10 + fract(seed * 6.3 + fi * 0.41) * maxR;
+      float d = acos(clamp(dot(p, c), -1.0, 1.0)) / r;
+      h += craterShape(d) * (0.4 + fract(seed * 11.7 + fi * 0.29) * 0.6);
     }
-    return clamp(cr, -1.0, 1.0);
+    return clamp(h, -1.0, 1.0);
   }
 
   /* Unified height field — same function drives vertex displacement AND bump */
@@ -48,57 +70,72 @@ const SHARED_GLSL = /* glsl */ `
     float h = 0.0;
 
     if (moonType < 0.5) {
-      // ── CRATERED: gentle basins + highland ridges + small craters ──
-      h += fbm(p * 3.5 + seed3) * 0.25;
-      h += craters(p, seed, 0.20, 6) * 0.35;
-      h += craters(p, seed + 3.0, 0.08, 6) * 0.15;
-      float ridge = 1.0 - abs(snoise(p * 5.0 + seed3));
-      h += ridge * ridge * 0.15;
+      // ── LUNA: large smooth basins (maria) + highland bumps + craters ──
+      // Very gentle large-scale undulation — the "highlands vs maria" dichotomy
+      float macro = smoothFbm(p * 1.2 + seed3) * 0.35;
+      h += macro;
+      // Large craters (prominent, few)
+      h += craterField(p, seed,            0.28, 4) * 0.50;
+      // Medium craters
+      h += craterField(p, seed + 3.0,      0.14, 5) * 0.28;
+      // Small craters (keep count low to avoid brainy look)
+      h += craterField(p, seed + 7.0,      0.07, 4) * 0.14;
     }
     else if (moonType < 1.5) {
-      // ── ICY: smooth plains with subtle crack trenches ──
-      h += fbm(p * 2.0 + seed3) * 0.12;
-      float crack = abs(fbm(p * 12.0 + seed3 * 2.0));
-      h -= smoothstep(0.04, 0.0, crack) * 0.30;
-      h += smoothstep(0.08, 0.04, crack) * 0.15;
-      h += craters(p, seed + 10.0, 0.10, 3) * 0.12;
+      // ── EUROPA: nearly perfectly smooth — just subtle tectonic warps ──
+      h += smoothFbm(p * 1.0 + seed3) * 0.08;
+      // Very rare small impacts (young surface)
+      h += craterField(p, seed + 10.0, 0.06, 3) * 0.10;
+      // Crack lineae: subtle ridges along great-circle-like paths
+      float crack1 = abs(snoise(p * 3.5 + seed3));
+      h += smoothstep(0.12, 0.05, crack1) * 0.08;
     }
     else if (moonType < 2.5) {
-      // ── VOLCANIC: calderas + volcanic peaks ──
-      h += fbm(p * 2.0 + seed3) * 0.20;
-      float peak = 1.0 - abs(snoise(p * 3.0 + seed3.yzx));
-      h += pow(peak, 3.0) * 0.35;
-      for (int i = 0; i < 4; i++) {
+      // ── IO: mostly flat volcanic plains, discrete calderas ──
+      h += smoothFbm(p * 1.5 + seed3) * 0.12;
+      // Calderas as inverted craters (depression only)
+      for (int i = 0; i < 5; i++) {
         float fi = float(i);
-        vec3 hotspot = normalize(vec3(
-          sin(seed * 123.4 + fi * 67.8),
-          cos(seed * 45.6  + fi * 89.0) * 0.6,
-          sin(seed * 78.9  + fi * 34.5)
+        vec3 c = normalize(vec3(
+          sin(seed * 111.3 + fi * 59.1),
+          cos(seed * 43.7  + fi * 81.3) * 0.7,
+          sin(seed * 77.2  + fi * 29.6)
         ));
-        float d = acos(clamp(dot(p, hotspot), -1.0, 1.0));
-        h -= smoothstep(0.18, 0.02, d) * 0.35;
-        h += smoothstep(0.22, 0.18, d) * 0.15;
+        float r = 0.06 + fract(seed * 8.9 + fi * 0.53) * 0.12;
+        float d = acos(clamp(dot(p, c), -1.0, 1.0)) / r;
+        if (d < 1.0) {
+          // Flat caldera floor, subtle raised rim
+          h -= smoothstep(0.0, 0.65, d) * 0.50 * step(d, 0.9);
+          h += smoothstep(0.85, 1.0, d) * smoothstep(1.0, 0.85, d) * 0.18;
+        }
       }
     }
     else if (moonType < 3.5) {
-      // ── DUSTY: ancient, multi-scale cratering ──
-      h += craters(p, seed, 0.22, 6) * 0.30;
-      h += craters(p, seed + 5.0, 0.10, 6) * 0.18;
-      h += craters(p, seed + 10.0, 0.05, 6) * 0.10;
-      h += fbm(p * 2.8 + seed3) * 0.18;
+      // ── CALLISTO: ancient, saturation-cratered, very rough at large scale ──
+      h += smoothFbm(p * 1.4 + seed3) * 0.20;
+      // Very dense large craters — the whole surface is covered
+      h += craterField(p, seed,        0.22, 7) * 0.45;
+      h += craterField(p, seed + 4.0,  0.12, 7) * 0.28;
+      h += craterField(p, seed + 9.0,  0.06, 6) * 0.14;
     }
     else if (moonType < 4.5) {
-      // ── METALLIC: subtle angular plateaus ──
-      float facets = snoise(p * 4.0 + seed3);
-      h += abs(facets) * 0.25;
-      float ridge1 = 1.0 - abs(snoise(p * 7.0 + seed3.zyx));
-      h += pow(ridge1, 4.0) * 0.25;
-      h += fbm(p * 6.0 + seed3) * 0.12;
+      // ── GANYMEDE: grooved terrain + icy smooth patches ──
+      // Grooves: parallel-ish tectonic ridges
+      float groove = sin(dot(p, normalize(vec3(
+        sin(seed * 31.7), cos(seed * 19.3), sin(seed * 53.9)
+      ))) * 15.0 + seed * 6.28) * 0.5 + 0.5;
+      h += groove * smoothstep(0.5, 0.8, smoothFbm(p * 1.8 + seed3) * 0.5 + 0.5) * 0.22;
+      h += smoothFbm(p * 1.3 + seed3) * 0.18;
+      h += craterField(p, seed, 0.16, 4) * 0.28;
     }
     else {
-      // ── HAZE: nearly smooth, gentle undulations ──
-      h += fbm(p * 2.0 + seed3) * 0.15;
-      h += sin(p.y * 8.0 + fbm(p * 3.0 + seed3) * 2.0) * 0.1;
+      // ── TITAN: nearly smooth, very gentle dune-like undulation ──
+      h += smoothFbm(p * 0.9 + seed3) * 0.10;
+      // Subtle parallel dune banding
+      vec3 northDir = normalize(vec3(sin(seed * 7.3), 0.1, cos(seed * 7.3)));
+      float dune = sin(dot(p - northDir * dot(p, northDir), vec3(0., 1., 0.)) * 6.0
+                   + snoise(p * 1.5 + seed3) * 1.2) * 0.5 + 0.5;
+      h += dune * 0.06;
     }
 
     return h;
@@ -124,12 +161,12 @@ const VERT = /* glsl */ `
 
     // Per-type displacement amplitude
     float dispScale;
-    if      (uMoonType < 0.5) dispScale = 0.045;  // cratered — visible basins
-    else if (uMoonType < 1.5) dispScale = 0.025;  // icy — subtle crack ridges
-    else if (uMoonType < 2.5) dispScale = 0.040;  // volcanic — calderas + peaks
-    else if (uMoonType < 3.5) dispScale = 0.040;  // dusty — pitted
-    else if (uMoonType < 4.5) dispScale = 0.035;  // metallic — angular
-    else                       dispScale = 0.015;  // haze — nearly smooth
+    if      (uMoonType < 0.5) dispScale = 0.040;  // Luna — craters + maria
+    else if (uMoonType < 1.5) dispScale = 0.010;  // Europa — nearly smooth
+    else if (uMoonType < 2.5) dispScale = 0.022;  // Io — calderas
+    else if (uMoonType < 3.5) dispScale = 0.045;  // Callisto — heavily cratered
+    else if (uMoonType < 4.5) dispScale = 0.030;  // Ganymede — grooved
+    else                       dispScale = 0.008;  // Titan — nearly flat
 
     vec3 displaced = position + normal * h * radius * dispScale;
 
@@ -176,14 +213,14 @@ const FRAG = /* glsl */ `
     float hy = moonHeight(normalize(p + vec3(0.0, eps, 0.0)), seed3, uMoonType, uSeed);
     vec3 grad = vec3(hx - h0, hy - h0, 0.0) / eps;
 
-    // Strong bump for rocky types, mild for atmospheric
+    // Bump strength per type
     float bumpStr;
-    if      (uMoonType < 0.5) bumpStr = 1.2;   // cratered
-    else if (uMoonType < 1.5) bumpStr = 0.8;   // icy
-    else if (uMoonType < 2.5) bumpStr = 1.0;   // volcanic
-    else if (uMoonType < 3.5) bumpStr = 1.2;   // dusty
-    else if (uMoonType < 4.5) bumpStr = 1.0;   // metallic
-    else                       bumpStr = 0.3;   // haze
+    if      (uMoonType < 0.5) bumpStr = 1.4;   // Luna — visible crater walls
+    else if (uMoonType < 1.5) bumpStr = 0.4;   // Europa — very subtle
+    else if (uMoonType < 2.5) bumpStr = 0.9;   // Io — caldera rims
+    else if (uMoonType < 3.5) bumpStr = 1.5;   // Callisto — heavy craters
+    else if (uMoonType < 4.5) bumpStr = 1.1;   // Ganymede — grooves
+    else                       bumpStr = 0.2;   // Titan — nearly flat
 
     vec3 bumpN = normalize(vWorldNorm + grad * bumpStr);
 
@@ -191,180 +228,171 @@ const FRAG = /* glsl */ `
     float day   = smoothstep(-0.03, 0.03, dot(bumpN, lightDir));
 
     vec3 albedo   = vec3(0.5);
-    float specStr = 0.08;
+    float specStr = 0.06;
     float specPow = 16.0;
     float rimStr  = 0.0;
     vec3  rimCol  = vec3(0.0);
 
     // ════════════════════════════════════════════════════════
-    //  TYPE 0: CRATERED (Luna / Mercury)
+    //  TYPE 0: LUNA (our Moon)
+    //  Grey highlands (bright) + dark volcanic maria basins + craters
     // ════════════════════════════════════════════════════════
     if (uMoonType < 0.5) {
-      float n = fbm(p * 2.5 + seed3) * 0.6 + fbm(p * 8.0 + seed3.yzx) * 0.4;
-      float t = smoothstep(0.2, 0.8, n);
+      // Large-scale maria vs highland colour from smooth macro noise
+      float macro = smoothFbm(p * 1.2 + seed3) * 0.5 + 0.5;
+      vec3 highland = hsv2rgb(vec3(0.08 + uHue*0.04, 0.05 + uSeed*0.06, 0.58 + uSeed*0.08));
+      vec3 maria    = hsv2rgb(vec3(0.07 + uHue*0.03, 0.06 + uSeed*0.05, 0.25 + uSeed*0.06));
+      albedo = mix(maria, highland, smoothstep(0.35, 0.70, macro));
 
-      vec3 hiC = hsv2rgb(vec3(fract(uHue * 0.08 + 0.06), 0.08 + uSeed * 0.12, 0.55 + uSeed * 0.15));
-      vec3 loC = hsv2rgb(vec3(fract(uHue * 0.08 + 0.08), 0.05 + uSeed * 0.08, 0.22 + uSeed * 0.10));
-      albedo = mix(loC, hiC, t);
+      // Crater colouring — dark floors, bright rims (ejecta)
+      float crFld = craterField(p, uSeed,       0.28, 4);
+      float crMed = craterField(p, uSeed + 3.0, 0.14, 5);
+      float crSml = craterField(p, uSeed + 7.0, 0.07, 4);
+      float cr = clamp(crFld * 0.6 + crMed * 0.3 + crSml * 0.1, -1.0, 1.0);
+      albedo = mix(albedo, maria * 0.5,     max(-cr, 0.0));
+      albedo = mix(albedo, highland * 1.25, max( cr, 0.0) * 0.7);
 
-      float cr = craters(p, uSeed, 0.18, 6);
-      albedo = mix(albedo, loC * 0.35, max(-cr, 0.0));
-      albedo = mix(albedo, hiC * 1.2,  max( cr, 0.0) * 0.5);
-
-      float frost = smoothstep(0.78, 0.95, abs(p.y)) * step(0.5, uSeed);
-      albedo = mix(albedo, vec3(0.88, 0.87, 0.85), frost * 0.5);
-
-      specStr = 0.05;
-      specPow = 8.0;
+      specStr = 0.04; specPow = 8.0;
 
     // ════════════════════════════════════════════════════════
-    //  TYPE 1: ICY (Europa / Enceladus)
+    //  TYPE 1: EUROPA
+    //  Bright white-blue ice, distinctive red-brown crack linea
     // ════════════════════════════════════════════════════════
     } else if (uMoonType < 1.5) {
-      float n1 = fbm(p * 3.0 + seed3);
-      float n2 = fbm(p * 7.0 + seed3.zxy);
+      vec3 iceWhite = hsv2rgb(vec3(0.57 + uHue*0.04, 0.06 + uSeed*0.05, 0.92 + uSeed*0.05));
+      vec3 iceBlue  = hsv2rgb(vec3(0.60 + uHue*0.04, 0.18 + uSeed*0.08, 0.78 + uSeed*0.08));
+      float bg = smoothFbm(p * 1.1 + seed3) * 0.5 + 0.5;
+      albedo = mix(iceWhite, iceBlue, smoothstep(0.4, 0.7, bg));
 
-      float iceHue = fract(0.50 + uHue * 0.25);
-      vec3 iceWhite = hsv2rgb(vec3(iceHue, 0.05 + uSeed * 0.08, 0.90 + uSeed * 0.05));
-      vec3 iceDeep  = hsv2rgb(vec3(fract(iceHue + 0.05), 0.30 + uSeed * 0.15, 0.72 + uSeed * 0.10));
-      albedo = mix(iceWhite, iceDeep, smoothstep(0.3, 0.7, n1));
+      // Red-brown crack network (linea) — low-frequency crack pattern
+      float crack1 = abs(snoise(p * 3.2 + seed3));
+      float crack2 = abs(snoise(p * 4.8 + seed3.yzx + vec3(1.7)));
+      float crackMask = smoothstep(0.12, 0.04, crack1) + smoothstep(0.10, 0.03, crack2) * 0.6;
+      crackMask = clamp(crackMask, 0.0, 1.0);
+      vec3 linea = hsv2rgb(vec3(0.05 + uHue*0.04, 0.58 + uSeed*0.15, 0.38 + uSeed*0.10));
+      albedo = mix(albedo, linea, crackMask * 0.85);
 
-      float crack = abs(fbm(p * 12.0 + seed3 * 2.0));
-      float crackMask = smoothstep(0.02, 0.0, crack) * 0.7;
-      vec3 crackCol = hsv2rgb(vec3(fract(uHue * 0.3 + 0.04), 0.50 + uSeed * 0.15, 0.30 + uSeed * 0.10));
-      albedo = mix(albedo, crackCol, crackMask);
+      // Very rare small impacts
+      float crSml = craterField(p, uSeed + 10.0, 0.05, 3);
+      albedo = mix(albedo, iceWhite * 0.80, max(-crSml, 0.0) * 0.3);
 
-      float terrain = smoothstep(0.4, 0.6, n2);
-      albedo = mix(albedo, iceDeep * 0.85, terrain * 0.2);
-
-      float cr = craters(p, uSeed + 10.0, 0.10, 3);
-      albedo = mix(albedo, iceWhite * 0.7, max(-cr, 0.0) * 0.3);
-
-      specStr = 0.30;
-      specPow = 48.0;
-      rimStr  = 0.15;
-      rimCol  = vec3(0.7, 0.85, 1.0);
+      specStr = 0.35; specPow = 55.0;
+      rimStr = 0.18; rimCol = vec3(0.70, 0.86, 1.0);
 
     // ════════════════════════════════════════════════════════
-    //  TYPE 2: VOLCANIC (Io)
+    //  TYPE 2: IO
+    //  Yellow-orange-white sulfur plains, dark calderas, lava glow
     // ════════════════════════════════════════════════════════
     } else if (uMoonType < 2.5) {
-      float n = fbm(p * 2.0 + seed3);
+      float bg = smoothFbm(p * 1.4 + seed3) * 0.5 + 0.5;
+      vec3 sulphurY = hsv2rgb(vec3(0.13 + uHue*0.04, 0.75 + uSeed*0.10, 0.82 + uSeed*0.08));
+      vec3 sulphurO = hsv2rgb(vec3(0.06 + uHue*0.03, 0.80 + uSeed*0.10, 0.68 + uSeed*0.08));
+      vec3 paleSulf = hsv2rgb(vec3(0.15 + uHue*0.03, 0.35 + uSeed*0.10, 0.90 + uSeed*0.05));
+      albedo = mix(sulphurO, sulphurY, smoothstep(0.3, 0.7, bg));
+      // Pale sulfur dioxide frost patches
+      float frost = smoothstep(0.65, 0.80, smoothFbm(p * 2.0 + seed3.zxy) * 0.5 + 0.5);
+      albedo = mix(albedo, paleSulf, frost * 0.45);
 
-      float volHue = fract(0.02 + uHue * 0.16);
-      vec3 sulphur = hsv2rgb(vec3(fract(volHue + 0.10), 0.75 + uSeed * 0.15, 0.70 + uSeed * 0.10));
-      vec3 pale    = hsv2rgb(vec3(fract(volHue + 0.14), 0.30 + uSeed * 0.15, 0.85 + uSeed * 0.08));
-      vec3 dark    = hsv2rgb(vec3(fract(volHue - 0.02), 0.65 + uSeed * 0.15, 0.20 + uSeed * 0.08));
-
-      albedo = mix(sulphur, pale, smoothstep(0.3, 0.7, n));
-
-      float deposits = smoothstep(0.55, 0.70, fbm(p * 5.0 + seed3.yzx));
-      albedo = mix(albedo, dark, deposits * 0.6);
-
-      for (int i = 0; i < 4; i++) {
+      // Calderas — dark basalt floor, subtle rim, animated lava glow
+      for (int i = 0; i < 5; i++) {
         float fi = float(i);
-        vec3 hotspot = normalize(vec3(
-          sin(uSeed * 123.4 + fi * 67.8),
-          cos(uSeed * 45.6  + fi * 89.0) * 0.6,
-          sin(uSeed * 78.9  + fi * 34.5)
+        vec3 c = normalize(vec3(
+          sin(uSeed * 111.3 + fi * 59.1),
+          cos(uSeed * 43.7  + fi * 81.3) * 0.7,
+          sin(uSeed * 77.2  + fi * 29.6)
         ));
-        float d = acos(clamp(dot(p, hotspot), -1.0, 1.0));
-        float caldera = smoothstep(0.15, 0.02, d);
-        float glow    = smoothstep(0.25, 0.05, d);
-        vec3 lavaCol = mix(vec3(1.0, 0.3, 0.0), vec3(1.0, 0.8, 0.2), caldera);
-        albedo = mix(albedo, dark * 0.5, caldera * 0.6);
-        albedo += lavaCol * glow * 0.5 * (0.8 + 0.2 * sin(uTime * 1.5 + fi * 2.0));
+        float r = 0.07 + fract(uSeed * 8.9 + fi * 0.53) * 0.10;
+        float d = acos(clamp(dot(p, c), -1.0, 1.0)) / r;
+        if (d < 1.2) {
+          float caldera = smoothstep(1.0, 0.0, d);
+          // Dark basalt floor
+          vec3 basalt = hsv2rgb(vec3(0.05 + uHue*0.02, 0.30, 0.12 + uSeed*0.06));
+          albedo = mix(albedo, basalt, caldera * 0.85);
+          // Lava glow at hottest part — animated
+          float glow = smoothstep(0.35, 0.0, d);
+          float pulse = 0.75 + 0.25 * sin(uTime * 1.2 + fi * 2.5 + uSeed * 6.28);
+          vec3 lava = mix(vec3(1.0, 0.15, 0.0), vec3(1.0, 0.70, 0.1), caldera);
+          albedo += lava * glow * 0.55 * pulse;
+        }
       }
-
-      specStr = 0.08;
-      specPow = 12.0;
+      specStr = 0.06; specPow = 10.0;
 
     // ════════════════════════════════════════════════════════
-    //  TYPE 3: DUSTY (Callisto)
+    //  TYPE 3: CALLISTO
+    //  Very dark ancient surface, saturated with craters at all scales
     // ════════════════════════════════════════════════════════
     } else if (uMoonType < 3.5) {
-      float n = fbm(p * 2.8 + seed3) * 0.55 + fbm(p * 6.0 + seed3.yzx) * 0.45;
-      float t = smoothstep(0.25, 0.75, n);
+      float bg = smoothFbm(p * 1.3 + seed3) * 0.5 + 0.5;
+      vec3 darkBase = hsv2rgb(vec3(0.06 + uHue*0.04, 0.25 + uSeed*0.10, 0.14 + uSeed*0.05));
+      vec3 midBrown = hsv2rgb(vec3(0.07 + uHue*0.03, 0.18 + uSeed*0.08, 0.26 + uSeed*0.06));
+      albedo = mix(darkBase, midBrown, smoothstep(0.35, 0.70, bg));
 
-      float dustHue = fract(0.05 + uHue * 0.07);
-      vec3 darkBrown = hsv2rgb(vec3(dustHue, 0.30 + uSeed * 0.15, 0.15 + uSeed * 0.06));
-      vec3 midBrown  = hsv2rgb(vec3(fract(dustHue + 0.03), 0.22 + uSeed * 0.12, 0.28 + uSeed * 0.08));
-      vec3 lightDust = hsv2rgb(vec3(fract(dustHue + 0.06), 0.16 + uSeed * 0.10, 0.38 + uSeed * 0.10));
-      albedo = mix(darkBrown, midBrown, t);
-      albedo = mix(albedo, lightDust, smoothstep(0.65, 0.85, n) * 0.4);
+      // Multi-scale cratering
+      float crLg = craterField(p, uSeed,        0.22, 7) * 0.55;
+      float crMd = craterField(p, uSeed + 4.0,  0.12, 7) * 0.30;
+      float crSm = craterField(p, uSeed + 9.0,  0.06, 6) * 0.15;
+      float cr = clamp(crLg + crMd + crSm, -1.0, 1.0);
+      // Crater floors even darker
+      albedo = mix(albedo, darkBase * 0.40, max(-cr, 0.0) * 0.70);
+      // Bright ejecta/rim — ice revealed by impact
+      vec3 iceEjecta = hsv2rgb(vec3(0.60, 0.08, 0.62 + uSeed*0.10));
+      albedo = mix(albedo, iceEjecta, max(cr, 0.0) * 0.55);
 
-      float cr = craters(p, uSeed, 0.22, 6);
-      cr += craters(p, uSeed + 5.0, 0.10, 6) * 0.5;
-      cr = clamp(cr, -1.0, 1.0);
-      albedo = mix(albedo, darkBrown * 0.5, max(-cr, 0.0) * 0.5);
-      albedo = mix(albedo, lightDust * 1.1, max(cr, 0.0) * 0.3);
-
-      float rays = abs(fbm(p * 14.0 + seed3 * 3.0));
-      float rayMask = smoothstep(0.04, 0.0, rays) * 0.25;
-      albedo = mix(albedo, lightDust * 1.3, rayMask);
-
-      specStr = 0.03;
-      specPow = 6.0;
+      specStr = 0.03; specPow = 6.0;
 
     // ════════════════════════════════════════════════════════
-    //  TYPE 4: METALLIC (iron-nickel)
+    //  TYPE 4: GANYMEDE
+    //  Mixed terrain — dark grooved regions + icy bright patches
     // ════════════════════════════════════════════════════════
     } else if (uMoonType < 4.5) {
-      float n1 = fbm(p * 3.0 + seed3);
-      float n2 = fbm(p * 9.0 + seed3.zyx);
+      float bg = smoothFbm(p * 1.2 + seed3) * 0.5 + 0.5;
+      vec3 dark  = hsv2rgb(vec3(0.08 + uHue*0.04, 0.20 + uSeed*0.08, 0.24 + uSeed*0.06));
+      vec3 light = hsv2rgb(vec3(0.58 + uHue*0.04, 0.06 + uSeed*0.06, 0.68 + uSeed*0.10));
+      // Large-scale dark/light terrain dichotomy
+      float terrain = smoothstep(0.38, 0.65, bg);
+      albedo = mix(dark, light, terrain);
 
-      float metHue = fract(uHue * 0.7 + 0.55);
-      vec3 silver   = hsv2rgb(vec3(metHue, 0.04 + uSeed * 0.10, 0.68 + uSeed * 0.12));
-      vec3 darkIron = hsv2rgb(vec3(fract(metHue - 0.02), 0.08 + uSeed * 0.08, 0.30 + uSeed * 0.10));
-      vec3 rust     = hsv2rgb(vec3(fract(metHue + 0.40), 0.40 + uSeed * 0.15, 0.35 + uSeed * 0.10));
+      // Groove pattern in dark regions
+      vec3 gDir = normalize(vec3(sin(uSeed*31.7), cos(uSeed*19.3), sin(uSeed*53.9)));
+      float groove = sin(dot(p, gDir) * 14.0 + uSeed * 6.28) * 0.5 + 0.5;
+      float grv = groove * (1.0 - terrain);  // only on dark terrain
+      albedo = mix(albedo, dark * 0.6, grv * smoothstep(0.45, 0.55, groove) * 0.5);
+      albedo = mix(albedo, light * 0.8, grv * smoothstep(0.55, 0.65, groove) * 0.3);
 
-      albedo = mix(darkIron, silver, smoothstep(0.3, 0.7, n1));
+      // Craters
+      float cr = craterField(p, uSeed, 0.16, 5);
+      albedo = mix(albedo, dark * 0.45,  max(-cr, 0.0) * 0.65);
+      albedo = mix(albedo, light * 1.15, max( cr, 0.0) * 0.55);
 
-      float facets = abs(snoise(p * 6.0 + seed3));
-      float facetEdge = smoothstep(0.05, 0.0, facets);
-      albedo = mix(albedo, silver * 1.3, facetEdge * 0.3);
-
-      float rustPatch = smoothstep(0.5, 0.7, n2);
-      albedo = mix(albedo, rust, rustPatch * 0.35);
-
-      float cr = craters(p, uSeed + 20.0, 0.12, 4);
-      albedo = mix(albedo, darkIron * 0.6, max(-cr, 0.0) * 0.4);
-
-      specStr = 0.45;
-      specPow = 64.0;
-      rimStr  = 0.08;
-      rimCol  = silver;
+      specStr = 0.10; specPow = 18.0;
+      rimStr = 0.07; rimCol = light;
 
     // ════════════════════════════════════════════════════════
-    //  TYPE 5: HAZE (Titan)
+    //  TYPE 5: TITAN
+    //  Smooth orange-amber, atmospheric haze, subtle dune banding
     // ════════════════════════════════════════════════════════
     } else {
-      float n = fbm(p * 1.8 + seed3 + vec3(uTime * 0.003, 0.0, 0.0));
-      float n2 = fbm(p * 4.0 + seed3.yzx + vec3(0.0, uTime * 0.005, 0.0));
+      float bg  = smoothFbm(p * 0.9 + seed3 + vec3(uTime * 0.002, 0.0, 0.0)) * 0.5 + 0.5;
+      float bg2 = smoothFbm(p * 1.6 + seed3.yzx) * 0.5 + 0.5;
+      float hazeHue = fract(0.04 + uHue * 0.12);
+      vec3 deep  = hsv2rgb(vec3(hazeHue,        0.72 + uSeed*0.12, 0.35 + uSeed*0.08));
+      vec3 amber = hsv2rgb(vec3(hazeHue + 0.03, 0.58 + uSeed*0.12, 0.55 + uSeed*0.10));
+      vec3 pale  = hsv2rgb(vec3(hazeHue + 0.07, 0.32 + uSeed*0.10, 0.72 + uSeed*0.08));
+      albedo = mix(deep, amber, smoothstep(0.3, 0.65, bg));
+      albedo = mix(albedo, pale, smoothstep(0.60, 0.80, bg2) * 0.35);
 
-      float hazeHue = fract(0.03 + uHue * 0.30);
-      vec3 deepOrange = hsv2rgb(vec3(hazeHue, 0.65 + uSeed * 0.15, 0.40 + uSeed * 0.10));
-      vec3 amber      = hsv2rgb(vec3(fract(hazeHue + 0.04), 0.48 + uSeed * 0.15, 0.58 + uSeed * 0.12));
-      vec3 paleGold   = hsv2rgb(vec3(fract(hazeHue + 0.08), 0.28 + uSeed * 0.12, 0.75 + uSeed * 0.10));
-
-      albedo = mix(deepOrange, amber, smoothstep(0.3, 0.6, n));
-      albedo = mix(albedo, paleGold, smoothstep(0.5, 0.8, n2) * 0.35);
-
+      // Latitudinal banding (like Titan's haze layers)
       float lat = p.y;
-      float bands = sin(lat * 12.0 + n * 2.0) * 0.5 + 0.5;
-      albedo = mix(albedo, amber * 0.8, smoothstep(0.4, 0.6, bands) * 0.2);
+      float band = sin(lat * 5.0 + smoothFbm(p * 1.2 + seed3) * 0.8) * 0.5 + 0.5;
+      albedo = mix(albedo, amber * 0.85, smoothstep(0.45, 0.55, band) * 0.20);
 
-      float surface = fbm(p * 8.0 + seed3 * 4.0);
-      albedo = mix(albedo, deepOrange * 0.6, smoothstep(0.6, 0.8, surface) * 0.15);
-
-      specStr = 0.12;
-      specPow = 24.0;
-      rimStr  = 0.35;
-      rimCol  = hsv2rgb(vec3(fract(hazeHue + 0.06), 0.40 + uSeed * 0.10, 0.85 + uSeed * 0.08));
+      specStr = 0.08; specPow = 20.0;
+      rimStr = 0.40;
+      rimCol = hsv2rgb(vec3(hazeHue + 0.06, 0.40 + uSeed*0.08, 0.90 + uSeed*0.06));
     }
 
     // ── Diffuse ───────────────────────────────────────────
-    vec3 color = albedo * (0.06 + NdotL * 0.94);
+    vec3 color = albedo * NdotL;
 
     // ── Specular ──────────────────────────────────────────
     if (specPow > 0.0) {

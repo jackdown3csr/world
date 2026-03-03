@@ -148,7 +148,7 @@ export default function SolarSystem() {
         <OrbitControls
           ref={controlsRef}
           enablePan={false}
-          minDistance={8}
+          minDistance={0.3}
           maxDistance={1805}
           enableDamping
           dampingFactor={0.05}
