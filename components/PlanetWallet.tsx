@@ -23,9 +23,14 @@ interface PlanetWalletProps {
   showMoonLabels?: boolean;
   showRingLabels?: boolean;
   showRenamedOnly?: boolean;
+  showTrails?: boolean;
+  onShiftSelect?: (addr: string) => void;
 }
 
-export default function PlanetWallet({ data, selected, panelOpen, onSelect, onDeselect, selectedAddress, onSelectAddress, showLabel, showMoonLabels, showRingLabels, showRenamedOnly }: PlanetWalletProps) {
+const TRAIL_N   = 60;
+const TRAIL_SEC = 30;
+
+export default function PlanetWallet({ data, selected, panelOpen, onSelect, onDeselect, selectedAddress, onSelectAddress, showLabel, showMoonLabels, showRingLabels, showRenamedOnly, showTrails, onShiftSelect }: PlanetWalletProps) {
   const orbitRef = useRef<THREE.Group>(null);
   const meshRef  = useRef<THREE.Mesh>(null);
   const [hovered, setHovered] = useState(false);
@@ -162,14 +167,105 @@ export default function PlanetWallet({ data, selected, panelOpen, onSelect, onDe
     });
   }, [data.planetType, data.ringWallets.length, data.hue]);
 
+  // ── Lock-expiry warning glow ──
+  // Pulses red (≤ 30 days), amber (≤ 90 days), or silent.
+  const expiryGlowMat = useMemo(() => {
+    const lockEnd = data.wallet.lockEnd;
+    if (!lockEnd || lockEnd === 0) return null;
+    const daysLeft = (lockEnd - Date.now() / 1000) / 86400;
+    if (daysLeft > 90) return null;
+
+    const color     = daysLeft <= 30
+      ? new THREE.Color(1.00, 0.18, 0.04)   // urgent red
+      : new THREE.Color(0.95, 0.55, 0.05);  // caution amber
+    const intensity = daysLeft <= 30 ? 0.55 : 0.35;
+
+    return new THREE.ShaderMaterial({
+      vertexShader: /* glsl */ `
+        varying vec3 vNorm;
+        varying vec3 vWorldPos;
+        void main() {
+          vNorm = normalize(mat3(modelMatrix) * normal);
+          vec4 wp = modelMatrix * vec4(position, 1.0);
+          vWorldPos = wp.xyz;
+          gl_Position = projectionMatrix * viewMatrix * wp;
+        }
+      `,
+      fragmentShader: /* glsl */ `
+        uniform vec3  uColor;
+        uniform float uIntensity;
+        uniform float uTime;
+        varying vec3  vNorm;
+        varying vec3  vWorldPos;
+        void main() {
+          vec3 viewDir = normalize(cameraPosition - vWorldPos);
+          float rim    = 1.0 - max(dot(vNorm, viewDir), 0.0);
+          float pulse  = 0.60 + 0.40 * sin(uTime * 2.8);
+          float glow   = pow(rim, 2.2) * uIntensity * pulse;
+          gl_FragColor = vec4(uColor * glow, glow * 0.9);
+        }
+      `,
+      uniforms: {
+        uColor:     { value: color },
+        uIntensity: { value: intensity },
+        uTime:      { value: 0 },
+      },
+      transparent: true,
+      side: THREE.BackSide,
+      depthWrite: false,
+      blending: THREE.AdditiveBlending,
+    });
+  }, [data.wallet.lockEnd]);
+
+  // ── Orbit trail geometry ──
+  const trailPositions = useMemo(() => new Float32Array(TRAIL_N * 3), []);
+  const trailColors    = useMemo(() => new Float32Array(TRAIL_N * 3), []);
+  const trailGeo = useMemo(() => {
+    const g = new THREE.BufferGeometry();
+    g.setAttribute("position", new THREE.BufferAttribute(trailPositions, 3).setUsage(THREE.DynamicDrawUsage));
+    g.setAttribute("color",    new THREE.BufferAttribute(trailColors,    3).setUsage(THREE.DynamicDrawUsage));
+    return g;
+  }, [trailPositions, trailColors]);
+  const trailMat = useMemo(
+    () => new THREE.LineBasicMaterial({
+      vertexColors: true,
+      transparent:  true,
+      opacity:      0.40,
+      depthWrite:   false,
+      blending:     THREE.AdditiveBlending,
+    }),
+    [],
+  );
+  const trailLine = useMemo(() => {
+    const line = new THREE.Line(trailGeo, trailMat);
+    line.frustumCulled = false;   // bounding sphere never updates; skip culling
+    return line;
+  }, [trailGeo, trailMat]);
+
   useFrame((state) => {
     const t = state.clock.elapsedTime;
     if (orbitRef.current) orbitRef.current.rotation.y = data.initialAngle + data.orbitSpeed * t;
     if (meshRef.current)  meshRef.current.rotation.y  = 0.04 * t;
     material.uniforms.uTime.value = t;
+    if (expiryGlowMat) expiryGlowMat.uniforms.uTime.value = t;
 
     // Analytically compute moon world positions for transit shadow uniforms.
     // Transform chain: Rx(planet.tilt) → Ry(planetAngle) → T(orbitR) → Rx(moon.tilt) → Ry(moonAngle) → T(moon.orbitR)
+    // ── Update trail ──
+    if (showTrails) {
+      const pos = trailGeo.attributes.position as THREE.BufferAttribute;
+      const col = trailGeo.attributes.color    as THREE.BufferAttribute;
+      for (let i = 0; i < TRAIL_N; i++) {
+        const frac  = i / (TRAIL_N - 1);           // 0 = oldest tail, 1 = current head
+        const ti    = t - TRAIL_SEC * (1 - frac);
+        const angle = data.initialAngle + data.orbitSpeed * ti;
+        pos.setXYZ(i, data.orbitRadius * Math.cos(angle), 0, data.orbitRadius * Math.sin(angle));
+        col.setXYZ(i, 0.0, frac * 0.45, frac * 0.75);  // fade from black → dim cyan
+      }
+      pos.needsUpdate = true;
+      col.needsUpdate = true;
+    }
+
     if (data.moons.length > 0) {
       const planetAngle = data.initialAngle + data.orbitSpeed * t;
       const cp = Math.cos(planetAngle), sp = Math.sin(planetAngle);
@@ -210,11 +306,19 @@ export default function PlanetWallet({ data, selected, panelOpen, onSelect, onDe
     setHovered(false); document.body.style.cursor = "auto";
   }, []);
   const onClick = useCallback((e: ThreeEvent<MouseEvent>) => {
-    e.stopPropagation(); onSelect();
-  }, [onSelect]);
+    e.stopPropagation();
+    if (e.nativeEvent.shiftKey && onShiftSelect) {
+      onShiftSelect(data.wallet.address);
+    } else {
+      onSelect();
+    }
+  }, [onSelect, onShiftSelect, data.wallet.address]);
 
   return (
     <group rotation={[data.tilt, 0, 0]}>
+      {/* Orbit trail — lives in tilted-group local space so tilt is inherited */}
+      {showTrails && <primitive object={trailLine} />}
+
       <group ref={orbitRef}>
 
         {/* Planet sphere */}
@@ -243,6 +347,14 @@ export default function PlanetWallet({ data, selected, panelOpen, onSelect, onDe
           <mesh position={[data.orbitRadius, 0, 0]}>
             <sphereGeometry args={[data.radius * 1.06, 48, 48]} />
             <primitive object={atmosRimMat} attach="material" />
+          </mesh>
+        )}
+
+        {/* Lock-expiry warning pulse — behind other glows */}
+        {expiryGlowMat && (
+          <mesh position={[data.orbitRadius, 0, 0]}>
+            <sphereGeometry args={[data.radius * 1.22, 32, 32]} />
+            <primitive object={expiryGlowMat} attach="material" />
           </mesh>
         )}
 

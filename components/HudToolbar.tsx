@@ -32,6 +32,8 @@ interface HudToolbarProps {
   onToggleHelp: () => void;
   showOrbits: boolean;
   onToggleOrbits: () => void;
+  showTrails: boolean;
+  onToggleTrails: () => void;
   onReset: () => void;
   mobile?: boolean;
 }
@@ -47,6 +49,8 @@ export default function HudToolbar({
   onToggleHelp,
   showOrbits,
   onToggleOrbits,
+  showTrails,
+  onToggleTrails,
   onReset,
   mobile = false,
 }: HudToolbarProps) {
@@ -88,6 +92,9 @@ export default function HudToolbar({
       </button>
       <button onClick={onToggleOrbits} style={btn(showOrbits)}>
         orbit
+      </button>
+      <button onClick={onToggleTrails} style={btn(showTrails)}>
+        trails
       </button>
       <button onClick={onToggleHelp} style={btn(showHelp)}>
         help

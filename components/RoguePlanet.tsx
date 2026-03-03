@@ -1,0 +1,139 @@
+"use client";
+
+import { useRef, useMemo } from "react";
+import { useFrame } from "@react-three/fiber";
+import * as THREE from "three";
+
+/* ── Orbital parameters ── */
+const ORBIT_R  = 580;          // AU-scale units, outer system
+const INCL     = 65 * (Math.PI / 180); // high inclination — clearly not one of us
+const PERIOD   = 950;          // seconds per full orbit
+const OMEGA    = (2 * Math.PI) / PERIOD;
+const PHASE    = 2.17;         // arbitrary starting phase
+const ROGUE_R  = 4.2;          // body radius
+
+/* The single cryptic identifying hash shown on click */
+export const ROGUE_HASH =
+  "0x3f7a91b4e2c85d0f6a1b9e47c3d28f05a6e94b71c2d85f3e0a791b4c6d2e8f01";
+
+/* ── Dark displaced shader ── */
+const VERT = /* glsl */ `
+  uniform float uTime;
+  uniform float uSeed;
+  varying vec3 vNorm;
+  varying vec3 vPos;
+  varying float vDisp;
+
+  // Quick hash-based "noise"
+  float h31(vec3 p) {
+    p = fract(p * vec3(443.8975, 397.2973, 491.1871));
+    p += dot(p, p.yxz + 19.19);
+    return fract((p.x + p.y) * p.z);
+  }
+  float n3(vec3 p) {
+    vec3 i = floor(p);
+    vec3 f = fract(p);
+    f = f * f * (3.0 - 2.0 * f);
+    return mix(
+      mix(mix(h31(i),           h31(i+vec3(1,0,0)), f.x),
+          mix(h31(i+vec3(0,1,0)), h31(i+vec3(1,1,0)), f.x), f.y),
+      mix(mix(h31(i+vec3(0,0,1)), h31(i+vec3(1,0,1)), f.x),
+          mix(h31(i+vec3(0,1,1)), h31(i+vec3(1,1,1)), f.x), f.y),
+      f.z);
+  }
+  float fbm(vec3 p) {
+    float v = 0.0, a = 0.5;
+    for (int i = 0; i < 5; i++) { v += a * n3(p); p = p * 2.1 + uSeed; a *= 0.5; }
+    return v;
+  }
+
+  void main() {
+    vec3 p = position * 2.8 + uSeed;
+    float d = fbm(p) * 0.28 + fbm(p * 2.0 + 7.3) * 0.12;
+    vDisp = d;
+    vPos  = position;
+    vNorm = normalize(normal);
+    vec3 displaced = position + normal * d * 0.6;
+    gl_Position = projectionMatrix * modelViewMatrix * vec4(displaced, 1.0);
+  }
+`;
+
+const FRAG = /* glsl */ `
+  uniform float uTime;
+  varying vec3 vNorm;
+  varying vec3 vPos;
+  varying float vDisp;
+
+  void main() {
+    vec3 viewDir = normalize(cameraPosition - vPos);
+    float NdotV  = max(dot(vNorm, viewDir), 0.0);
+
+    // Base: near-black with faint deep crimson seams
+    vec3 col = vec3(0.035, 0.018, 0.022);
+
+    // Displacement-driven crack glow — very subtle deep red
+    float crack = smoothstep(0.28, 0.50, vDisp);
+    col += crack * vec3(0.12, 0.02, 0.005);
+
+    // Faint specular from the sun (origin)
+    vec3 sunDir = normalize(-vPos);
+    float spec  = pow(max(dot(reflect(-sunDir, vNorm), viewDir), 0.0), 18.0);
+    col += spec * vec3(0.04, 0.02, 0.025);
+
+    // Edge fades to nearly-black
+    float rim = 1.0 - NdotV;
+    col      *= (0.6 + rim * 0.4);
+
+    gl_FragColor = vec4(col, 1.0);
+  }
+`;
+
+interface RoguePlanetProps {
+  onRogueClick: () => void;
+}
+
+export default function RoguePlanet({ onRogueClick }: RoguePlanetProps) {
+  const groupRef = useRef<THREE.Group>(null);
+  const meshRef  = useRef<THREE.Mesh>(null);
+
+  const material = useMemo(
+    () =>
+      new THREE.ShaderMaterial({
+        vertexShader:   VERT,
+        fragmentShader: FRAG,
+        uniforms: {
+          uTime: { value: 0 },
+          uSeed: { value: 7.31 },
+        },
+      }),
+    [],
+  );
+
+  useFrame(({ clock }) => {
+    const t     = clock.elapsedTime;
+    const angle = PHASE + OMEGA * t;
+    if (groupRef.current) {
+      groupRef.current.position.set(
+        ORBIT_R * Math.cos(angle),
+        ORBIT_R * Math.sin(INCL) * Math.sin(angle),   // inclined orbit
+        ORBIT_R * Math.cos(INCL) * Math.sin(angle),
+      );
+    }
+    if (meshRef.current) meshRef.current.rotation.y = 0.012 * t;
+    material.uniforms.uTime.value = t;
+  });
+
+  return (
+    <group ref={groupRef}>
+      <mesh
+        ref={meshRef}
+        onPointerEnter={(e) => { e.stopPropagation(); document.body.style.cursor = "pointer"; }}
+        onPointerLeave={() => { document.body.style.cursor = "auto"; }}
+        onClick={(e) => { e.stopPropagation(); onRogueClick(); }}
+      >
+        <sphereGeometry args={[ROGUE_R, 64, 48]} />
+        <primitive object={material} attach="material" />
+      </mesh>
+    </group>
+  );
+}

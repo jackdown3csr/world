@@ -244,9 +244,10 @@ function LensFlare() {
 interface SunProps {
   totalVotingPower?: string;
   totalLocked?: string;
+  blockNumber?: number;   // changes each block → triggers a flash
 }
 
-export default function Sun({ totalVotingPower, totalLocked }: SunProps) {
+export default function Sun({ totalVotingPower, totalLocked, blockNumber }: SunProps) {
   const surfaceMat = useMemo(
     () => new THREE.ShaderMaterial({
       vertexShader: surfaceVert, fragmentShader: surfaceFrag,
@@ -262,10 +263,40 @@ export default function Sun({ totalVotingPower, totalLocked }: SunProps) {
       side: THREE.FrontSide,
     }), []);
 
-  useFrame((state) => {
+  // ── Block-flash corona ──
+  const flashMat = useMemo(() => new THREE.ShaderMaterial({
+    vertexShader: haloVert,
+    fragmentShader: haloFrag,
+    uniforms: {
+      uColor:   { value: new THREE.Color("#fff8d0") },
+      uAlpha:   { value: 0 },
+      uFalloff: { value: 1.8 },
+    },
+    blending:    THREE.AdditiveBlending,
+    transparent: true,
+    depthWrite:  false,
+    side:        THREE.DoubleSide,
+  }), []);
+  const flashRef     = useRef<THREE.Mesh>(null);
+  const flashAmount  = useRef(0);         // 0–1 decaying value
+  const prevBlock    = useRef<number>(-1);
+  const { camera } = useThree();
+
+  useFrame((state, delta) => {
     const t = state.clock.elapsedTime;
     surfaceMat.uniforms.uTime.value = t;
     promMat.uniforms.uTime.value    = t;
+
+    // Flash on new block
+    if (blockNumber !== undefined && blockNumber !== prevBlock.current && blockNumber > 0) {
+      prevBlock.current = blockNumber;
+      flashAmount.current = 1.0;
+    }
+    if (flashAmount.current > 0) {
+      flashAmount.current = Math.max(0, flashAmount.current - delta * 2.8);
+      flashMat.uniforms.uAlpha.value = flashAmount.current * 0.45;
+    }
+    if (flashRef.current) flashRef.current.quaternion.copy(camera.quaternion);
   });
 
   return (
@@ -280,6 +311,12 @@ export default function Sun({ totalVotingPower, totalLocked }: SunProps) {
       <mesh>
         <sphereGeometry args={[SUN_RADIUS * 1.015, 96, 96]} />
         <primitive object={promMat} attach="material" />
+      </mesh>
+
+      {/* block-flash halo */}
+      <mesh ref={flashRef}>
+        <planeGeometry args={[SUN_RADIUS * 2 * 9, SUN_RADIUS * 2 * 9]} />
+        <primitive object={flashMat} attach="material" />
       </mesh>
 
       {/* soft bloom billboard */}
