@@ -135,6 +135,17 @@ export default function DirectoryPanel({
             >
               {addrLabel(m.wallet)}
             </span>
+            <span
+              style={{
+                color: "#00e5ff",
+                fontSize: 9,
+                flexShrink: 0,
+                fontVariantNumeric: "tabular-nums",
+                opacity: 0.6,
+              }}
+            >
+              {m.wallet.votingPowerFormatted}
+            </span>
           </button>
         )),
       )}
@@ -184,16 +195,38 @@ export default function DirectoryPanel({
               style={rowStyle(sel === a.wallet.address.toLowerCase(), true)}
             >
               <span
+                  style={{
+                    color: "#7a8e9e",
+                    fontSize: 10,
+                    flex: 1,
+                    overflow: "hidden",
+                    textOverflow: "ellipsis",
+                    whiteSpace: "nowrap",
+                  }}
+                >
+                  {addrLabel(r.wallet)}
+                </span>
+                <span
+                  style={{
+                    color: "#00e5ff",
+                    fontSize: 9,
+                    flexShrink: 0,
+                    fontVariantNumeric: "tabular-nums",
+                    opacity: 0.6,
+                  }}
+                >
+                  {r.wallet.votingPowerFormatted}
+                </span>
+              <span
                 style={{
-                  color: "#7a8e9e",
-                  fontSize: 10,
-                  flex: 1,
-                  overflow: "hidden",
-                  textOverflow: "ellipsis",
-                  whiteSpace: "nowrap",
+                  color: "#00e5ff",
+                  fontSize: 9,
+                  flexShrink: 0,
+                  fontVariantNumeric: "tabular-nums",
+                  opacity: 0.6,
                 }}
               >
-                {addrLabel(a.wallet)}
+                {a.wallet.votingPowerFormatted}
               </span>
             </button>
           ))}
