@@ -89,7 +89,61 @@ export function buildMoonList(
       initialAngle: frac(mw.address, 11) * Math.PI * 2,
       hue:          frac(mw.address, 22),
       seed:         frac(mw.address, 33),
-      tilt:         (frac(mw.address, 44) - 0.5) * 0.25,
+      tilt:         0,
+      moonType:     (Math.floor(frac(mw.address, 66) * 6) % 6) as 0 | 1 | 2 | 3 | 4 | 5,
+    };
+  });
+}
+
+/* ── Saturn-specific moon placement ───────────────────────── */
+
+/**
+ * Predefined orbit slots for Saturn moons (as multiples of host radius).
+ * Shepherd moons sit within the ring bands to create gaps;
+ * larger moons orbit beyond the ring's outer edge.
+ */
+const SATURN_MOON_SLOTS = [
+  1.45,   // D/C ring boundary — shepherd moon (creates visible gap)
+  2.10,   // mid-C ring — shepherd moon
+  2.80,   // near Cassini Division — like Mimas
+  3.45,   // A ring — like Daphnis in Encke gap
+  4.30,   // just outside ring system — like Janus
+  5.00,   // far outer orbit — like Enceladus
+];
+
+/**
+ * Build moon layout for Saturn. Moons are spread across and beyond the
+ * ring system rather than packed at the inner edge, so the ring disc
+ * shader can carve realistic gaps at each moon orbit.
+ */
+export function buildSaturnMoonList(
+  wallets:    WalletEntry[],
+  hostRadius: number,
+  stats:      MoonVPStats,
+): MoonData[] {
+  return wallets.map((mw, i) => {
+    const mvp   = weiToFloat(mw.votingPower);
+    const mt    = Math.max(0, Math.min(1,
+      (Math.log10(Math.max(mvp, 0.001)) - stats.mlogMin) / stats.mvpRange));
+    const mrRaw = MIN_MOON_R + Math.pow(mt, 0.5) * (MAX_MOON_R - MIN_MOON_R);
+    const mr    = Math.min(mrRaw, hostRadius * 0.30);
+
+    const slot  = SATURN_MOON_SLOTS[i % SATURN_MOON_SLOTS.length];
+    const mo    = hostRadius * slot;
+
+    // Kepler-like orbit speed: inner moons orbit faster
+    const baseOrbitR = hostRadius * SATURN_MOON_SLOTS[0];
+    const speed      = BASE_MOON_SPEED * Math.pow(baseOrbitR / mo, 1.5);
+
+    return {
+      wallet:       mw,
+      radius:       mr,
+      orbitRadius:  mo,
+      orbitSpeed:   speed,
+      initialAngle: frac(mw.address, 11) * Math.PI * 2,
+      hue:          frac(mw.address, 22),
+      seed:         frac(mw.address, 33),
+      tilt:         0,
       moonType:     (Math.floor(frac(mw.address, 66) * 6) % 6) as 0 | 1 | 2 | 3 | 4 | 5,
     };
   });

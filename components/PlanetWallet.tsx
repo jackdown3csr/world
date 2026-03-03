@@ -9,7 +9,7 @@ import type { PlanetData } from "@/lib/layout";
 import { createPlanetMaterial } from "@/lib/shaders/planetMaterial";
 import WalletTooltip from "./WalletTooltip";
 import MoonBody from "./MoonBody";
-import WalletRing from "./WalletRing";
+import SaturnSystem from "./SaturnSystem";
 
 interface PlanetWalletProps {
   data:     PlanetData;
@@ -132,15 +132,17 @@ export default function PlanetWallet({ data, selected, panelOpen, onSelect, onDe
           </mesh>
         )}
 
-        {/* Wallet-particle ring (Saturn) */}
+        {/* Saturn ring + moon system (same tilt plane) */}
         {data.ringWallets.length > 0 && (
           <group position={[data.orbitRadius, 0, 0]}>
-            <WalletRing
-              ringWallets={data.ringWallets}
-              hostRadius={data.radius}
+            <SaturnSystem
+              data={data}
               selectedAddress={selectedAddress}
               onSelectAddress={onSelectAddress}
-              showLabels={showRingLabels}
+              onDeselect={onDeselect}
+              panelOpen={panelOpen}
+              showMoonLabels={showMoonLabels}
+              showRingLabels={showRingLabels}
               showRenamedOnly={showRenamedOnly}
             />
           </group>
@@ -184,8 +186,8 @@ export default function PlanetWallet({ data, selected, panelOpen, onSelect, onDe
           ) : null
         )}
 
-        {/* Moons */}
-        {data.moons.map((moon, i) => (
+        {/* Moons (non-Saturn planets only — Saturn moons handled by SaturnSystem) */}
+        {data.ringWallets.length === 0 && data.moons.map((moon, i) => (
           <MoonBody
             key={moon.wallet.address + i}
             data={moon}

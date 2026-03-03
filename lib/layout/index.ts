@@ -23,7 +23,7 @@ import {
 } from "./constants";
 import { weiToFloat, frac } from "./helpers";
 import { computePlanetSizing, computeOrbits } from "./planetLayout";
-import { distributeMoons, computeMoonVPStats, buildMoonList } from "./moonLayout";
+import { distributeMoons, computeMoonVPStats, buildMoonList, buildSaturnMoonList } from "./moonLayout";
 import { buildRingParticles } from "./ringLayout";
 import { buildAsteroids } from "./asteroidLayout";
 
@@ -62,7 +62,10 @@ export function buildSolarSystem(wallets: WalletEntry[]): SolarSystemData {
     const orbitRadius = orbitByIdx[i];
     const orbitSpeed  = BASE_PLANET_SPEED * Math.pow(FIRST_ORBIT / orbitRadius, 1.5);
     const pType       = typeMap.get(w.address)!;
-    const moons       = buildMoonList(moonGroups.get(i) ?? [], radius, moonStats);
+    const isSaturn    = i === saturnIdx;
+    const moons       = isSaturn
+      ? buildSaturnMoonList(moonGroups.get(i) ?? [], radius, moonStats)
+      : buildMoonList(moonGroups.get(i) ?? [], radius, moonStats);
 
     return {
       wallet:       w,
