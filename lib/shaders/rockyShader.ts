@@ -81,7 +81,8 @@ export const FRAG = /* glsl */ `
     float h0   = typeHeight(p, seed3, uSeed);
     float hx   = typeHeight(normalize(p + vec3(eps,0.,0.)), seed3, uSeed);
     float hy   = typeHeight(normalize(p + vec3(0.,eps,0.)), seed3, uSeed);
-    vec3 grad  = vec3(hx-h0, hy-h0, 0.) / eps;
+    float hz   = typeHeight(normalize(p + vec3(0.,0.,eps)), seed3, uSeed);
+    vec3 grad  = vec3(hx-h0, hy-h0, hz-h0) / eps;
     vec3 bumpN = normalize(vWorldNorm + grad * 0.9);
 
     float NdotL_raw = dot(bumpN, lightDir);

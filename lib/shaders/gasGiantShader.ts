@@ -134,9 +134,9 @@ export const FRAG = /* glsl */ `
     float spec = pow(max(dot(bumpN,halfV),0.), 24.0);
     color += vec3(1.,0.97,0.88) * spec * 0.30 * day;
 
-    // ── Atmosphere Fresnel rim (suppressed when planet has wallet ring) ──
+    // ── Atmosphere Fresnel rim (partially suppressed when planet has wallet ring) ──
     vec3  atmosCol  = hsv(vec3(fract(0.09+hShift), 0.50, 0.98));
-    float atmosStr  = 0.35 * (1.0 - uHasRing);
+    float atmosStr  = 0.35 * (1.0 - uHasRing * 0.55);
     float vdn       = max(dot(bumpN, viewDir), 0.);
     float sunFacing = smoothstep(-0.15, 0.35, dot(vWorldNorm, lightDir));
     float fres      = pow(1.-vdn, 3.5) * sunFacing;

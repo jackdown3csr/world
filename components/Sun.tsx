@@ -63,20 +63,22 @@ const surfaceFrag = /* glsl */ `
 
     vec3 viewDir = normalize(cameraPosition - vWorldPos);
     float mu   = max(dot(vNorm, viewDir), 0.0);
+
+    /* limb darkening */
     float limb = 0.55 + 0.45 * pow(mu, 0.35);
     col *= limb;
 
     float edge = pow(1.0 - mu, 4.0);
-    col = mix(col, vec3(1.0, 0.40, 0.06), edge * 0.50);
+    col = mix(col, vec3(1.0, 0.40, 0.06), edge * 0.45);
 
-    /* ── integrated prominence / filament effect ── */
+    /* ── subtle prominence / filament highlights ── */
     float fn = fbm(p * 3.0 + vec3(uTime*0.012, uTime*0.007, 0.0));
     float faceMask = pow(mu, 0.4);
     float filament = smoothstep(0.35, 0.65, fn) * faceMask;
     vec3 filCol = mix(vec3(1.0, 0.35, 0.05), vec3(1.0, 0.80, 0.30), fn);
-    col += filCol * filament * 0.55;
+    col += filCol * filament * 0.45;
 
-    col *= 1.6;
+    col *= 1.5;
 
     gl_FragColor = vec4(col, 1.0);
   }
@@ -182,7 +184,7 @@ function HaloLayer({ scale, color, alpha, falloff }:
         uFalloff: { value: falloff },
       },
       blending: THREE.AdditiveBlending, transparent: true, depthWrite: false,
-      side: THREE.DoubleSide,
+      depthTest: false, side: THREE.DoubleSide,
     }), [color, alpha, falloff]);
   useFrame(() => { if (ref.current) ref.current.quaternion.copy(camera.quaternion); });
   const s = SUN_RADIUS * scale;
@@ -205,7 +207,7 @@ function LensFlare() {
       blending: THREE.AdditiveBlending,
       transparent: true,
       depthWrite: false,
-      depthTest: true,
+      depthTest: false,
       side: THREE.DoubleSide,
     }), []);
 
@@ -251,6 +253,7 @@ export default function Sun({ totalVotingPower, totalLocked, blockNumber }: SunP
     blending:    THREE.AdditiveBlending,
     transparent: true,
     depthWrite:  false,
+    depthTest:   false,
     side:        THREE.DoubleSide,
   }), []);
   const flashRef     = useRef<THREE.Mesh>(null);

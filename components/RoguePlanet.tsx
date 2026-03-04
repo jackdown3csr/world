@@ -22,6 +22,7 @@ const VERT = /* glsl */ `
   uniform float uSeed;
   varying vec3 vNorm;
   varying vec3 vPos;
+  varying vec3 vWorldPos;
   varying float vDisp;
 
   // Quick hash-based "noise"
@@ -47,13 +48,28 @@ const VERT = /* glsl */ `
     return v;
   }
 
+  float dispAt(vec3 pos) {
+    vec3 p = pos * 2.8 + uSeed;
+    return fbm(p) * 0.28 + fbm(p * 2.0 + 7.3) * 0.12;
+  }
+
   void main() {
-    vec3 p = position * 2.8 + uSeed;
-    float d = fbm(p) * 0.28 + fbm(p * 2.0 + 7.3) * 0.12;
+    float d = dispAt(position);
     vDisp = d;
-    vPos  = position;
-    vNorm = normalize(normal);
     vec3 displaced = position + normal * d * 0.6;
+
+    // Recompute normal via finite differences
+    float eps = 0.005;
+    vec3 t1 = normalize(abs(normal.y) < 0.99 ? cross(normal, vec3(0,1,0)) : cross(normal, vec3(1,0,0)));
+    vec3 t2 = cross(normal, t1);
+    float d1 = dispAt(position + t1 * eps);
+    float d2 = dispAt(position + t2 * eps);
+    vec3 p1 = (position + t1 * eps) + normal * d1 * 0.6;
+    vec3 p2 = (position + t2 * eps) + normal * d2 * 0.6;
+    vNorm = normalize((modelMatrix * vec4(cross(p1 - displaced, p2 - displaced), 0.0)).xyz);
+
+    vPos  = position;
+    vWorldPos = (modelMatrix * vec4(displaced, 1.0)).xyz;
     gl_Position = projectionMatrix * modelViewMatrix * vec4(displaced, 1.0);
   }
 `;
@@ -62,10 +78,11 @@ const FRAG = /* glsl */ `
   uniform float uTime;
   varying vec3 vNorm;
   varying vec3 vPos;
+  varying vec3 vWorldPos;
   varying float vDisp;
 
   void main() {
-    vec3 viewDir = normalize(cameraPosition - vPos);
+    vec3 viewDir = normalize(cameraPosition - vWorldPos);
     float NdotV  = max(dot(vNorm, viewDir), 0.0);
 
     // Base: near-black with faint deep crimson seams
@@ -75,8 +92,8 @@ const FRAG = /* glsl */ `
     float crack = smoothstep(0.28, 0.50, vDisp);
     col += crack * vec3(0.12, 0.02, 0.005);
 
-    // Faint specular from the sun (origin)
-    vec3 sunDir = normalize(-vPos);
+    // Faint specular from the sun (world origin)
+    vec3 sunDir = normalize(-vWorldPos);
     float spec  = pow(max(dot(reflect(-sunDir, vNorm), viewDir), 0.0), 18.0);
     col += spec * vec3(0.04, 0.02, 0.025);
 
