@@ -8,6 +8,9 @@ import type { WalletEntry } from "../types";
 
 export type PlanetType = "rocky" | "terrestrial" | "ice_giant" | "gas_giant";
 
+/** Layout mode: "solar" = real-solar-system bands, "ranked" = VP rank → distance, "ranked-gnet" = locked GNET rank → distance */
+export type LayoutMode = "solar" | "ranked" | "ranked-gnet";
+
 export interface PlanetData {
   wallet:       WalletEntry;
   radius:       number;
@@ -20,6 +23,8 @@ export interface PlanetData {
   tilt:         number;
   moons:        MoonData[];
   ringWallets:  RingParticleData[];
+  /** 1-based rank by voting power (veGNET), highest VP = 1 */
+  vpRank:       number;
   /** True for the highest-ranked rocky planet (the "Mars" of this system) */
   isMars?:      boolean;
 }

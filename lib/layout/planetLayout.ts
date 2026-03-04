@@ -3,9 +3,9 @@
  */
 
 import type { WalletEntry } from "../types";
-import type { PlanetType } from "./types";
+import type { PlanetType, LayoutMode } from "./types";
 import { SIZE_RANGES, FIRST_ORBIT, SURFACE_GAP, SATURN_RING_OUTER_MULT, SATURN_RING_EXTRA_GAP } from "./constants";
-import { fnv1a, planetTypeByRank } from "./helpers";
+import { fnv1a, weiToFloat, planetTypeByRank } from "./helpers";
 
 interface RankedEntry { w: WalletEntry; vp: number }
 
@@ -55,25 +55,37 @@ export function computeOrbits(
   radiusMap: Map<string, number>,
   typeMap:   Map<string, PlanetType>,
   saturnEntryIdx = -1,   // index in planetEntries of the ring-host (Saturn)
+  layoutMode: LayoutMode = "solar",
 ): number[] {
   const N = planetEntries.length;
 
-  // Type → orbit-band priority (lower = closer to sun)
-  const TYPE_ORDER: Record<PlanetType, number> = {
-    rocky: 0, terrestrial: 1, ice_giant: 2, gas_giant: 3,
-  };
+  let slotOrder: number[];
 
-  // Build entries with type + sub-key for intra-group ordering
-  const entries = planetEntries.map(({ w }, i) => ({
-    i,
-    type:   typeMap.get(w.address) ?? ("rocky" as PlanetType),
-    subKey: w.orbitSlot != null ? w.orbitSlot : fnv1a(w.address, 0xcafe) % N,
-  }));
+  if (layoutMode === "ranked") {
+    // Ranked mode: highest VP (index 0) = closest to Sun
+    slotOrder = planetEntries.map((_, i) => i);
+  } else if (layoutMode === "ranked-gnet") {
+    // Ranked by locked GNET descending
+    const byGnet = planetEntries
+      .map(({ w }, i) => ({ i, gnet: weiToFloat(w.lockedGnet) }))
+      .sort((a, b) => b.gnet - a.gnet);
+    slotOrder = byGnet.map(x => x.i);
+  } else {
+    // Solar mode: type bands (rocky inner → gas giant outer)
+    const TYPE_ORDER: Record<PlanetType, number> = {
+      rocky: 0, terrestrial: 1, ice_giant: 2, gas_giant: 3,
+    };
 
-  // Sort: first by type band, then by sub-key within band
-  const slotOrder = entries
-    .sort((a, b) => TYPE_ORDER[a.type] - TYPE_ORDER[b.type] || a.subKey - b.subKey)
-    .map(x => x.i);
+    const entries = planetEntries.map(({ w }, i) => ({
+      i,
+      type:   typeMap.get(w.address) ?? ("rocky" as PlanetType),
+      subKey: w.orbitSlot != null ? w.orbitSlot : fnv1a(w.address, 0xcafe) % N,
+    }));
+
+    slotOrder = entries
+      .sort((a, b) => TYPE_ORDER[a.type] - TYPE_ORDER[b.type] || a.subKey - b.subKey)
+      .map(x => x.i);
+  }
 
   const orbitByIdx = new Array<number>(N).fill(0);
   let cursor = FIRST_ORBIT;

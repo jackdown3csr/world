@@ -85,6 +85,8 @@ export default function HelpPanel({ mobile = false }: { mobile?: boolean }) {
         <span style={s.cyan}>TRAILS</span> — toggle orbit history trails<br />
         <span style={s.cyan}>LABELS</span> — show/hide all labels<br />
         <span style={s.cyan}>NAMED</span> — show only renamed wallets<br />
+        <span style={s.cyan}>RANKED</span> — sort planets by VP rank (closest = highest)<br />
+        <span style={s.cyan}>GNET</span> — when ranked, sort by locked GNET instead<br />
         <span style={s.cyan}>SEARCH</span> — open wallet directory<br />
         <span style={s.cyan}>HELP</span> — toggle this panel<br />
         <span style={s.cyan}>RESET</span> — camera overview

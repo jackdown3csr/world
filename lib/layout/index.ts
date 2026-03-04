@@ -11,7 +11,7 @@
  */
 
 import type { WalletEntry } from "../types";
-import type { SolarSystemData, PlanetData } from "./types";
+import type { SolarSystemData, PlanetData, LayoutMode } from "./types";
 import {
   PLANET_COUNT,
   MOON_END_RANK,
@@ -27,7 +27,7 @@ import { distributeMoons, computeMoonVPStats, buildMoonList, buildSaturnMoonList
 import { buildRingParticles } from "./ringLayout";
 import { buildAsteroids } from "./asteroidLayout";
 
-export function buildSolarSystem(wallets: WalletEntry[]): SolarSystemData {
+export function buildSolarSystem(wallets: WalletEntry[], layoutMode: LayoutMode = "solar"): SolarSystemData {
   if (wallets.length === 0)
     return { planets: [], asteroids: [], beltInnerRadius: 0, beltOuterRadius: 0 };
 
@@ -49,7 +49,7 @@ export function buildSolarSystem(wallets: WalletEntry[]): SolarSystemData {
   const saturnIdx  = 0;   // ring-host is always rank-0 (highest VP) planet
   // Mars = highest-ranked rocky planet (first entry with type "rocky" = rank 14)
   const marsIdx    = planetEntries.findIndex((_, i) => planetTypeByRank(i) === "rocky");
-  const orbitByIdx = computeOrbits(planetEntries, radiusMap, typeMap, saturnIdx);
+  const orbitByIdx = computeOrbits(planetEntries, radiusMap, typeMap, saturnIdx, layoutMode);
 
   /* 4. Moon distribution */
   const { moonGroups, overflowBelt } = distributeMoons(moonEntries, N);
@@ -82,6 +82,7 @@ export function buildSolarSystem(wallets: WalletEntry[]): SolarSystemData {
       tilt:         i === marsIdx ? 0.44 : (frac(w.address, 77) - 0.5) * 0.28,
       moons,
       ringWallets:  i === saturnIdx ? ringParticles : [],
+      vpRank:       i + 1,
       isMars:       i === marsIdx,
     };
   });
@@ -104,5 +105,6 @@ export type {
   RingParticleData,
   AsteroidData,
   SolarSystemData,
+  LayoutMode,
 } from "./types";
 export { SUN_RADIUS } from "./constants";

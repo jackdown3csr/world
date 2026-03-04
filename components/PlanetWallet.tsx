@@ -426,8 +426,7 @@ export default function PlanetWallet({ data, selected, panelOpen, onSelect, onDe
               letterSpacing: "0.08em",
               textTransform: "uppercase",
               opacity: 0.85,
-            }}>
-              {data.wallet.customName || `${data.wallet.address.slice(0, 6)}\u2026${data.wallet.address.slice(-4)}`}
+            }}>              <span style={{ color: "rgba(0,229,255,0.55)", marginRight: 4 }}>#{data.vpRank}</span>              {data.wallet.customName || `${data.wallet.address.slice(0, 6)}\u2026${data.wallet.address.slice(-4)}`}
             </div>
           </Html>
           ) : null

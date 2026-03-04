@@ -18,6 +18,8 @@ const icons = {
   help:   (s?: number) => <I d="M12 12m-10 0a10 10 0 1 0 20 0a10 10 0 1 0-20 0M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3M12 17h.01" size={s} />,
   reset:  (s?: number) => <I d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8M3 3v5h5" size={s} />,
   fly:    (s?: number) => <I d="M9.5 15.5L5 20M14.5 13.5l-5 5M22 2L11 13M22 2l-7 20-4-9-9-4z" size={s} />,
+  ranked: (s?: number) => <I d="M3 4h18M3 8h14M3 12h10M3 16h6" size={s} />,
+  gnet:   (s?: number) => <I d="M12 2v4M12 18v4M4.93 4.93l2.83 2.83M16.24 16.24l2.83 2.83M2 12h4M18 12h4M4.93 19.07l2.83-2.83M16.24 7.76l2.83-2.83" size={s} />,
   photo:  (s?: number) => <I d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2zM12 17a4 4 0 1 0 0-8 4 4 0 0 0 0 8z" size={s} />,
 };
 
@@ -144,6 +146,10 @@ interface HudToolbarProps {
   flyModeEnabled?: boolean;
   onToggleFlyMode?: () => void;
   onPhotoMode?: () => void;
+  rankedLayout?: boolean;
+  onToggleLayout?: () => void;
+  gnetRanked?: boolean;
+  onToggleGnet?: () => void;
   mobile?: boolean;
 }
 
@@ -164,6 +170,10 @@ export default function HudToolbar({
   flyModeEnabled = false,
   onToggleFlyMode,
   onPhotoMode,
+  rankedLayout = false,
+  onToggleLayout,
+  gnetRanked = false,
+  onToggleGnet,
   mobile = false,
 }: HudToolbarProps) {
   return (
@@ -184,11 +194,20 @@ export default function HudToolbar({
         backdropFilter: "blur(8px)",
       }}
     >
-      <Group label="display" mobile={mobile}>
+      <Group label="view" mobile={mobile}>
         <HudBtn active={showOrbits} onClick={onToggleOrbits} icon={icons.orbit} label="orbits" shortcut="O" mobile={mobile} />
         <HudBtn active={showTrails} onClick={onToggleTrails} icon={icons.trail} label="trails" shortcut="T" mobile={mobile} />
         <HudBtn active={showAllNames} onClick={onToggleLabels} icon={icons.label} label="labels" shortcut="L" mobile={mobile} />
         <HudBtn active={showRenamedOnly && showAllNames} onClick={onToggleRenamed} icon={icons.named} label="named" shortcut="N" disabled={!showAllNames} mobile={mobile} />
+      </Group>
+
+      <Group label="layout" mobile={mobile}>
+        {onToggleLayout && (
+          <HudBtn active={rankedLayout} onClick={onToggleLayout} icon={icons.ranked} label="ranked" shortcut="K" mobile={mobile} />
+        )}
+        {onToggleGnet && (
+          <HudBtn active={gnetRanked} onClick={onToggleGnet} icon={icons.gnet} label="gnet" shortcut="J" disabled={!rankedLayout} mobile={mobile} />
+        )}
       </Group>
 
       <Group label="tools" mobile={mobile}>
