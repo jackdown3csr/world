@@ -64,44 +64,21 @@ const surfaceFrag = /* glsl */ `
 
     float edge = pow(1.0 - mu, 4.0);
     col = mix(col, vec3(1.0, 0.40, 0.06), edge * 0.50);
+
+    /* ── integrated prominence / filament effect ── */
+    float fn = fbm(p * 3.0 + vec3(uTime*0.012, uTime*0.007, 0.0));
+    float faceMask = pow(mu, 0.4);
+    float filament = smoothstep(0.35, 0.65, fn) * faceMask;
+    vec3 filCol = mix(vec3(1.0, 0.35, 0.05), vec3(1.0, 0.80, 0.30), fn);
+    col += filCol * filament * 0.55;
+
     col *= 1.6;
 
     gl_FragColor = vec4(col, 1.0);
   }
 `;
 
-/* == prominence / filament layer == */
-const promVert = /* glsl */ `
-  varying vec3 vPos;
-  varying vec3 vNorm;
-  void main() {
-    vPos  = position;
-    vNorm = normalize(normalMatrix * normal);
-    gl_Position = projectionMatrix * modelViewMatrix * vec4(position,1.0);
-  }
-`;
-
-const promFrag = /* glsl */ `
-  uniform float uTime;
-  varying vec3 vPos;
-  varying vec3 vNorm;
-
-  ${NOISE_GLSL}
-
-  void main() {
-    vec3 p  = normalize(vPos);
-    float mu = max(dot(vNorm, vec3(0.0,0.0,1.0)), 0.0);
-    // Fade to zero at the very limb so the sphere edge is invisible
-    float edgeFade = smoothstep(0.0, 0.18, mu);
-    float faceMask = pow(mu, 0.4) * edgeFade;
-    float n = fbm(p * 3.0 + vec3(uTime*0.012, uTime*0.007, 0.0));
-    float filament = smoothstep(0.35, 0.65, n) * faceMask;
-
-    vec3 col = mix(vec3(1.0, 0.35, 0.05), vec3(1.0, 0.80, 0.30), n) * filament;
-    float alpha = filament * 0.55;
-    gl_FragColor = vec4(col, alpha);
-  }
-`;
+/* prominence / filament effect is now integrated into surfaceFrag above */
 
 /* == corona / glow halo == */
 const haloVert = /* glsl */ `
@@ -256,14 +233,7 @@ export default function Sun({ totalVotingPower, totalLocked, blockNumber }: SunP
       uniforms: { uTime: { value: 0 } },
     }), []);
 
-  const promMat = useMemo(
-    () => new THREE.ShaderMaterial({
-      vertexShader: promVert, fragmentShader: promFrag,
-      uniforms: { uTime: { value: 0 } },
-      transparent: true, depthWrite: false,
-      blending: THREE.AdditiveBlending,
-      side: THREE.FrontSide,
-    }), []);
+
 
   // ── Block-flash corona ──
   const flashMat = useMemo(() => new THREE.ShaderMaterial({
@@ -287,7 +257,6 @@ export default function Sun({ totalVotingPower, totalLocked, blockNumber }: SunP
   useFrame((state, delta) => {
     const t = state.clock.elapsedTime;
     surfaceMat.uniforms.uTime.value = t;
-    promMat.uniforms.uTime.value    = t;
 
     // Flash on new block
     if (blockNumber !== undefined && blockNumber !== prevBlock.current && blockNumber > 0) {
@@ -307,12 +276,6 @@ export default function Sun({ totalVotingPower, totalLocked, blockNumber }: SunP
       <mesh>
         <sphereGeometry args={[SUN_RADIUS, 128, 128]} />
         <primitive object={surfaceMat} attach="material" />
-      </mesh>
-
-      {/* prominence / filament shell */}
-      <mesh>
-        <sphereGeometry args={[SUN_RADIUS * 1.001, 96, 96]} />
-        <primitive object={promMat} attach="material" />
       </mesh>
 
       {/* block-flash halo */}
