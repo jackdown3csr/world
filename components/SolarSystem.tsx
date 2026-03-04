@@ -13,6 +13,7 @@ import { useWalletConnection } from "@/hooks/useWalletConnection";
 import { useIsMobile } from "@/hooks/useIsMobile";
 import { useBlock } from "@/hooks/useBlock";
 import { buildSolarSystem } from "@/lib/layout";
+import type { LayoutMode } from "@/lib/layout";
 import { formatBalance } from "@/lib/formatBalance";
 
 import Sun from "./Sun";
@@ -58,7 +59,8 @@ export default function SolarSystem() {
 
   /* ── Data ── */
   const { wallets, loading, refetch, updatedAt } = useWallets();
-  const solarData = useMemo(() => buildSolarSystem(wallets), [wallets]);
+  const [layoutMode, setLayoutMode] = useState<LayoutMode>("solar");
+  const solarData = useMemo(() => buildSolarSystem(wallets, layoutMode), [wallets, layoutMode]);
 
   /* ── Aggregate stats for Sun label ── */
   const { totalVotingPower, totalLocked } = useMemo(() => {
@@ -368,6 +370,10 @@ export default function SolarSystem() {
               }
             }}
             onPhotoMode={() => setPhotoMode(true)}
+            rankedLayout={layoutMode !== "solar"}
+            onToggleLayout={() => setLayoutMode(m => m === "solar" ? "ranked" : "solar")}
+            gnetRanked={layoutMode === "ranked-gnet"}
+            onToggleGnet={() => setLayoutMode(m => m === "ranked-gnet" ? "ranked" : "ranked-gnet")}
           />
         </div>
       ) : (
@@ -417,6 +423,10 @@ export default function SolarSystem() {
               }
             }}
             onPhotoMode={() => setPhotoMode(true)}
+            rankedLayout={layoutMode !== "solar"}
+            onToggleLayout={() => setLayoutMode(m => m === "solar" ? "ranked" : "solar")}
+            gnetRanked={layoutMode === "ranked-gnet"}
+            onToggleGnet={() => setLayoutMode(m => m === "ranked-gnet" ? "ranked" : "ranked-gnet")}
           />
 
           <WalletPanel
