@@ -170,6 +170,16 @@ const flareFrag = /* glsl */ `
   }
 `;
 
+/* == depth-eraser: clears Sun's depth so halos pass, but planets still block == */
+const depthEraseVert = /* glsl */ `
+  void main() {
+    gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+  }
+`;
+const depthEraseFrag = /* glsl */ `
+  void main() { gl_FragDepth = 1.0; }
+`;
+
 /* == HaloLayer (billboard) == */
 function HaloLayer({ scale, color, alpha, falloff }:
   { scale: number; color: string; alpha: number; falloff: number }) {
@@ -184,12 +194,12 @@ function HaloLayer({ scale, color, alpha, falloff }:
         uFalloff: { value: falloff },
       },
       blending: THREE.AdditiveBlending, transparent: true, depthWrite: false,
-      depthTest: false, side: THREE.DoubleSide,
+      depthTest: true, side: THREE.DoubleSide,
     }), [color, alpha, falloff]);
   useFrame(() => { if (ref.current) ref.current.quaternion.copy(camera.quaternion); });
   const s = SUN_RADIUS * scale;
   return (
-    <mesh ref={ref}>
+    <mesh ref={ref} renderOrder={-99}>
       <planeGeometry args={[s * 2, s * 2]} />
       <primitive object={mat} attach="material" />
     </mesh>
@@ -207,7 +217,7 @@ function LensFlare() {
       blending: THREE.AdditiveBlending,
       transparent: true,
       depthWrite: false,
-      depthTest: false,
+      depthTest: true,
       side: THREE.DoubleSide,
     }), []);
 
@@ -218,7 +228,7 @@ function LensFlare() {
 
   const s = SUN_RADIUS * 5;
   return (
-    <mesh ref={ref}>
+    <mesh ref={ref} renderOrder={-99}>
       <planeGeometry args={[s * 2, s * 2]} />
       <primitive object={mat} attach="material" />
     </mesh>
@@ -239,6 +249,16 @@ export default function Sun({ totalVotingPower, totalLocked, blockNumber }: SunP
       uniforms: { uTime: { value: 0 } },
     }), []);
 
+  // ── Depth eraser: clears Sun depth so halos aren't clipped, but planet depth remains ──
+  const depthEraseMat = useMemo(
+    () => new THREE.ShaderMaterial({
+      vertexShader: depthEraseVert, fragmentShader: depthEraseFrag,
+      depthTest: true,
+      depthWrite: true,
+      colorWrite: false,
+      transparent: true,   // renders in transparent pass (after opaques)
+    }), []);
+
 
 
   // ── Block-flash corona ──
@@ -253,7 +273,7 @@ export default function Sun({ totalVotingPower, totalLocked, blockNumber }: SunP
     blending:    THREE.AdditiveBlending,
     transparent: true,
     depthWrite:  false,
-    depthTest:   false,
+    depthTest:   true,
     side:        THREE.DoubleSide,
   }), []);
   const flashRef     = useRef<THREE.Mesh>(null);
@@ -285,8 +305,15 @@ export default function Sun({ totalVotingPower, totalLocked, blockNumber }: SunP
         <primitive object={surfaceMat} attach="material" />
       </mesh>
 
+      {/* depth eraser — invisible sphere that resets Sun’s depth to far plane
+          so halo billboards pass depthTest here but still hide behind planets */}
+      <mesh renderOrder={-100}>
+        <sphereGeometry args={[SUN_RADIUS, 64, 64]} />
+        <primitive object={depthEraseMat} attach="material" />
+      </mesh>
+
       {/* block-flash halo */}
-      <mesh ref={flashRef}>
+      <mesh ref={flashRef} renderOrder={-99}>
         <planeGeometry args={[SUN_RADIUS * 2 * 9, SUN_RADIUS * 2 * 9]} />
         <primitive object={flashMat} attach="material" />
       </mesh>

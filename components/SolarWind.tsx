@@ -4,11 +4,11 @@ import { useRef, useMemo } from "react";
 import { useFrame } from "@react-three/fiber";
 import * as THREE from "three";
 
-const N        = 1400;
-const MAX_DIST = 780;
-const MIN_DIST = 14;
-const SPEED_LO = 0.5;
-const SPEED_HI = 2.2;
+const N        = 800;
+const MAX_DIST = 600;
+const MIN_DIST = 16;
+const SPEED_LO = 0.6;
+const SPEED_HI = 2.8;
 
 function randDir(): THREE.Vector3 {
   const theta = Math.random() * Math.PI * 2;
@@ -26,7 +26,7 @@ const VERT = /* glsl */ `
   void main() {
     vAlpha = aAlpha;
     vec4 mv = modelViewMatrix * vec4(position, 1.0);
-    gl_PointSize = clamp(240.0 / -mv.z, 0.4, 2.2);
+    gl_PointSize = clamp(360.0 / -mv.z, 0.6, 3.5);
     gl_Position  = projectionMatrix * mv;
   }
 `;
@@ -34,8 +34,10 @@ const FRAG = /* glsl */ `
   varying float vAlpha;
   void main() {
     float d = length(gl_PointCoord - 0.5) * 2.0;
-    float a = smoothstep(1.0, 0.2, d) * vAlpha;
-    gl_FragColor = vec4(0.50, 0.80, 1.0, a * 0.55);
+    float a = smoothstep(1.0, 0.1, d) * vAlpha;
+    /* warm white-gold colour — like real solar wind plasma */
+    vec3 col = mix(vec3(1.0, 0.92, 0.65), vec3(1.0, 0.78, 0.42), d);
+    gl_FragColor = vec4(col, a * 0.70);
   }
 `;
 
@@ -58,7 +60,7 @@ export default function SolarWind() {
       vel[i * 3]     = dir.x * spd;
       vel[i * 3 + 1] = dir.y * spd;
       vel[i * 3 + 2] = dir.z * spd;
-      alpha[i] = 0.06 + Math.random() * 0.28;
+      alpha[i] = 0.10 + Math.random() * 0.40;
     }
 
     vels.current = vel;
