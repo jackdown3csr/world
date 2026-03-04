@@ -243,7 +243,14 @@ async function main() {
           firstSeenTimestamp: timestamp,
         });
       } catch (err) {
-        console.warn(`  ⚠ Query failed for ${addr}, skipping`);
+        // On RPC failure: preserve existing data rather than dropping the wallet
+        const existing = existingMap.get(addr);
+        if (existing) {
+          console.warn(`  ⚠ Query failed for ${addr}, keeping existing data`);
+          wallets.push(existing);
+        } else {
+          console.warn(`  ⚠ Query failed for ${addr}, no existing data – skipping`);
+        }
       }
 
       checked++;
