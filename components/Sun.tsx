@@ -81,6 +81,7 @@ const surfaceFrag = /* glsl */ `
     col *= 1.5;
 
     gl_FragColor = vec4(col, 1.0);
+    gl_FragDepth = 1.0;  /* push depth to far plane so halo billboards pass depthTest here */
   }
 `;
 
@@ -170,15 +171,6 @@ const flareFrag = /* glsl */ `
   }
 `;
 
-/* == depth-eraser: clears Sun's depth so halos pass, but planets still block == */
-const depthEraseVert = /* glsl */ `
-  void main() {
-    gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
-  }
-`;
-const depthEraseFrag = /* glsl */ `
-  void main() { gl_FragDepth = 1.0; }
-`;
 
 /* == HaloLayer (billboard) == */
 function HaloLayer({ scale, color, alpha, falloff }:
@@ -249,16 +241,6 @@ export default function Sun({ totalVotingPower, totalLocked, blockNumber }: SunP
       uniforms: { uTime: { value: 0 } },
     }), []);
 
-  // ── Depth eraser: clears Sun depth so halos aren't clipped, but planet depth remains ──
-  const depthEraseMat = useMemo(
-    () => new THREE.ShaderMaterial({
-      vertexShader: depthEraseVert, fragmentShader: depthEraseFrag,
-      depthTest: true,
-      depthWrite: true,
-      colorWrite: false,
-      transparent: true,   // renders in transparent pass (after opaques)
-    }), []);
-
 
 
   // ── Block-flash corona ──
@@ -303,13 +285,6 @@ export default function Sun({ totalVotingPower, totalLocked, blockNumber }: SunP
       <mesh>
         <sphereGeometry args={[SUN_RADIUS, 128, 128]} />
         <primitive object={surfaceMat} attach="material" />
-      </mesh>
-
-      {/* depth eraser — invisible sphere that resets Sun’s depth to far plane
-          so halo billboards pass depthTest here but still hide behind planets */}
-      <mesh renderOrder={-100}>
-        <sphereGeometry args={[SUN_RADIUS, 64, 64]} />
-        <primitive object={depthEraseMat} attach="material" />
       </mesh>
 
       {/* block-flash halo */}
