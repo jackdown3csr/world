@@ -17,6 +17,8 @@ const icons = {
   search: (s?: number) => <I d="M11 11m-8 0a8 8 0 1 0 16 0a8 8 0 1 0-16 0M21 21l-4.35-4.35" size={s} />,
   help:   (s?: number) => <I d="M12 12m-10 0a10 10 0 1 0 20 0a10 10 0 1 0-20 0M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3M12 17h.01" size={s} />,
   reset:  (s?: number) => <I d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8M3 3v5h5" size={s} />,
+  fly:    (s?: number) => <I d="M9.5 15.5L5 20M14.5 13.5l-5 5M22 2L11 13M22 2l-7 20-4-9-9-4z" size={s} />,
+  photo:  (s?: number) => <I d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2zM12 17a4 4 0 1 0 0-8 4 4 0 0 0 0 8z" size={s} />,
 };
 
 /* ────────────────────────── Button component ───────────────────────── */
@@ -139,6 +141,9 @@ interface HudToolbarProps {
   showTrails: boolean;
   onToggleTrails: () => void;
   onReset: () => void;
+  flyModeEnabled?: boolean;
+  onToggleFlyMode?: () => void;
+  onPhotoMode?: () => void;
   mobile?: boolean;
 }
 
@@ -156,6 +161,9 @@ export default function HudToolbar({
   showTrails,
   onToggleTrails,
   onReset,
+  flyModeEnabled = false,
+  onToggleFlyMode,
+  onPhotoMode,
   mobile = false,
 }: HudToolbarProps) {
   return (
@@ -187,6 +195,12 @@ export default function HudToolbar({
         <HudBtn active={showDirectory} onClick={onToggleDirectory} icon={icons.search} label="search" shortcut="F" mobile={mobile} />
         <HudBtn active={showHelp} onClick={onToggleHelp} icon={icons.help} label="help" shortcut="H" mobile={mobile} />
         <HudBtn active={false} onClick={onReset} icon={icons.reset} label="reset" shortcut="R" mobile={mobile} />
+        {onToggleFlyMode && !mobile && (
+          <HudBtn active={flyModeEnabled} onClick={onToggleFlyMode} icon={icons.fly} label="fly" shortcut="G" mobile={mobile} />
+        )}
+        {onPhotoMode && (
+          <HudBtn active={false} onClick={onPhotoMode} icon={icons.photo} label="photo" shortcut="P" mobile={mobile} />
+        )}
       </Group>
     </div>
   );

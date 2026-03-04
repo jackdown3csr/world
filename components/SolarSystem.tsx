@@ -1,9 +1,12 @@
 ﻿"use client";
 
-import React, { useMemo, useRef, useCallback, useState } from "react";
-import { Canvas } from "@react-three/fiber";
+import React, { useMemo, useRef, useCallback, useState, forwardRef, useImperativeHandle } from "react";
+import { Canvas, useThree } from "@react-three/fiber";
 import { OrbitControls } from "@react-three/drei";
 import type { OrbitControls as OrbitControlsImpl } from "three-stdlib";
+import FreeLookControls from "./FreeLookControls";
+import type { FreeLookHandle } from "./FreeLookControls";
+import type { CameraMode } from "./CameraController";
 
 import { useWallets } from "@/hooks/useWallets";
 import { useWalletConnection } from "@/hooks/useWalletConnection";
@@ -27,6 +30,23 @@ import DirectoryPanel from "./DirectoryPanel";
 import HelpPanel from "./HelpPanel";
 import RoguePlanet, { ROGUE_HASH } from "./RoguePlanet";
 import type { WalletEntry } from "@/lib/types";
+
+/* ── Screenshot helper (lives inside Canvas to access gl) ── */
+interface ScreenshotHandle { capture: () => void; }
+const ScreenshotHelper = forwardRef<ScreenshotHandle>(function ScreenshotHelper(_, ref) {
+  const { gl, scene, camera } = useThree();
+  useImperativeHandle(ref, () => ({
+    capture() {
+      gl.render(scene, camera);
+      const dataURL = gl.domElement.toDataURL("image/png");
+      const a = document.createElement("a");
+      a.href = dataURL;
+      a.download = `vescrow-${new Date().toISOString().slice(0, 19).replace(/:/g, "-")}.png`;
+      a.click();
+    },
+  }), [gl, scene, camera]);
+  return null;
+});
 
 /**
  * Top-level 3D scene: a solar system where each wallet is a celestial body.
@@ -76,6 +96,7 @@ export default function SolarSystem() {
   const [showHelp, setShowHelp] = useState(false);
   const [showOrbits, setShowOrbits] = useState(true);
   const [showTrails, setShowTrails] = useState(false);
+  const [photoMode, setPhotoMode] = useState(false);
   const [zoomLevel, setZoomLevel] = useState(1700);
   const [resetRequested, setResetRequested] = useState(false);
 
@@ -95,13 +116,24 @@ export default function SolarSystem() {
 
   /* ── Camera ── */
   const controlsRef = useRef<OrbitControlsImpl>(null);
+  const freelookRef = useRef<FreeLookHandle>(null);
+  const [cameraMode, setCameraMode] = useState<CameraMode>("orbit");
+  const [flyModeEnabled, setFlyModeEnabled] = useState(false);
+  const screenshotRef = useRef<ScreenshotHandle>(null);
+  const [flashCapture, setFlashCapture] = useState(false);
+
+  const doCapture = useCallback(() => {
+    screenshotRef.current?.capture();
+    setFlashCapture(true);
+    setTimeout(() => setFlashCapture(false), 350);
+  }, []);
 
   /* ── Directory item handler ── */
   const handleDirectorySelect = useCallback(
     (address: string, customName?: string) => {
       selectBody(address);
       wc.setNameInput(customName || "");
-      setShowNamesList(false);
+      // Directory stays open until user explicitly closes it
     },
     [selectBody, wc],
   );
@@ -125,24 +157,24 @@ export default function SolarSystem() {
       <Canvas
         camera={{ position: [0, 500, 1600], fov: 55, near: 0.1, far: 16000 }}
         style={{ width: "100%", height: "100%" }}
-        gl={{ antialias: true, alpha: false }}
+        gl={{ antialias: true, alpha: false, preserveDrawingBuffer: true }}
         dpr={[1, isMobile ? 1.5 : 2]}
       >
         <ambientLight intensity={0.025} />
         <GalaxyBackground />
         <SolarWind />
-        <Comet onSelect={handleSceneSelect} showLabel={showAllNames} />
+        <Comet onSelect={handleSceneSelect} showLabel={showAllNames && !photoMode} />
         <RoguePlanet onRogueClick={() => setRogueClicked(true)} />
         <Sun
-          totalVotingPower={showAllNames ? totalVotingPower : undefined}
-          totalLocked={showAllNames ? totalLocked : undefined}
+          totalVotingPower={showAllNames && !photoMode ? totalVotingPower : undefined}
+          totalLocked={showAllNames && !photoMode ? totalLocked : undefined}
           blockNumber={blockFlash}
         />
 
         {solarData.planets.map((p) => (
           <React.Fragment key={p.wallet.address}>
             {/* Skip orbit ring for Saturn — wallet ring is its visual identity */}
-            {showOrbits && p.ringWallets.length === 0 && (
+            {showOrbits && !photoMode && p.ringWallets.length === 0 && (
               <OrbitRing radius={p.orbitRadius} tilt={p.tilt} />
             )}
             <PlanetWallet
@@ -156,11 +188,11 @@ export default function SolarSystem() {
               panelOpen={panelOpen}
               selectedAddress={selectedAddress}
               onSelectAddress={handleSceneSelect}
-              showLabel={showAllNames}
-              showMoonLabels={showAllNames}
-              showRingLabels={showAllNames}
+              showLabel={showAllNames && !photoMode}
+              showMoonLabels={showAllNames && !photoMode}
+              showRingLabels={showAllNames && !photoMode}
               showRenamedOnly={showRenamedOnly}
-              showTrails={showTrails}
+              showTrails={showTrails && !photoMode}
               onShiftSelect={(addr) => {
                 const w = wallets.find(
                   (x) => x.address.toLowerCase() === addr.toLowerCase(),
@@ -179,9 +211,9 @@ export default function SolarSystem() {
           onSelectAddress={handleSceneSelect}
           onDeselect={() => setPanelOpen(false)}
           panelOpen={panelOpen}
-          showAllNames={showAllNames}
+          showAllNames={showAllNames && !photoMode}
           showRenamedOnly={showRenamedOnly}
-          showOrbits={showOrbits}
+          showOrbits={showOrbits && !photoMode}
         />
 
         <OrbitControls
@@ -191,21 +223,91 @@ export default function SolarSystem() {
           maxDistance={1805}
           enableDamping
           dampingFactor={0.05}
+          enabled={cameraMode === "orbit"}
         />
+
+        {flyModeEnabled && (
+          <FreeLookControls ref={freelookRef} enabled={cameraMode === "fly"} />
+        )}
 
         <CameraController
           selectedAddress={selectedAddress}
           selectionVersion={selectionVersion}
+          cameraMode={cameraMode}
           controlsRef={controlsRef}
+          freelookRef={freelookRef}
+          onModeChange={setCameraMode}
           onZoomChange={setZoomLevel}
           onCameraDebug={setCamDebug}
           resetRequested={resetRequested}
           onResetDone={() => setResetRequested(false)}
         />
+        <ScreenshotHelper ref={screenshotRef} />
       </Canvas>
 
+      {/* ── Photo mode overlay ── */}
+      {photoMode && (
+        <>
+          {/* White flash on capture */}
+          {flashCapture && (
+            <div style={{
+              position: "fixed", inset: 0, zIndex: 40,
+              background: "rgba(255,255,255,0.35)",
+              pointerEvents: "none",
+              animation: "none",
+            }} />
+          )}
+
+          {/* Exit button — top right */}
+          <button
+            onClick={() => setPhotoMode(false)}
+            title="Exit photo mode"
+            style={{
+              position: "fixed", top: 12, right: 12, zIndex: 35,
+              width: 28, height: 28, borderRadius: "50%",
+              border: "1px solid rgba(0,229,255,0.2)",
+              background: "rgba(2,6,14,0.5)", color: "rgba(0,229,255,0.4)",
+              cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center",
+              padding: 0, transition: "all 0.2s",
+            }}
+            onMouseEnter={(e) => { e.currentTarget.style.background = "rgba(0,229,255,0.12)"; e.currentTarget.style.color = "#00e5ff"; }}
+            onMouseLeave={(e) => { e.currentTarget.style.background = "rgba(2,6,14,0.5)"; e.currentTarget.style.color = "rgba(0,229,255,0.4)"; }}
+          >
+            <svg width={12} height={12} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.5} strokeLinecap="round">
+              <path d="M18 6L6 18M6 6l12 12" />
+            </svg>
+          </button>
+
+          {/* Shutter button — bottom centre */}
+          <button
+            onClick={doCapture}
+            title="Capture screenshot"
+            style={{
+              position: "fixed", bottom: 32, left: "50%", transform: "translateX(-50%)",
+              zIndex: 35, width: 64, height: 64, borderRadius: "50%",
+              border: "3px solid rgba(255,255,255,0.25)",
+              background: "rgba(255,255,255,0.10)",
+              backdropFilter: "blur(6px)",
+              cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center",
+              padding: 0, transition: "all 0.15s",
+            }}
+            onMouseEnter={(e) => { e.currentTarget.style.background = "rgba(255,255,255,0.22)"; e.currentTarget.style.borderColor = "rgba(255,255,255,0.6)"; }}
+            onMouseLeave={(e) => { e.currentTarget.style.background = "rgba(255,255,255,0.10)"; e.currentTarget.style.borderColor = "rgba(255,255,255,0.25)"; }}
+          >
+            {/* Outer ring + inner circle = camera shutter look */}
+            <div style={{
+              width: 38, height: 38, borderRadius: "50%",
+              border: "2px solid rgba(255,255,255,0.5)",
+              display: "flex", alignItems: "center", justifyContent: "center",
+            }}>
+              <div style={{ width: 22, height: 22, borderRadius: "50%", background: "rgba(255,255,255,0.75)" }} />
+            </div>
+          </button>
+        </>
+      )}
+
       {/* ── HUD overlay ── */}
-      {isMobile ? (
+      {!photoMode && (isMobile ? (
         /* ════ MOBILE: bottom sheet ════ */
         <div style={{
           position: "fixed", bottom: 0, left: 0, right: 0, zIndex: 20,
@@ -255,6 +357,17 @@ export default function SolarSystem() {
             showTrails={showTrails}
             onToggleTrails={() => setShowTrails((v) => !v)}
             onReset={() => { setResetRequested(true); setSelectedAddress(null); setPanelOpen(false); }}
+            flyModeEnabled={flyModeEnabled}
+            onToggleFlyMode={() => {
+              const next = !flyModeEnabled;
+              setFlyModeEnabled(next);
+              if (next) {
+                setCameraMode("fly");
+              } else {
+                setCameraMode("orbit");
+              }
+            }}
+            onPhotoMode={() => setPhotoMode(true)}
           />
         </div>
       ) : (
@@ -293,6 +406,17 @@ export default function SolarSystem() {
               setSelectedAddress(null);
               setPanelOpen(false);
             }}
+            flyModeEnabled={flyModeEnabled}
+            onToggleFlyMode={() => {
+              const next = !flyModeEnabled;
+              setFlyModeEnabled(next);
+              if (next) {
+                setCameraMode("fly");
+              } else {
+                setCameraMode("orbit");
+              }
+            }}
+            onPhotoMode={() => setPhotoMode(true)}
           />
 
           <WalletPanel
@@ -322,7 +446,7 @@ export default function SolarSystem() {
 
           {showHelp && <HelpPanel />}
         </div>
-      )}
+      ))}
 
       {/* Camera debug overlay hidden */}
 
@@ -476,6 +600,7 @@ export default function SolarSystem() {
       })()}
 
       {/* ── Top-left stats overlay ── */}
+      {!photoMode && (
       <div
         style={{
           position: "fixed",
@@ -536,6 +661,7 @@ export default function SolarSystem() {
           </>
         )}
       </div>
+      )}
     </>
   );
 }

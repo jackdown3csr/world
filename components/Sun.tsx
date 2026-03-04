@@ -302,6 +302,9 @@ export default function Sun({ totalVotingPower, totalLocked, blockNumber }: SunP
     () => new THREE.ShaderMaterial({
       vertexShader: surfaceVert, fragmentShader: surfaceFrag,
       uniforms: { uTime: { value: 0 } },
+      transparent: false,
+      depthWrite: true,
+      depthTest: true,
     }), []);
 
 
@@ -373,7 +376,7 @@ export default function Sun({ totalVotingPower, totalLocked, blockNumber }: SunP
       {/* soft bloom billboard */}
       <LensFlare />
 
-      {/* corona layers — fewer, softer */}
+      {/* corona layers */}
       <HaloLayer scale={1.12} color="#fffef0" alpha={0.90} falloff={4.0} />
       <HaloLayer scale={1.45} color="#fff4c8" alpha={0.55} falloff={3.0} />
       <HaloLayer scale={2.20} color="#ffe080" alpha={0.30} falloff={2.2} />

@@ -12,7 +12,7 @@
  */
 
 import { useRef, useMemo } from "react";
-import { useFrame } from "@react-three/fiber";
+import { useFrame, useThree } from "@react-three/fiber";
 import * as THREE from "three";
 import { Html } from "@react-three/drei";
 
@@ -177,6 +177,31 @@ const NUCLEUS_FRAG = /* glsl */`
   }
 `;
 
+// ── Coma glow billboard shader ────────────────────────────────────────
+const COMA_VERT = /* glsl */`
+  varying vec2 vUv;
+  void main() {
+    vUv = uv;
+    gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+  }
+`;
+const COMA_FRAG = /* glsl */`
+  varying vec2 vUv;
+  void main() {
+    float d = length(vUv - 0.5) * 2.0;
+    /* hard circular clip — nothing beyond radius 1.0 */
+    if (d > 1.0) discard;
+    /* smooth fade to zero well before edge */
+    float mask = smoothstep(1.0, 0.4, d);
+    /* soft radial falloff — bright core, gentle fade */
+    float glow  = exp(-d * 3.5) * 0.60;
+    float outer = exp(-d * 1.4) * 0.18;
+    float total = (glow + outer) * mask;
+    vec3 col = mix(vec3(0.55, 0.80, 1.0), vec3(0.85, 0.95, 1.0), exp(-d * 5.0));
+    gl_FragColor = vec4(col * total, total);
+  }
+`;
+
 // ── Tail (Points) shader ──────────────────────────────────────────────
 const TAIL_VERT = /* glsl */`
   attribute float aAlpha;
@@ -218,12 +243,12 @@ const SPRAY_FRAG = /* glsl */`
   }
 `;
 
-const ION_N   = 400;
-const DUST_N  = 280;
-const SPRAY_N = 120;
-const NUCLEUS_R    = 1.8;
-const TAIL_VIS_DIST = 800;   // tail starts fading beyond this distance
-const TAIL_MIN     = 0.15;   // minimum tail strength (always faintly visible)
+const ION_N   = 700;
+const DUST_N  = 500;
+const SPRAY_N = 200;
+const NUCLEUS_R    = 0.45;
+const TAIL_VIS_DIST = 900;   // tail starts fading beyond this distance
+const TAIL_MIN     = 0.25;   // minimum tail strength (always faintly visible)
 
 /** Seeded pseudo-random (deterministic, no Math.random) */
 function sr(s: number): number { const x = Math.sin(s * 127.1 + 311.7) * 43758.5; return x - Math.floor(x); }
@@ -232,6 +257,7 @@ export const COMET_ADDRESS = "cascopea";
 
 export default function Comet({ onSelect, showLabel = true }: { onSelect?: (addr: string) => void; showLabel?: boolean }) {
   const groupRef    = useRef<THREE.Group>(null);
+  const comaRef     = useRef<THREE.Mesh>(null);
   const nucMatRef   = useRef<THREE.ShaderMaterial | null>(null);
   const ionGeoRef   = useRef<THREE.BufferGeometry>(null!);
   const dustGeoRef  = useRef<THREE.BufferGeometry>(null!);
@@ -265,6 +291,13 @@ export default function Comet({ onSelect, showLabel = true }: { onSelect?: (addr
     transparent: true, depthWrite: false, blending: THREE.AdditiveBlending,
   }), []);
 
+  // ── Coma glow billboard mat ──
+  const comaMat = useMemo(() => new THREE.ShaderMaterial({
+    vertexShader: COMA_VERT, fragmentShader: COMA_FRAG,
+    transparent: true, depthWrite: false, blending: THREE.AdditiveBlending,
+    side: THREE.DoubleSide,
+  }), []);
+
   // ── Pre-generated deterministic particle seeds ──
   const ionSeeds = useMemo(() => Array.from({ length: ION_N }, (_, i) => ({
     t:     Math.pow(sr(i * 3.1 + 0.1), 0.65),   // distance 0–1 along tail, weighted near
@@ -277,7 +310,7 @@ export default function Comet({ onSelect, showLabel = true }: { onSelect?: (addr
   const dustSeeds = useMemo(() => Array.from({ length: DUST_N }, (_, i) => ({
     t:     Math.pow(sr(i * 2.9 + 0.2), 0.60),
     ang:   sr(i * 1.3 + 0.5) * Math.PI * 2,
-    cone:  sr(i * 2.1 + 1.2) * 0.10,
+    cone:  sr(i * 2.1 + 1.2) * 0.18,
     curve: sr(i * 0.9 + 0.1) - 0.3,  // offset along orbit tangent (-0.3…0.7)
     sz:    sr(i * 0.4 + 0.2),
     speed: 0.02 + sr(i * 0.6 + 0.4) * 0.05,   // slower streaming than ion
@@ -338,12 +371,16 @@ export default function Comet({ onSelect, showLabel = true }: { onSelect?: (addr
 
   useFrame((state) => {
     const t = state.clock.elapsedTime;
+    const camera = state.camera;
     getOrbitalState(t, _pos, _vel);
 
     const dist = _pos.length();
 
     // Move group to comet world position
     groupRef.current?.position.copy(_pos);
+
+    // Billboard coma — always face camera
+    if (comaRef.current) comaRef.current.quaternion.copy(camera.quaternion);
 
     // Sun-facing direction (for nucleus shader lighting)
     _tmp.copy(_pos).negate().normalize();
@@ -359,8 +396,8 @@ export default function Comet({ onSelect, showLabel = true }: { onSelect?: (addr
 
     // Tail length & brightness scale with proximity to sun
     const proximity  = Math.max(TAIL_MIN, Math.pow(Math.max(0, 1 - dist / TAIL_VIS_DIST), 0.7));
-    const ionLength  = 60  + proximity * 300;
-    const dustLength = 45  + proximity * 200;
+    const ionLength  = 120  + proximity * 600;
+    const dustLength = 80  + proximity * 400;
 
     // ── Ion tail ──
     const iPos = ionGeoRef.current.attributes.position as THREE.BufferAttribute;
@@ -375,8 +412,8 @@ export default function Comet({ onSelect, showLabel = true }: { onSelect?: (addr
       const cy = _rt.y * Math.cos(s.ang) + _up.y * Math.sin(s.ang);
       const cz = _rt.z * Math.cos(s.ang) + _up.z * Math.sin(s.ang);
       iPos.setXYZ(i, _anti.x * d + cx * cr, _anti.y * d + cy * cr, _anti.z * d + cz * cr);
-      iAlp.setX(i,  (1.0 - et * 0.75) * 0.65 * proximity);
-      iSz.setX(i,   (1.2 + s.sz * 1.5 + (1 - et) * 2.0) * proximity);
+      iAlp.setX(i,  (1.0 - et * 0.70) * 0.85 * proximity);
+      iSz.setX(i,   (2.0 + s.sz * 2.5 + (1 - et) * 4.0) * proximity);
     }
     iPos.needsUpdate = true; iAlp.needsUpdate = true; iSz.needsUpdate = true;
 
@@ -399,8 +436,8 @@ export default function Comet({ onSelect, showLabel = true }: { onSelect?: (addr
         _anti.y * d + cy * cr + _vel.y * bc,
         _anti.z * d + cz * cr + _vel.z * bc,
       );
-      dAlp.setX(i,  (1.0 - et * 0.65) * 0.50 * proximity);
-      dSz.setX(i,   (1.5 + s.sz * 1.8 + (1 - et) * 1.6) * proximity);
+      dAlp.setX(i,  (1.0 - et * 0.60) * 0.70 * proximity);
+      dSz.setX(i,   (2.5 + s.sz * 2.5 + (1 - et) * 3.0) * proximity);
     }
     dPos.needsUpdate = true; dAlp.needsUpdate = true; dSz.needsUpdate = true;
 
@@ -408,7 +445,7 @@ export default function Comet({ onSelect, showLabel = true }: { onSelect?: (addr
     const sPos = sprayGeoRef.current.attributes.position as THREE.BufferAttribute;
     const sAlp = sprayGeoRef.current.attributes.aAlpha   as THREE.BufferAttribute;
     const sSz  = sprayGeoRef.current.attributes.aSize    as THREE.BufferAttribute;
-    const JET_LEN = 12;    // tight coma, stays close to nucleus
+    const JET_LEN = 18;    // coma envelope around nucleus
     // sunDir = -_anti (toward sun), used to bias which jets are active
     const sunX = -_anti.x, sunY = -_anti.y, sunZ = -_anti.z;
     for (let i = 0; i < SPRAY_N; i++) {
@@ -425,8 +462,8 @@ export default function Comet({ onSelect, showLabel = true }: { onSelect?: (addr
         s.dz * d + _anti.z * drift,
       );
       const fadeout = Math.pow(1.0 - at, 1.8);    // steep fade, bright only near nucleus
-      sAlp.setX(i, fadeout * activity * 0.30 * proximity);
-      sSz.setX(i,  (s.sz * 2.0 + fadeout * 2.5) * Math.max(proximity, 0.3));
+      sAlp.setX(i, fadeout * activity * 0.55 * proximity);
+      sSz.setX(i,  (s.sz * 3.5 + fadeout * 4.0) * Math.max(proximity, 0.4));
     }
     sPos.needsUpdate = true; sAlp.needsUpdate = true; sSz.needsUpdate = true;
   });
@@ -438,7 +475,7 @@ export default function Comet({ onSelect, showLabel = true }: { onSelect?: (addr
         userData={{ walletAddress: COMET_ADDRESS, bodyRadius: NUCLEUS_R, bodyType: "comet" }}
         onClick={(e) => { e.stopPropagation(); onSelect?.(COMET_ADDRESS); }}
       >
-        <sphereGeometry args={[NUCLEUS_R, 64, 48]} />
+        <sphereGeometry args={[NUCLEUS_R, 32, 24]} />
         <primitive object={nucleusMat} attach="material" />
       </mesh>
 

@@ -11,17 +11,28 @@ const s = {
     maxHeight: 480,
     overflowY: "auto" as const,
     fontSize: 10,
-    lineHeight: 1.7,
+    lineHeight: 1.65,
     color: "#7a94aa",
     fontFamily: "'JetBrains Mono', 'SF Mono', monospace",
+  },
+  title: {
+    color: "#d8f6ff",
+    fontSize: 11,
+    letterSpacing: "0.12em",
+    textTransform: "uppercase" as const,
+    marginBottom: 8,
+    fontWeight: 700,
   },
   h: {
     color: "#00e5ff",
     fontSize: 9,
     letterSpacing: "0.15em",
     textTransform: "uppercase" as const,
-    margin: "10px 0 4px",
+    margin: "12px 0 4px",
+    fontWeight: 700,
   },
+  block: { margin: "4px 0" },
+  li: { margin: "2px 0" },
   cyan: { color: "#00e5ff" },
   dim: { color: "#4a6278" },
 };
@@ -29,12 +40,54 @@ const s = {
 export default function HelpPanel({ mobile = false }: { mobile?: boolean }) {
   return (
     <div style={s.box}>
-      <div style={{ ...s.h, marginTop: 0 }}>How it works</div>
-      <p style={{ margin: "4px 0" }}>
-        Every wallet that locks <span style={s.cyan}>GNET</span> in the{" "}
-        <span style={s.cyan}>veGNET</span> voting escrow becomes a celestial
-        body. Your rank is determined by your{" "}
-        <span style={s.cyan}>voting power</span> (veGNET balance).
+      <div style={s.title}>Guide</div>
+
+      <div style={{ ...s.h, marginTop: 0 }}>Quick start</div>
+      <p style={s.block}>
+        Lock <span style={s.cyan}>GNET</span> in <span style={s.cyan}>veGNET</span>.
+        Every locker appears as a body in the system. Higher <span style={s.cyan}>voting power</span>
+        means higher rank and bigger body type.
+      </p>
+
+      <div style={s.h}>How to become a planet</div>
+      <p style={s.block}>
+        1. Lock <span style={s.cyan}>GNET</span> on <span style={s.cyan}>Galactica mainnet</span><br />
+        2. Increase amount / lock time to grow <span style={s.cyan}>voting power</span><br />
+        3. Reach <span style={s.cyan}>Top 20</span> to become a planet<br />
+        4. Connect wallet here and set your custom body name
+      </p>
+
+      <div style={s.h}>Navigation</div>
+      <p style={s.block}>
+        {mobile ? (
+          <>
+            <span style={s.cyan}>One finger drag</span> — look around (fly mode)<br />
+            <span style={s.cyan}>Pinch</span> — move forward / backward<br />
+            <span style={s.cyan}>Tap body</span> — fly to it &amp; orbit<br />
+            <span style={s.cyan}>Escape</span> — detach, return to free-fly<br />
+            <span style={s.cyan}>Reset</span> — overview + free-fly
+          </>
+        ) : (
+          <>
+            <span style={s.cyan}>Drag</span> — look around (fly) / orbit body<br />
+            <span style={s.cyan}>Scroll</span> — fly forward/back or zoom<br />
+            <span style={s.cyan}>Click body</span> — fly to it &amp; enter orbit<br />
+            <span style={s.cyan}>Escape</span> — detach, return to free-fly<br />
+            <span style={s.cyan}>Shift + click</span> — inspect raw contract slot<br />
+            <span style={s.cyan}>Reset</span> — overview + free-fly
+          </>
+        )}
+      </p>
+
+      <div style={s.h}>HUD controls</div>
+      <p style={s.block}>
+        <span style={s.cyan}>ORBITS</span> — toggle orbit rings<br />
+        <span style={s.cyan}>TRAILS</span> — toggle orbit history trails<br />
+        <span style={s.cyan}>LABELS</span> — show/hide all labels<br />
+        <span style={s.cyan}>NAMED</span> — show only renamed wallets<br />
+        <span style={s.cyan}>SEARCH</span> — open wallet directory<br />
+        <span style={s.cyan}>HELP</span> — toggle this panel<br />
+        <span style={s.cyan}>RESET</span> — camera overview
       </p>
 
       <div style={s.h}>Tier system</div>
@@ -58,58 +111,12 @@ export default function HelpPanel({ mobile = false }: { mobile?: boolean }) {
         </tbody>
       </table>
 
-      <div style={s.h}>Become a planet</div>
-      <p style={{ margin: "4px 0" }}>
-        1. Lock <span style={s.cyan}>GNET</span> on{" "}
-        <span style={s.cyan}>Galactica mainnet</span> via the veGNET contract<br />
-        2. The more you lock & the longer the lock, the higher your voting power<br />
-        3. Top 20 by voting power → you are a <span style={s.cyan}>planet</span><br />
-        4. Connect your wallet here to <span style={s.cyan}>name</span> your body
-      </p>
-
-      <div style={s.h}>Controls</div>
-      <p style={{ margin: "4px 0" }}>
-        {mobile ? (
-          <>
-            <span style={s.cyan}>Pinch</span> — zoom in/out<br />
-            <span style={s.cyan}>One finger</span> — rotate camera<br />
-            <span style={s.cyan}>Tap</span> — select &amp; fly to body<br />
-            <span style={s.cyan}>RST</span> — reset camera
-          </>
-        ) : (
-          <>
-            <span style={s.cyan}>Scroll</span> — zoom in/out<br />
-            <span style={s.cyan}>Drag</span> — rotate camera<br />
-            <span style={s.cyan}>Click</span> — select &amp; fly to body<br />
-            <span style={s.cyan}>Shift+click</span> — inspect raw contract storage slot<br />
-            <span style={s.cyan}>RST</span> — reset camera
-          </>
-        )}
-      </p>
-
-      <div style={s.h}>HUD buttons</div>
-      <p style={{ margin: "4px 0" }}>
-        <span style={s.cyan}>LABELS</span> — show all wallet labels<br />
-        <span style={s.cyan}>NAMED</span> — show only renamed wallets<br />
-        <span style={s.cyan}>DIR</span> — open wallet directory<br />
-        <span style={s.cyan}>ORBIT</span> — toggle orbit rings<br />
-        <span style={s.cyan}>TRAILS</span> — toggle orbit history trails<br />
-        <span style={s.cyan}>HELP</span> — this panel
-      </p>
-
       <div style={s.h}>Visual indicators</div>
-      <p style={{ margin: "4px 0" }}>
+      <p style={s.block}>
         <span style={{ color: "#ff4422" }}>Red pulse</span> — lock expires in &lt;30 days<br />
         <span style={{ color: "#f08822" }}>Amber pulse</span> — lock expires in 30–90 days<br />
         <span style={s.cyan}>blk N</span> — latest block from chain (stats overlay)<br />
-        Sun flashes briefly each new block
-      </p>
-
-      <div style={s.h}>Easter eggs</div>
-      <p style={{ margin: "4px 0" }}>
-        <span style={s.cyan}>CASCOPEA</span> — a comet drifting through the system<br />
-        <span style={{ color: "#5a3535" }}>Something else</span>{" "}
-        <span style={s.dim}>wanders the outer field…</span>
+         <span style={s.cyan}>Sun CME ring</span> — plasma burst expands on each new block
       </p>
     </div>
   );
