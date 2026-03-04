@@ -91,12 +91,14 @@ const promFrag = /* glsl */ `
   void main() {
     vec3 p  = normalize(vPos);
     float mu = max(dot(vNorm, vec3(0.0,0.0,1.0)), 0.0);
-    float limbMask = pow(1.0 - mu, 5.0);
+    // Fade to zero at the very limb so the sphere edge is invisible
+    float edgeFade = smoothstep(0.0, 0.18, mu);
+    float faceMask = pow(mu, 0.4) * edgeFade;
     float n = fbm(p * 3.0 + vec3(uTime*0.012, uTime*0.007, 0.0));
-    float filament = smoothstep(0.35, 0.65, n) * limbMask;
+    float filament = smoothstep(0.35, 0.65, n) * faceMask;
 
     vec3 col = mix(vec3(1.0, 0.35, 0.05), vec3(1.0, 0.80, 0.30), n) * filament;
-    float alpha = filament * 0.75;
+    float alpha = filament * 0.55;
     gl_FragColor = vec4(col, alpha);
   }
 `;
@@ -309,7 +311,7 @@ export default function Sun({ totalVotingPower, totalLocked, blockNumber }: SunP
 
       {/* prominence / filament shell */}
       <mesh>
-        <sphereGeometry args={[SUN_RADIUS * 1.015, 96, 96]} />
+        <sphereGeometry args={[SUN_RADIUS * 1.001, 96, 96]} />
         <primitive object={promMat} attach="material" />
       </mesh>
 
