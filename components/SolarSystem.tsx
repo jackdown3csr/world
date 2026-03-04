@@ -398,34 +398,27 @@ export default function SolarSystem() {
 
       {/*  Rogue planet click popup  */}
       {rogueClicked && (() => {
-        const R = ({ k, v, dim }: { k: string; v: string; dim?: boolean }) => (
-          <div style={{ display:"flex", gap:8, marginBottom:1 }}>
-            <span style={{ color:"#2e1414", minWidth:108, flexShrink:0 }}>{k}</span>
-            <span style={{ color: dim ? "#3a1a1a" : "#5a2626" }}>{v}</span>
-          </div>
-        );
         return (
           <div
-            onClick={() => setRogueClicked(false)}
             style={{
-              position: "fixed", inset: 0, zIndex: 50,
-              background: "rgba(0,0,0,0.82)",
+              position: "fixed", inset: 0, zIndex: 20000,
               display: "flex", alignItems: "center", justifyContent: "center",
+              pointerEvents: "auto",
             }}
+            onClick={() => setRogueClicked(false)}
           >
             <style>{`
               @keyframes rogue-flicker {
-                0%,100%{opacity:1} 7%{opacity:0.82} 8%{opacity:1}
-                45%{opacity:1} 46%{opacity:0.60} 47%{opacity:1}
-                72%{opacity:1} 73%{opacity:0.75} 74%{opacity:1}
+                0%,100%{opacity:1} 7%{opacity:0.88} 8%{opacity:1}
+                55%{opacity:1} 56%{opacity:0.72} 57%{opacity:1}
               }
               @keyframes rogue-scan { 0%{top:-4%} 100%{top:106%} }
-              .rogue-box { animation: rogue-flicker 4.3s infinite; }
+              .rogue-box { animation: rogue-flicker 5s infinite; }
               .rogue-scan { position:relative; overflow:hidden; }
               .rogue-scan::after {
-                content:""; position:absolute; left:0; right:0; height:2px;
-                background:rgba(180,14,14,0.15);
-                animation:rogue-scan 3.2s linear infinite;
+                content:""; position:absolute; left:0; right:0; height:1px;
+                background:rgba(180,14,14,0.12);
+                animation:rogue-scan 4s linear infinite;
                 pointer-events:none;
               }
             `}</style>
@@ -433,46 +426,49 @@ export default function SolarSystem() {
               onClick={(e) => e.stopPropagation()}
               className="rogue-box rogue-scan"
               style={{
-                background: "rgba(4,2,2,0.98)",
-                border: "1px solid rgba(140,10,10,0.35)",
-                borderLeft: "2px solid rgba(200,18,18,0.60)",
+                background: "rgba(2, 3, 5, 0.94)",
+                border: "1px solid rgba(180,30,30,0.22)",
+                borderLeft: "2px solid rgba(200,30,30,0.55)",
                 borderRadius: 3,
-                padding: "16px 20px",
+                padding: "14px 18px",
                 fontFamily: "JetBrains Mono,SF Mono,Fira Code,Menlo,monospace",
                 fontSize: 11,
-                color: "#6a4040",
-                maxWidth: 500,
-                width: "calc(100vw - 48px)",
+                color: "#7a5050",
                 lineHeight: 1.75,
+                boxShadow: "0 2px 24px rgba(0,0,0,0.7), inset 0 0 30px rgba(140,10,10,0.03)",
+                maxWidth: 380,
+                width: "calc(100vw - 48px)",
               }}
             >
               <div style={{ display:"flex", justifyContent:"space-between", alignItems:"baseline", marginBottom:10 }}>
-                <span style={{ color:"#7a1818", fontSize:9, letterSpacing:"0.22em", textTransform:"uppercase" }}>
-                  SCAN RESULT / DEEP FIELD
-                </span>
-                <span style={{ color:"#3a1a1a", fontSize:9 }}>seq #00f3c1</span>
+                <span style={{ color:"#8a2020", fontSize:9, letterSpacing:"0.22em", textTransform:"uppercase" }}>UNKNOWN BODY</span>
+                <button
+                  onClick={() => setRogueClicked(false)}
+                  style={{ background:"none", border:"none", color:"#4a2020", cursor:"pointer", fontSize:14, padding:0, fontFamily:"inherit" }}
+                >×</button>
               </div>
-              <div style={{ borderTop:"1px solid rgba(140,10,10,0.14)", paddingTop:8, marginBottom:8 }}>
-                <R k="body_class    " v="[NO MATCH]" dim />
-                <R k="escrow_record " v="0x000...000  NOT FOUND" dim />
-                <R k="voting_power  " v="0x[REDACTED]" dim />
-                <R k="lock_end      " v="??????????????????" dim />
-                <R k="first_seen    " v="OUTSIDE REGISTRY" dim />
+              <div style={{ borderTop:"1px solid rgba(160,20,20,0.15)", paddingTop:8, marginBottom:8 }}>
+                {([
+                  ["class",       "NO MATCH"],
+                  ["registry",    "NOT FOUND"],
+                  ["incl",        "65.0°"],
+                  ["period",      "950 s"],
+                  ["first seen",  "OUTSIDE KNOWN EPOCH"],
+                ] as [string,string][]).map(([k,v]) => (
+                  <div key={k} style={{ display:"flex", gap:12, marginBottom:2 }}>
+                    <span style={{ color:"#3a1818", minWidth:80, flexShrink:0 }}>{k}</span>
+                    <span style={{ color:"#6a3030" }}>{v}</span>
+                  </div>
+                ))}
               </div>
-              <div style={{ borderTop:"1px solid rgba(140,10,10,0.12)", paddingTop:8, marginBottom:8 }}>
-                <R k="ra_j2000      " v="04h 58m [??].?s" dim />
-                <R k="dec_j2000     " v="+[??] [??] [??]" dim />
-                <R k="incl_ecliptic " v="65.0 deg" />
-                <R k="period_s      " v="950" />
-              </div>
-              <div style={{ borderTop:"1px solid rgba(140,10,10,0.12)", paddingTop:8, marginBottom:4 }}>
-                <div style={{ color:"#3a1818", fontSize:9, letterSpacing:"0.14em", marginBottom:3 }}>SIGNAL FINGERPRINT</div>
-                <div style={{ wordBreak:"break-all", color:"#5a2828", fontSize:10.5, letterSpacing:"0.04em" }}>
+              <div style={{ borderTop:"1px solid rgba(160,20,20,0.10)", paddingTop:8 }}>
+                <div style={{ color:"#3a1818", fontSize:9, letterSpacing:"0.12em", marginBottom:4 }}>SIGNAL</div>
+                <div style={{ wordBreak:"break-all", color:"#4a2525", fontSize:10, letterSpacing:"0.04em", lineHeight:1.6 }}>
                   {ROGUE_HASH}
                 </div>
               </div>
               <div style={{ marginTop:10, textAlign:"right", color:"#2e1414", fontSize:9, letterSpacing:"0.10em" }}>
-                click to close transmission
+                click to dismiss
               </div>
             </div>
           </div>

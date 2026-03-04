@@ -449,7 +449,7 @@ export default function Comet({ onSelect, showLabel = true }: { onSelect?: (addr
 
       {/* Label */}
       {showLabel && (
-      <Html position={[0, NUCLEUS_R + 6, 0]} center style={{ pointerEvents: "none", whiteSpace: "nowrap" }}>
+      <Html position={[0, NUCLEUS_R + 6, 0]} center zIndexRange={[10000, 0]} style={{ pointerEvents: "none", whiteSpace: "nowrap" }}>
         <div style={{
           fontFamily: "'JetBrains Mono','SF Mono',monospace",
           fontSize: 9,

@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useRef, useMemo, useState, useCallback } from "react";
+import React, { useRef, useMemo, useState, useCallback, useEffect } from "react";
 import { useFrame, type ThreeEvent } from "@react-three/fiber";
 import { Html } from "@react-three/drei";
 import * as THREE from "three";
@@ -217,6 +217,16 @@ export default function PlanetWallet({ data, selected, panelOpen, onSelect, onDe
     });
   }, [data.wallet.lockEnd]);
 
+  // ── LOD geometries (distance-adaptive tessellation) ──
+  const _lodPos = useMemo(() => new THREE.Vector3(), []);
+  const planetGeos = useMemo(() => [
+    new THREE.SphereGeometry(data.radius, 64, 64),   // close
+    new THREE.SphereGeometry(data.radius, 32, 32),   // mid
+    new THREE.SphereGeometry(data.radius, 16, 16),   // far
+  ], [data.radius]);
+  const lodRef = useRef(0);
+  useEffect(() => () => { planetGeos.forEach(g => g.dispose()); }, [planetGeos]);
+
   // ── Orbit trail geometry ──
   const trailPositions = useMemo(() => new Float32Array(TRAIL_N * 3), []);
   const trailColors    = useMemo(() => new Float32Array(TRAIL_N * 3), []);
@@ -248,6 +258,17 @@ export default function PlanetWallet({ data, selected, panelOpen, onSelect, onDe
     if (meshRef.current)  meshRef.current.rotation.y  = 0.04 * t;
     material.uniforms.uTime.value = t;
     if (expiryGlowMat) expiryGlowMat.uniforms.uTime.value = t;
+
+    // LOD: swap sphere tessellation based on camera distance
+    if (meshRef.current) {
+      meshRef.current.getWorldPosition(_lodPos);
+      const d = _lodPos.distanceTo(state.camera.position);
+      const lod = d < 80 ? 0 : d < 300 ? 1 : 2;
+      if (lod !== lodRef.current) {
+        lodRef.current = lod;
+        meshRef.current.geometry = planetGeos[lod];
+      }
+    }
 
     // Analytically compute moon world positions for transit shadow uniforms.
     // Transform chain: Rx(planet.tilt) → Ry(planetAngle) → T(orbitR) → Rx(moon.tilt) → Ry(moonAngle) → T(moon.orbitR)
@@ -330,7 +351,7 @@ export default function PlanetWallet({ data, selected, panelOpen, onSelect, onDe
           onPointerLeave={onPointerLeave}
           onClick={onClick}
         >
-          <sphereGeometry args={[data.radius, 80, 80]} />
+          <primitive object={planetGeos[lodRef.current]} attach="geometry" />
           <primitive object={material} attach="material" />
         </mesh>
 

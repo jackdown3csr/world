@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useRef, useMemo, useState, useCallback } from "react";
+import React, { useRef, useMemo, useState, useCallback, useEffect } from "react";
 import { useFrame, type ThreeEvent } from "@react-three/fiber";
 import { Html } from "@react-three/drei";
 import * as THREE from "three";
@@ -36,6 +36,16 @@ export default function MoonBody({ data, planetOrbit, hostRadius, selected, pane
     [data.moonType, data.hue, data.seed],
   );
 
+  // LOD geometries
+  const _lodPos = useMemo(() => new THREE.Vector3(), []);
+  const moonGeos = useMemo(() => [
+    new THREE.SphereGeometry(data.radius, 48, 48),
+    new THREE.SphereGeometry(data.radius, 24, 24),
+    new THREE.SphereGeometry(data.radius, 12, 12),
+  ], [data.radius]);
+  const lodRef = useRef(0);
+  useEffect(() => () => { moonGeos.forEach(g => g.dispose()); }, [moonGeos]);
+
   useFrame((state) => {
     const t = state.clock.elapsedTime;
     if (moonOrbitRef.current)
@@ -43,6 +53,17 @@ export default function MoonBody({ data, planetOrbit, hostRadius, selected, pane
     if (meshRef.current)
       meshRef.current.rotation.y = data.seed * 6.28 + 0.06 * t;
     material.uniforms.uTime.value = t;
+
+    // LOD: swap sphere tessellation based on camera distance
+    if (meshRef.current) {
+      meshRef.current.getWorldPosition(_lodPos);
+      const d = _lodPos.distanceTo(state.camera.position);
+      const lod = d < 50 ? 0 : d < 200 ? 1 : 2;
+      if (lod !== lodRef.current) {
+        lodRef.current = lod;
+        meshRef.current.geometry = moonGeos[lod];
+      }
+    }
 
     // Track host planet world position for shadow casting
     if (hostGroupRef.current) {
@@ -74,7 +95,7 @@ export default function MoonBody({ data, planetOrbit, hostRadius, selected, pane
           onPointerLeave={onPointerLeave}
           onClick={onClick}
         >
-          <sphereGeometry args={[data.radius, 64, 64]} />
+          <primitive object={moonGeos[lodRef.current]} attach="geometry" />
           <primitive object={material} attach="material" />
         </mesh>
 

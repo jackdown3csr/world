@@ -146,6 +146,22 @@ export default function SaturnSystem({
     [moons],
   );
 
+  /* ── Moon LOD geometries (3 levels per moon) ── */
+  const _lodPos = useMemo(() => new THREE.Vector3(), []);
+  const moonGeoLODs = useMemo(
+    () => moons.map(m => [
+      new THREE.SphereGeometry(m.radius, 48, 48),
+      new THREE.SphereGeometry(m.radius, 24, 24),
+      new THREE.SphereGeometry(m.radius, 12, 12),
+    ]),
+    [moons],
+  );
+  const moonLodRefs = useRef<number[]>([]);
+  useEffect(() => {
+    moonLodRefs.current = moons.map(() => 0);
+    return () => { moonGeoLODs.forEach(set => set.forEach(g => g.dispose())); };
+  }, [moonGeoLODs, moons]);
+
   /* ── Ring particle positions (XZ plane, gap-aware) ── */
   const positions = useMemo(() => ringWallets.map(rp => {
     const r = saturnRingRadius(rp.radialT, inner, outer, moonOrbits);
@@ -199,12 +215,22 @@ export default function SaturnSystem({
     // Ring disc + particles: slow rotation
     if (ringGroupRef.current) ringGroupRef.current.rotation.y = 0.008 * t;
 
-    // Moon orbits + self-rotation
+    // Moon orbits + self-rotation + LOD
     moons.forEach((moon, i) => {
       const orbitGrp = moonOrbitRefs.current[i];
       if (orbitGrp) orbitGrp.rotation.y = moon.initialAngle + moon.orbitSpeed * t;
       const mesh = moonMeshRefs.current[i];
-      if (mesh) mesh.rotation.y = moon.seed * 6.28 + 0.06 * t;
+      if (mesh) {
+        mesh.rotation.y = moon.seed * 6.28 + 0.06 * t;
+        // LOD swap
+        mesh.getWorldPosition(_lodPos);
+        const d = _lodPos.distanceTo(state.camera.position);
+        const lod = d < 50 ? 0 : d < 200 ? 1 : 2;
+        if (moonLodRefs.current[i] !== lod) {
+          moonLodRefs.current[i] = lod;
+          mesh.geometry = moonGeoLODs[i][lod];
+        }
+      }
     });
 
     // Moon materials time + host shadow uniforms
@@ -403,7 +429,7 @@ export default function SaturnSystem({
               onPointerLeave={onMoonLeave}
               onClick={onMoonClick(i)}
             >
-              <sphereGeometry args={[moon.radius, 64, 64]} />
+              <primitive object={moonGeoLODs[i]?.[0] ?? moonGeoLODs[0]?.[0]} attach="geometry" />
               <primitive object={moonMaterials[i]} attach="material" />
             </mesh>
 

@@ -227,6 +227,70 @@ function LensFlare() {
   );
 }
 
+/* == CME (Coronal Mass Ejection) expanding plasma bubble == */
+const cmeVert = /* glsl */ `
+  uniform float uProgress;
+  varying vec3 vNorm;
+  varying vec3 vWorldPos;
+
+  // Lightweight multi-octave hash noise for irregular ejecta surface
+  float h3(vec3 p) {
+    p = fract(p * vec3(127.1, 311.7, 74.7));
+    p += dot(p, p.yxz + 19.19);
+    return fract((p.x + p.y) * p.z);
+  }
+  float bumps(vec3 p) {
+    float s = 0.0; float a = 0.5;
+    for (int i = 0; i < 4; i++) { s += a * h3(p); p *= 2.1; p.xy += 0.37; a *= 0.5; }
+    return s;
+  }
+
+  void main() {
+    vNorm = normalize(mat3(modelMatrix) * normal);
+    // Irregular ejecta: ragged when fresh, smooths as it disperses
+    float warp = (bumps(normal * 4.0 + uProgress * 3.7) * 2.0 - 1.0)
+                 * 0.22 * (1.0 - uProgress * 0.75);
+    vec3 displaced = position * (1.0 + warp);
+    vec4 wp = modelMatrix * vec4(displaced, 1.0);
+    vWorldPos = wp.xyz;
+    gl_Position = projectionMatrix * viewMatrix * wp;
+  }
+`;
+
+const cmeFrag = /* glsl */ `
+  uniform float uAlpha;
+  uniform float uProgress;
+  varying vec3 vNorm;
+  varying vec3 vWorldPos;
+
+  void main() {
+    vec3 viewDir = normalize(cameraPosition - vWorldPos);
+    float NdotV  = abs(dot(normalize(vNorm), viewDir));
+    float rim    = 1.0 - NdotV;
+
+    // Leading shock front (sharp limb)
+    float shockRim  = pow(rim, 1.3);
+    // Soft inner plasma body (face-on glow)
+    float innerBody = pow(NdotV, 3.0) * 0.45;
+    // Combine for bubble appearance
+    float shape = shockRim * 0.85 + innerBody;
+
+    // Colour: hot white-yellow (fresh) → orange → deep red (expanded)
+    vec3 hotColor  = vec3(1.00, 0.95, 0.65);
+    vec3 midColor  = vec3(1.00, 0.48, 0.08);
+    vec3 coolColor = vec3(0.85, 0.14, 0.04);
+    float t = uProgress;
+    vec3 plasmaCol = t < 0.45
+      ? mix(hotColor, midColor,  t / 0.45)
+      : mix(midColor, coolColor, (t - 0.45) / 0.55);
+    // Rim is always brighter / hotter looking
+    vec3 col = plasmaCol + vec3(0.35, 0.12, 0.0) * shockRim;
+
+    float alpha = shape * uAlpha;
+    gl_FragColor = vec4(col, clamp(alpha, 0.0, 1.0));
+  }
+`;
+
 /* == Sun component == */
 interface SunProps {
   totalVotingPower?: string;
@@ -243,14 +307,13 @@ export default function Sun({ totalVotingPower, totalLocked, blockNumber }: SunP
 
 
 
-  // ── Block-flash corona ──
-  const flashMat = useMemo(() => new THREE.ShaderMaterial({
-    vertexShader: haloVert,
-    fragmentShader: haloFrag,
+  // ── CME (Coronal Mass Ejection) — expanding plasma bubble on each new block ──
+  const cmeMat = useMemo(() => new THREE.ShaderMaterial({
+    vertexShader:   cmeVert,
+    fragmentShader: cmeFrag,
     uniforms: {
-      uColor:   { value: new THREE.Color("#fff8d0") },
-      uAlpha:   { value: 0 },
-      uFalloff: { value: 1.8 },
+      uAlpha:    { value: 0 },
+      uProgress: { value: 0 },
     },
     blending:    THREE.AdditiveBlending,
     transparent: true,
@@ -258,25 +321,40 @@ export default function Sun({ totalVotingPower, totalLocked, blockNumber }: SunP
     depthTest:   true,
     side:        THREE.DoubleSide,
   }), []);
-  const flashRef     = useRef<THREE.Mesh>(null);
-  const flashAmount  = useRef(0);         // 0–1 decaying value
-  const prevBlock    = useRef<number>(-1);
-  const { camera } = useThree();
+  const cmeRef      = useRef<THREE.Mesh>(null);
+  const cmeProgress = useRef(1.0);   // starts at 1 (invisible/done)
+  const cmeActive   = useRef(false);
+  const prevBlock   = useRef<number>(-1);
 
   useFrame((state, delta) => {
     const t = state.clock.elapsedTime;
     surfaceMat.uniforms.uTime.value = t;
 
-    // Flash on new block
+    // CME — trigger on new block
     if (blockNumber !== undefined && blockNumber !== prevBlock.current && blockNumber > 0) {
       prevBlock.current = blockNumber;
-      flashAmount.current = 1.0;
+      cmeProgress.current = 0.0;
+      cmeActive.current   = true;
+      if (cmeRef.current) cmeRef.current.scale.setScalar(1.0);
     }
-    if (flashAmount.current > 0) {
-      flashAmount.current = Math.max(0, flashAmount.current - delta * 2.8);
-      flashMat.uniforms.uAlpha.value = flashAmount.current * 0.45;
+    if (cmeActive.current && cmeRef.current) {
+      cmeProgress.current = Math.min(1.0, cmeProgress.current + delta / 3.2);
+      if (cmeProgress.current >= 1.0) {
+        cmeActive.current = false;
+        cmeMat.uniforms.uAlpha.value = 0;
+      } else {
+        // Expand from 1× to 13× sun radius
+        const scale = 1.0 + cmeProgress.current * 12.0;
+        cmeRef.current.scale.setScalar(scale);
+        // Alpha: fast rise (first 8%), slow smooth decay
+        const p = cmeProgress.current;
+        const a = p < 0.08
+          ? p * 12.5
+          : Math.pow(1.0 - (p - 0.08) / 0.92, 1.35);
+        cmeMat.uniforms.uAlpha.value    = a * 0.65;
+        cmeMat.uniforms.uProgress.value = p;
+      }
     }
-    if (flashRef.current) flashRef.current.quaternion.copy(camera.quaternion);
   });
 
   return (
@@ -287,10 +365,10 @@ export default function Sun({ totalVotingPower, totalLocked, blockNumber }: SunP
         <primitive object={surfaceMat} attach="material" />
       </mesh>
 
-      {/* block-flash halo */}
-      <mesh ref={flashRef} renderOrder={-99}>
-        <planeGeometry args={[SUN_RADIUS * 2 * 9, SUN_RADIUS * 2 * 9]} />
-        <primitive object={flashMat} attach="material" />
+      {/* CME expanding plasma bubble (triggered each block) */}
+      <mesh ref={cmeRef}>
+        <sphereGeometry args={[SUN_RADIUS, 48, 32]} />
+        <primitive object={cmeMat} attach="material" />
       </mesh>
 
       {/* soft bloom billboard */}
