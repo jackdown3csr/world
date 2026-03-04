@@ -11,9 +11,11 @@ import { SUN_RADIUS } from "@/lib/layout";
 const surfaceVert = /* glsl */ `
   varying vec3 vPos;
   varying vec3 vNorm;
+  varying vec3 vWorldPos;
   void main() {
     vPos  = position;
-    vNorm = normalize(normalMatrix * normal);
+    vNorm = normalize((modelMatrix * vec4(normal, 0.0)).xyz);
+    vWorldPos = (modelMatrix * vec4(position, 1.0)).xyz;
     gl_Position = projectionMatrix * modelViewMatrix * vec4(position,1.0);
   }
 `;
@@ -22,6 +24,7 @@ const surfaceFrag = /* glsl */ `
   uniform float uTime;
   varying vec3 vPos;
   varying vec3 vNorm;
+  varying vec3 vWorldPos;
 
   ${NOISE_GLSL}
 
@@ -58,7 +61,8 @@ const surfaceFrag = /* glsl */ `
     col      = mix(col, dark, spots);
     col     += white * fac;
 
-    float mu   = max(dot(vNorm, vec3(0.0,0.0,1.0)), 0.0);
+    vec3 viewDir = normalize(cameraPosition - vWorldPos);
+    float mu   = max(dot(vNorm, viewDir), 0.0);
     float limb = 0.55 + 0.45 * pow(mu, 0.35);
     col *= limb;
 
