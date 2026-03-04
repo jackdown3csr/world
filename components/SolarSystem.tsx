@@ -128,7 +128,7 @@ export default function SolarSystem() {
         gl={{ antialias: true, alpha: false }}
         dpr={[1, isMobile ? 1.5 : 2]}
       >
-        <ambientLight intensity={0.06} />
+        <ambientLight intensity={0.025} />
         <GalaxyBackground />
         <SolarWind />
         <Comet onSelect={handleSceneSelect} showLabel={showAllNames} />
@@ -265,7 +265,7 @@ export default function SolarSystem() {
             right: 16,
             top: 16,
             zIndex: 20,
-            width: 280,
+            width: 360,
             fontFamily:
               "'JetBrains Mono', 'SF Mono', 'Fira Code', Menlo, monospace",
             fontSize: 12,

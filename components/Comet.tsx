@@ -267,10 +267,11 @@ export default function Comet({ onSelect, showLabel = true }: { onSelect?: (addr
 
   // ── Pre-generated deterministic particle seeds ──
   const ionSeeds = useMemo(() => Array.from({ length: ION_N }, (_, i) => ({
-    t:    Math.pow(sr(i * 3.1 + 0.1), 0.65),   // distance 0–1 along tail, weighted near
-    ang:  sr(i * 1.7 + 0.3) * Math.PI * 2,
-    cone: sr(i * 2.3 + 0.9) * 0.05,
-    sz:   sr(i * 0.7 + 0.5),
+    t:     Math.pow(sr(i * 3.1 + 0.1), 0.65),   // distance 0–1 along tail, weighted near
+    ang:   sr(i * 1.7 + 0.3) * Math.PI * 2,
+    cone:  sr(i * 2.3 + 0.9) * 0.05,
+    sz:    sr(i * 0.7 + 0.5),
+    speed: 0.04 + sr(i * 1.1 + 0.6) * 0.08,   // streaming speed along tail
   })), []);
 
   const dustSeeds = useMemo(() => Array.from({ length: DUST_N }, (_, i) => ({
@@ -279,6 +280,7 @@ export default function Comet({ onSelect, showLabel = true }: { onSelect?: (addr
     cone:  sr(i * 2.1 + 1.2) * 0.10,
     curve: sr(i * 0.9 + 0.1) - 0.3,  // offset along orbit tangent (-0.3…0.7)
     sz:    sr(i * 0.4 + 0.2),
+    speed: 0.02 + sr(i * 0.6 + 0.4) * 0.05,   // slower streaming than ion
   })), []);
 
   // ── Spray/jet seeds (outgassing from surface, drifting anti-sunward) ──
@@ -366,14 +368,15 @@ export default function Comet({ onSelect, showLabel = true }: { onSelect?: (addr
     const iSz  = ionGeoRef.current.attributes.aSize    as THREE.BufferAttribute;
     for (let i = 0; i < ION_N; i++) {
       const s  = ionSeeds[i];
-      const d  = s.t * ionLength;
+      const et = (s.t + t * s.speed) % 1;   // cycling parametric position
+      const d  = et * ionLength;
       const cr = d * s.cone;
       const cx = _rt.x * Math.cos(s.ang) + _up.x * Math.sin(s.ang);
       const cy = _rt.y * Math.cos(s.ang) + _up.y * Math.sin(s.ang);
       const cz = _rt.z * Math.cos(s.ang) + _up.z * Math.sin(s.ang);
       iPos.setXYZ(i, _anti.x * d + cx * cr, _anti.y * d + cy * cr, _anti.z * d + cz * cr);
-      iAlp.setX(i,  (1.0 - s.t * 0.75) * 0.65 * proximity);
-      iSz.setX(i,   (1.2 + s.sz * 1.5 + (1 - s.t) * 2.0) * proximity);
+      iAlp.setX(i,  (1.0 - et * 0.75) * 0.65 * proximity);
+      iSz.setX(i,   (1.2 + s.sz * 1.5 + (1 - et) * 2.0) * proximity);
     }
     iPos.needsUpdate = true; iAlp.needsUpdate = true; iSz.needsUpdate = true;
 
@@ -383,7 +386,8 @@ export default function Comet({ onSelect, showLabel = true }: { onSelect?: (addr
     const dSz  = dustGeoRef.current.attributes.aSize    as THREE.BufferAttribute;
     for (let i = 0; i < DUST_N; i++) {
       const s  = dustSeeds[i];
-      const d  = s.t * dustLength;
+      const et = (s.t + t * s.speed) % 1;   // cycling parametric position
+      const d  = et * dustLength;
       const cr = d * s.cone;
       const cx = _rt.x * Math.cos(s.ang) + _up.x * Math.sin(s.ang);
       const cy = _rt.y * Math.cos(s.ang) + _up.y * Math.sin(s.ang);
@@ -395,8 +399,8 @@ export default function Comet({ onSelect, showLabel = true }: { onSelect?: (addr
         _anti.y * d + cy * cr + _vel.y * bc,
         _anti.z * d + cz * cr + _vel.z * bc,
       );
-      dAlp.setX(i,  (1.0 - s.t * 0.65) * 0.50 * proximity);
-      dSz.setX(i,   (1.5 + s.sz * 1.8 + (1 - s.t) * 1.6) * proximity);
+      dAlp.setX(i,  (1.0 - et * 0.65) * 0.50 * proximity);
+      dSz.setX(i,   (1.5 + s.sz * 1.8 + (1 - et) * 1.6) * proximity);
     }
     dPos.needsUpdate = true; dAlp.needsUpdate = true; dSz.needsUpdate = true;
 

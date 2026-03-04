@@ -107,15 +107,20 @@ export default function CameraController({
   const trackingAddr   = useRef<string | null>(null);
   const lastBodyPos    = useRef(new THREE.Vector3());   // body world pos last frame
 
-  useFrame(() => {
+  /* Smooth snap state */
+  const snapGoalCam    = useRef(new THREE.Vector3());
+  const snapGoalTarget = useRef(new THREE.Vector3());
+  const isSnapping     = useRef(false);
+
+  useFrame((_state, delta) => {
     const ctrl = controlsRef.current;
     if (!ctrl) return;
 
     /* ── handle reset ── */
     if (resetRequested && !prevReset.current) {
-      camera.position.copy(DEFAULT_POS);
-      ctrl.target.copy(DEFAULT_TARGET);
-      ctrl.update();
+      snapGoalCam.current.copy(DEFAULT_POS);
+      snapGoalTarget.current.copy(DEFAULT_TARGET);
+      isSnapping.current = true;
       trackingAddr.current = null;
       prevReset.current = true;
       onResetDone?.();
@@ -194,14 +199,31 @@ export default function CameraController({
         .add(dir.clone().multiplyScalar(dist * 0.7))
         .add(new THREE.Vector3(0, dist * 0.4, 0));
 
-      /* Snap camera + target */
-      ctrl.target.copy(body.position);
-      camera.position.copy(camPos);
-      ctrl.update();
+      /* Store snap goals and start interpolating */
+      snapGoalCam.current.copy(camPos);
+      snapGoalTarget.current.copy(body.position);
+      isSnapping.current = true;
 
       /* Start tracking */
       trackingAddr.current = addr;
       lastBodyPos.current.copy(body.position);   // seed delta tracker
+      return;
+    }
+
+    /* ── smooth snap interpolation ── */
+    if (isSnapping.current) {
+      const alpha = 1 - Math.exp(-9 * delta);
+      camera.position.lerp(snapGoalCam.current, alpha);
+      ctrl.target.lerp(snapGoalTarget.current, alpha);
+      ctrl.update();
+      // Keep lastBodyPos current so tracking doesn't jump when snap ends
+      if (trackingAddr.current) {
+        const bSnap = findBody(scene, trackingAddr.current);
+        if (bSnap) lastBodyPos.current.copy(bSnap.position);
+      }
+      const camDist  = camera.position.distanceTo(snapGoalCam.current);
+      const tgtDist  = ctrl.target.distanceTo(snapGoalTarget.current);
+      if (camDist < 0.5 && tgtDist < 0.5) isSnapping.current = false;
       return;
     }
 

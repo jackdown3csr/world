@@ -41,7 +41,7 @@ const frag = /* glsl */ `
     return fract(sin(p) * 43758.5453123);
   }
 
-  /* ── simplex-ish value noise (fast, no artifacts) ─── */
+  /* ── value noise + fbm ─────────────────────────────── */
   float vnoise(vec3 p) {
     vec3 i = floor(p);
     vec3 f = fract(p);
@@ -59,82 +59,110 @@ const frag = /* glsl */ `
   }
 
   float fbm4(vec3 p) {
-    float v = 0.0;
-    float a = 0.5;
-    for (int i = 0; i < 4; i++) {
-      v += a * vnoise(p);
-      p *= 2.03;
-      a *= 0.5;
-    }
+    float v = 0.0; float a = 0.5;
+    for (int i = 0; i < 4; i++) { v += a * vnoise(p); p *= 2.03; a *= 0.5; }
+    return v;
+  }
+  float fbm6(vec3 p) {
+    float v = 0.0; float a = 0.5;
+    for (int i = 0; i < 6; i++) { v += a * vnoise(p); p *= 2.07; a *= 0.48; }
     return v;
   }
 
-  /* ── starfield layer (soft glow) ───────────────── */
-  float stars(vec3 dir, float scale, float size) {
-    vec3 cell = floor(dir * scale);
+  /* ── starfield: sharp point-like stars ─────────────── */
+  /* Each cell has one random star. Brightness peaks sharply at centre.  */
+  float starLayer(vec3 dir, float scale, float threshold) {
+    vec3 cell  = floor(dir * scale);
     vec3 local = fract(dir * scale) - 0.5;
-    /* one star per cell — random position + brightness */
-    vec3 rnd = hash33(cell);
-    vec3 offset = (rnd - 0.5) * 0.9;
+    vec3 rnd   = hash33(cell);
+    /* skip most cells — only a fraction have visible stars */
+    if (rnd.x > threshold) return 0.0;
+    vec3 offset = (rnd - 0.5) * 0.85;
     float d = length(local - offset);
-    /* Gaussian falloff — soft glow instead of hard dots */
-    float bright = exp(-d * d / (size * size * 0.08));
-    /* colour temperature from hash */
-    float temp = rnd.z;
-    bright *= 0.5 + 0.5 * temp;
-    /* static — no shimmer */
+    /* sharp Gaussian — real stars are pin-points */
+    float bright = exp(-d * d * 2800.0);
+    /* brightness variation from hash */
+    bright *= 0.3 + 0.7 * rnd.y;
     return bright;
+  }
+
+  /* star with colour temperature (returns RGB) */
+  vec3 starColoured(vec3 dir, float scale, float threshold) {
+    vec3 cell  = floor(dir * scale);
+    vec3 local = fract(dir * scale) - 0.5;
+    vec3 rnd   = hash33(cell);
+    if (rnd.x > threshold) return vec3(0.0);
+    vec3 offset = (rnd - 0.5) * 0.85;
+    float d = length(local - offset);
+    float bright = exp(-d * d * 2800.0) * (0.3 + 0.7 * rnd.y);
+    /* colour from temperature: cool blue → white → warm orange */
+    float temp = rnd.z;
+    vec3 col;
+    if (temp < 0.3)      col = vec3(0.70, 0.80, 1.00);  /* blue-white */
+    else if (temp < 0.7) col = vec3(1.00, 0.98, 0.95);  /* white */
+    else if (temp < 0.9) col = vec3(1.00, 0.88, 0.65);  /* warm yellow */
+    else                 col = vec3(1.00, 0.70, 0.45);   /* deep orange */
+    return col * bright;
   }
 
   void main() {
     vec3 dir = normalize(vDir);
 
-    /* ── nebula ──────────────────────────────────────── */
-    vec3 np = dir * 1.8 + vec3(uTime * 0.002, uTime * 0.001, 0.0);
-    float n1 = fbm4(np);
-    float n2 = fbm4(np * 2.3 + 7.7);
-    float n3 = fbm4(np * 0.7 + 3.3);
+    /* ── multi-layer starfield ───────────────────────── */
+    /* 5 layers at different densities create realistic star distribution */
+    vec3 starTotal = vec3(0.0);
+    starTotal += starColoured(dir,  60.0, 0.015) * 1.40;  /* rare bright giants */
+    starTotal += starColoured(dir, 120.0, 0.04)  * 0.65;  /* medium stars */
+    starTotal += starColoured(dir, 250.0, 0.07)  * 0.30;  /* common faint */
+    starTotal += starColoured(dir, 500.0, 0.10)  * 0.12;  /* dense dim field */
+    starTotal += starColoured(dir, 900.0, 0.13)  * 0.05;  /* ultra-faint background */
 
-    /* two-tone nebula colouring — very subtle, deep space */
-    vec3 nebA  = vec3(0.015, 0.018, 0.04);   /* near-black blue */
-    vec3 nebB  = vec3(0.008, 0.03, 0.045);   /* dark teal */
-    vec3 nebC  = vec3(0.035, 0.015, 0.01);   /* faint warm dust */
-    vec3 nebula = mix(nebA, nebB, smoothstep(0.3, 0.7, n1));
-    nebula = mix(nebula, nebC, smoothstep(0.55, 0.80, n2) * 0.25);
-    float nebMask = smoothstep(0.40, 0.70, n1) * 0.08;
+    /* subtle twinkle on the brightest layer */
+    float twinkle = 0.85 + 0.15 * sin(hash13(floor(dir * 60.0)) * 50.0 + uTime * 1.8);
+    starTotal.rgb *= vec3(twinkle, twinkle, twinkle) *
+      vec3(1.0, 1.0, 1.0) + vec3(0.0, 0.0, 0.0) * (1.0 - twinkle);
 
-    /* dust lanes (darker streaks) */
-    float dust = smoothstep(0.48, 0.52, n3) * 0.3;
+    /* ── Milky Way — dense star band + faint unresolved glow ────── */
+    float galLat   = abs(dir.y);
+    float galBand  = exp(-18.0 * galLat * galLat);           /* tight core */
+    float galWide  = exp(-4.0 * galLat * galLat) * 0.3;     /* broad wings */
+    float galMask  = galBand + galWide;
 
-    /* ── starfield — 2 layers (sparse bright + faint dense) ── */
-    float s  = 0.0;
-    s += stars(dir, 100.0, 0.06) * 0.35;   /* sparse bright */
-    s += stars(dir, 400.0, 0.04) * 0.08;   /* dense faint */
+    /* dark rift structure — breaks up the band organically */
+    float riftNoise = fbm4(dir * 4.5 + vec3(0.0, 0.0, 5.1));
+    float rift      = smoothstep(0.38, 0.55, riftNoise);    /* 0 = dark lane, 1 = bright */
+    galMask *= mix(0.2, 1.0, rift);
 
-    /* dim stars in bright nebula areas */
-    s *= 1.0 - nebMask * 0.5;
+    /* extra resolved stars in the galactic plane */
+    vec3 milkyStars = starColoured(dir, 700.0, 0.22) * galBand * 0.10;
+    milkyStars += starColoured(dir, 1200.0, 0.28) * galBand * 0.04;
+    milkyStars += starColoured(dir, 1800.0, 0.32) * galMask * 0.02;
 
-    /* colour: mostly white, faint warm/cool tint */
-    vec3 starCol = vec3(0.88, 0.90, 1.0) * s;
-    starCol += vec3(0.9, 0.65, 0.35) * stars(dir, 80.0, 0.05) * 0.05;
-    starCol += vec3(0.45, 0.65, 1.0) * stars(dir, 160.0, 0.04) * 0.04;
+    /* faint unresolved stellar background — warm neutral, NOT blue */
+    vec3 milkyGlow = vec3(0.008, 0.007, 0.008) * galMask;
 
-    /* ── Milky Way band — faint glow along galactic plane ── */
-    float galactic = exp(-12.0 * dir.y * dir.y);
-    vec3 milky = vec3(0.012, 0.012, 0.018) * galactic;
-    float milkyStars = stars(dir, 350.0, 0.04) * galactic * 0.08;
-    milky += vec3(0.7, 0.75, 0.9) * milkyStars;
+    /* ── sparse nebula accents (only near galactic plane) ────── */
+    /* Very small, rare colour patches — NOT a uniform wash       */
+    float nebInput = fbm4(dir * 6.0 + vec3(2.3, 7.1, 0.5));
+    /* narrow band-pass: only a thin slice of noise values glow */
+    float nebMask  = smoothstep(0.56, 0.60, nebInput) * smoothstep(0.68, 0.60, nebInput);
+    nebMask *= galBand * 0.06;   /* only in the galactic plane, very faint */
+    vec3 nebCol = mix(
+      vec3(0.018, 0.006, 0.004),   /* warm H-alpha reddish */
+      vec3(0.004, 0.008, 0.014),   /* cool reflection blue */
+      step(0.5, fract(nebInput * 7.3))
+    );
 
     /* ── composite ───────────────────────────────────── */
-    vec3 bg = vec3(0.001, 0.001, 0.004);   /* near-black deep space */
-    vec3 color = bg;
-    color += milky;
-    color += nebula * nebMask;
-    color -= dust * nebMask * 0.3;
-    color += starCol;
-
-    /* subtle vignette toward edges helps depth */
+    vec3 color = vec3(0.0);          /* pure black base */
+    color += starTotal;
+    color += milkyStars;
+    color += milkyGlow;
+    color += nebCol * nebMask;
     color = max(color, vec3(0.0));
+
+    /* very mild filmic tone-map to tame the brightest stars */
+    color = color / (1.0 + color * 0.4);
 
     /* gamma */
     color = pow(color, vec3(1.0 / 2.2));

@@ -78,10 +78,12 @@ const surfaceFrag = /* glsl */ `
     vec3 filCol = mix(vec3(1.0, 0.35, 0.05), vec3(1.0, 0.80, 0.30), fn);
     col += filCol * filament * 0.45;
 
-    col *= 1.5;
+    col *= 1.1;
 
     gl_FragColor = vec4(col, 1.0);
-    gl_FragDepth = 1.0;  /* push depth to far plane so halo billboards pass depthTest here */
+    /* Halos use renderOrder -99 so they render before the depth buffer
+       has any data — no need to push depth to far plane here.
+       Normal depth ensures planets behind the sun are properly occluded. */
   }
 `;
 
@@ -136,8 +138,8 @@ const flareFrag = /* glsl */ `
     float outerGlow = exp(-d * 3.5) * 0.12;
 
     /* ── 2. subtle anamorphic horizontal streak (like a real lens) ── */
-    float hStretch = exp(-abs(c.y) * 35.0) * exp(-abs(c.x) * 1.8) * 0.25;
-    float vStretch = exp(-abs(c.x) * 45.0) * exp(-abs(c.y) * 2.5) * 0.08;
+    float hStretch = exp(-abs(c.y) * 35.0) * exp(-abs(c.x) * 1.8) * 0.12;
+    float vStretch = exp(-abs(c.x) * 45.0) * exp(-abs(c.y) * 2.5) * 0.04;
 
     /* ── 3. noise-based corona wisps (organic, not geometric) ── */
     float angle = atan(c.y, c.x);
@@ -147,11 +149,11 @@ const flareFrag = /* glsl */ `
       uTime * 0.015
     );
     float n = fbm(noiseCoord * 1.5);
-    float wisps = n * exp(-d * 3.0) * 0.20;
+    float wisps = n * exp(-d * 3.0) * 0.10;
 
     /* subtle angular variation (very soft, organic) */
     float angularVar = fbm(vec3(angle * 1.2, d * 3.0, uTime * 0.008));
-    float softRays = pow(angularVar, 2.0) * exp(-d * 4.0) * 0.15;
+    float softRays = pow(angularVar, 2.0) * exp(-d * 4.0) * 0.07;
 
     /* ── combine everything ── */
     float brightness = core + innerGlow + outerGlow + hStretch + vStretch + wisps + softRays;
@@ -247,9 +249,9 @@ const cmeVert = /* glsl */ `
 
   void main() {
     vNorm = normalize(mat3(modelMatrix) * normal);
-    // Irregular ejecta: ragged when fresh, smooths as it disperses
+    // Very subtle surface variation — keep edges soft
     float warp = (bumps(normal * 4.0 + uProgress * 3.7) * 2.0 - 1.0)
-                 * 0.22 * (1.0 - uProgress * 0.75);
+                 * 0.06 * (1.0 - uProgress * 0.85);
     vec3 displaced = position * (1.0 + warp);
     vec4 wp = modelMatrix * vec4(displaced, 1.0);
     vWorldPos = wp.xyz;
@@ -268,23 +270,20 @@ const cmeFrag = /* glsl */ `
     float NdotV  = abs(dot(normalize(vNorm), viewDir));
     float rim    = 1.0 - NdotV;
 
-    // Leading shock front (sharp limb)
-    float shockRim  = pow(rim, 1.3);
-    // Soft inner plasma body (face-on glow)
-    float innerBody = pow(NdotV, 3.0) * 0.45;
-    // Combine for bubble appearance
-    float shape = shockRim * 0.85 + innerBody;
+    // Very soft shell rim — high power = thin glowing edge only
+    float shockRim = pow(rim, 5.5);
+    // No inner fill — pure transparent shell
+    float shape = shockRim;
 
-    // Colour: hot white-yellow (fresh) → orange → deep red (expanded)
-    vec3 hotColor  = vec3(1.00, 0.95, 0.65);
-    vec3 midColor  = vec3(1.00, 0.48, 0.08);
-    vec3 coolColor = vec3(0.85, 0.14, 0.04);
+    // Colour: warm white-gold (fresh) → faint orange (expanded)
+    vec3 hotColor  = vec3(1.00, 0.92, 0.60);
+    vec3 midColor  = vec3(1.00, 0.55, 0.15);
+    vec3 coolColor = vec3(0.90, 0.28, 0.06);
     float t = uProgress;
     vec3 plasmaCol = t < 0.45
       ? mix(hotColor, midColor,  t / 0.45)
       : mix(midColor, coolColor, (t - 0.45) / 0.55);
-    // Rim is always brighter / hotter looking
-    vec3 col = plasmaCol + vec3(0.35, 0.12, 0.0) * shockRim;
+    vec3 col = plasmaCol;
 
     float alpha = shape * uAlpha;
     gl_FragColor = vec4(col, clamp(alpha, 0.0, 1.0));
@@ -351,7 +350,7 @@ export default function Sun({ totalVotingPower, totalLocked, blockNumber }: SunP
         const a = p < 0.08
           ? p * 12.5
           : Math.pow(1.0 - (p - 0.08) / 0.92, 1.35);
-        cmeMat.uniforms.uAlpha.value    = a * 0.65;
+        cmeMat.uniforms.uAlpha.value    = a * 0.18;
         cmeMat.uniforms.uProgress.value = p;
       }
     }
