@@ -234,6 +234,7 @@ export default function CameraController({
       /* Zoom distance by body type */
       let dist: number;
       switch (body.bodyType) {
+        case "star":   dist = body.bodyRadius * 5; break;          // overview of whole star
         case "planet": dist = Math.max(body.bodyRadius * 4, 12); break;
         case "moon":   dist = Math.max(body.bodyRadius * 8, 4);  break;
         case "ring":   dist = Math.max(body.bodyRadius * 12, 8); break;

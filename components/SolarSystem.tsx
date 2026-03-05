@@ -187,6 +187,7 @@ export default function SolarSystem() {
           panelOpen={panelOpen}
           onSelect={handleSceneSelect}
           onDeselect={() => setPanelOpen(false)}
+          onStarSelect={() => handleSceneSelect("__star_warm__")}
           onShiftSelect={(addr) => {
             const w = wallets.find(
               (x) => x.address.toLowerCase() === addr.toLowerCase(),
@@ -212,6 +213,7 @@ export default function SolarSystem() {
           panelOpen={panelOpen}
           onSelect={handleSceneSelect}
           onDeselect={() => setPanelOpen(false)}
+          onStarSelect={() => handleSceneSelect("__star_cool__")}
           onShiftSelect={(addr) => {
             const w = vestingWallets.find(
               (x) => x.address.toLowerCase() === addr.toLowerCase(),
@@ -396,6 +398,40 @@ export default function SolarSystem() {
             gap: 6,
           }}
         >
+          {/* ── System indicator + jump button ── */}
+          {(() => {
+            const nearVesting = camDebug ? camDebug.pos[0] > 2000 : false;
+            const thisSystem  = nearVesting ? "VESTING" : "VESCROW";
+            const otherKey    = nearVesting ? "__star_warm__" : "__star_cool__";
+            const thisColor   = nearVesting ? "#00ffee" : "#ffc860";
+            const otherColor  = nearVesting ? "#ffc860" : "#00ffee";
+            return (
+              <div style={{
+                display: "flex", alignItems: "center", gap: 8,
+                padding: "4px 8px",
+                background: "rgba(2,6,14,0.6)", borderRadius: 4,
+                border: `1px solid ${thisColor}28`,
+                fontSize: 11, fontFamily: "inherit",
+              }}>
+                <span style={{ color: thisColor, fontWeight: 700, letterSpacing: "0.15em" }}>
+                  ◉ {thisSystem}
+                </span>
+                <button
+                  onClick={() => handleSceneSelect(otherKey)}
+                  title="Jump to other star system"
+                  style={{
+                    marginLeft: "auto", padding: "2px 8px",
+                    background: "transparent", border: `1px solid ${otherColor}44`,
+                    borderRadius: 3, color: otherColor, cursor: "pointer",
+                    fontSize: 10, letterSpacing: "0.10em", fontFamily: "inherit",
+                  }}
+                >
+                  → {nearVesting ? "VESCROW" : "VESTING"}
+                </button>
+              </div>
+            );
+          })()}
+
           <HudToolbar
             showAllNames={showAllNames}
             onToggleLabels={() => setShowAllNames((v) => !v)}

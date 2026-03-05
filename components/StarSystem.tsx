@@ -51,6 +51,8 @@ export interface StarSystemProps {
   onSelect?: (address: string) => void;
   onDeselect?: () => void;
   onShiftSelect?: (address: string) => void;
+  /** Called when user clicks the star itself */
+  onStarSelect?: () => void;
   /** Replace the flat asteroid belt with the protoplanetary disk (vesting system) */
   diskMode?: boolean;
 }
@@ -74,6 +76,7 @@ export default function StarSystem({
   onSelect,
   onDeselect,
   onShiftSelect,
+  onStarSelect,
   diskMode = false,
 }: StarSystemProps) {
   return (
@@ -92,6 +95,8 @@ export default function StarSystem({
           blockNumber={blockNumber}
           palette={palette}
           label={starLabel}
+          starId={`__star_${palette}__`}
+          onSelect={onStarSelect}
         />
 
         {solarData.planets.map((p) => (

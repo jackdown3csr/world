@@ -319,9 +319,13 @@ interface SunProps {
   position?: [number, number, number];
   palette?: StarPalette;
   label?: string;
+  /** Scene-graph identifier (for CameraController body lookup) */
+  starId?: string;
+  /** Called when user clicks the star */
+  onSelect?: () => void;
 }
 
-export default function Sun({ totalVotingPower, totalLocked, blockNumber, position = [0, 0, 0], palette = "warm", label }: SunProps) {
+export default function Sun({ totalVotingPower, totalLocked, blockNumber, position = [0, 0, 0], palette = "warm", label, starId = "__star__", onSelect }: SunProps) {
   const pal = SUN_PALETTES[palette];
   const surfaceMat = useMemo(
     () => new THREE.ShaderMaterial({
@@ -387,7 +391,12 @@ export default function Sun({ totalVotingPower, totalLocked, blockNumber, positi
   return (
     <group position={position}>
       {/* photosphere */}
-      <mesh>
+      <mesh
+        userData={{ walletAddress: starId, bodyRadius: SUN_RADIUS, bodyType: "star" }}
+        onClick={onSelect ? (e) => { e.stopPropagation(); onSelect(); } : undefined}
+        onPointerOver={onSelect ? () => { document.body.style.cursor = "pointer"; } : undefined}
+        onPointerOut={() => { document.body.style.cursor = "auto"; }}
+      >
         <sphereGeometry args={[SUN_RADIUS, 128, 128]} />
         <primitive object={surfaceMat} attach="material" />
       </mesh>
