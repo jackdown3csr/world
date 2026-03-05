@@ -76,6 +76,7 @@ export default function PlanetWallet({ data, selected, panelOpen, onSelect, onDe
         }
       `,
       fragmentShader: /* glsl */ `
+        uniform vec3  uStarPos;
         uniform vec3 uColor;
         uniform float uIntensity;
         uniform float uFalloff;
@@ -83,7 +84,7 @@ export default function PlanetWallet({ data, selected, panelOpen, onSelect, onDe
         varying vec3 vWorldPos;
         void main() {
           vec3 viewDir  = normalize(cameraPosition - vWorldPos);
-          vec3 sunDir   = normalize(-vWorldPos);
+          vec3 sunDir   = normalize(uStarPos - vWorldPos);
           float sunFace = smoothstep(-0.1, 0.35, dot(vNorm, sunDir));
           float rim  = 1.0 - max(dot(vNorm, viewDir), 0.0);
           float glow = pow(rim, uFalloff) * uIntensity * sunFace;
@@ -96,6 +97,7 @@ export default function PlanetWallet({ data, selected, panelOpen, onSelect, onDe
         uColor:     { value: colorMap[data.planetType] ?? new THREE.Color(0.5, 0.7, 1.0) },
         uIntensity: { value: intensityMap[data.planetType] ?? 0.4 },
         uFalloff:   { value: falloffMap[data.planetType] ?? 4.5 },
+        uStarPos:   { value: new THREE.Vector3(0, 0, 0) },
       },
       transparent: true,
       side: THREE.BackSide,
@@ -121,6 +123,7 @@ export default function PlanetWallet({ data, selected, panelOpen, onSelect, onDe
         }
       `,
       fragmentShader: /* glsl */ `
+        uniform vec3  uStarPos;
         uniform vec3  uColorLow;   // horizon colour
         uniform vec3  uColorHigh;  // zenith colour (from camera pov)
         uniform float uHue;
@@ -129,7 +132,7 @@ export default function PlanetWallet({ data, selected, panelOpen, onSelect, onDe
 
         void main() {
           vec3 viewDir = normalize(cameraPosition - vWorldPos);
-          vec3 sunDir  = normalize(-vWorldPos);
+          vec3 sunDir  = normalize(uStarPos - vWorldPos);
           float NdotS  = dot(vNorm, sunDir);
 
           // sunFacing: 1 on day side, 0 on night, smooth terminator
@@ -159,6 +162,7 @@ export default function PlanetWallet({ data, selected, panelOpen, onSelect, onDe
         uColorLow:  { value: new THREE.Color(0.22, 0.52, 1.0) },   // limb — deep blue
         uColorHigh: { value: new THREE.Color(0.55, 0.78, 1.0) },   // zenith — azure
         uHue:       { value: data.hue },
+        uStarPos:   { value: new THREE.Vector3(0, 0, 0) },
       },
       transparent: true,
       side: THREE.FrontSide,

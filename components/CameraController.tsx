@@ -238,6 +238,7 @@ export default function CameraController({
         case "moon":   dist = Math.max(body.bodyRadius * 8, 4);  break;
         case "ring":   dist = Math.max(body.bodyRadius * 12, 8); break;
         case "comet":  dist = 55; break;
+        case "satellite": dist = 30; break;
         default:       dist = Math.max(body.bodyRadius * 12, 8); break;
       }
 

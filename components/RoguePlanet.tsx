@@ -76,6 +76,7 @@ const VERT = /* glsl */ `
 
 const FRAG = /* glsl */ `
   uniform float uTime;
+  uniform vec3  uStarPos;
   varying vec3 vNorm;
   varying vec3 vPos;
   varying vec3 vWorldPos;
@@ -93,7 +94,7 @@ const FRAG = /* glsl */ `
     col += crack * vec3(0.12, 0.02, 0.005);
 
     // Faint specular from the sun (world origin)
-    vec3 sunDir = normalize(-vWorldPos);
+    vec3 sunDir = normalize(uStarPos - vWorldPos);
     float spec  = pow(max(dot(reflect(-sunDir, vNorm), viewDir), 0.0), 18.0);
     col += spec * vec3(0.04, 0.02, 0.025);
 
@@ -119,8 +120,9 @@ export default function RoguePlanet({ onRogueClick }: RoguePlanetProps) {
         vertexShader:   VERT,
         fragmentShader: FRAG,
         uniforms: {
-          uTime: { value: 0 },
-          uSeed: { value: 7.31 },
+          uTime:    { value: 0 },
+          uSeed:    { value: 7.31 },
+          uStarPos: { value: new THREE.Vector3(0, 0, 0) },
         },
       }),
     [],

@@ -27,6 +27,7 @@ const VERT = /* glsl */ `
 /* ── Fragment shader ───────────────────────────────────────── */
 
 const FRAG = /* glsl */ `
+  uniform vec3  uStarPos;
   uniform float uInnerRadius;
   uniform float uOuterRadius;
   uniform float uSeed;
@@ -129,7 +130,7 @@ const FRAG = /* glsl */ `
 
     // ── Illumination + forward scattering ──
     // Sun is at origin; ring lives at vWorldPos
-    vec3 sunDir  = normalize(-vWorldPos);
+    vec3 sunDir  = normalize(uStarPos - vWorldPos);
     vec3 viewDir = normalize(cameraPosition - vWorldPos);
 
     // Basic diffuse — both sides lit, back slightly dimmer

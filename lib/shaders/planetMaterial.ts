@@ -10,12 +10,18 @@ import * as mars from "./marsShader";
 import * as terrestrial from "./terrestrialShader";
 import * as iceGiant from "./iceGiantShader";
 import * as gasGiant from "./gasGiantShader";
+import * as molten from "./moltenShader";
+import * as lavaOcean from "./lavaOceanShader";
+import * as protoplanetary from "./protoplanetaryShader";
 
 const SHADER_MAP: Record<PlanetType, { VERT: string; FRAG: string }> = {
   rocky,
   terrestrial,
-  ice_giant:  iceGiant,
-  gas_giant:  gasGiant,
+  ice_giant:      iceGiant,
+  gas_giant:      gasGiant,
+  molten,
+  lava_ocean:     lavaOcean,
+  protoplanetary,
 };
 
 function makeUniforms(hue: number, seed: number, hasRing = false) {
@@ -24,7 +30,8 @@ function makeUniforms(hue: number, seed: number, hasRing = false) {
     uSeed:    { value: seed },
     uTime:    { value: 0    },
     uVariant: { value: seed },
-    uHasRing: { value: hasRing ? 1.0 : 0.0 },
+    uHasRing:  { value: hasRing ? 1.0 : 0.0 },
+    uStarPos:  { value: new THREE.Vector3(0, 0, 0) },
     // Moon transit shadow uniforms (updated per frame by PlanetWallet)
     uMoonPos:   { value: Array.from({ length: 6 }, () => new THREE.Vector3()) },
     uMoonRad:   { value: [0, 0, 0, 0, 0, 0] },

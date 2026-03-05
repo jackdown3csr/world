@@ -44,6 +44,7 @@ export const VERT = /* glsl */ `
 /* ── Fragment shader ────────────────────────────────────────── */
 
 export const FRAG = /* glsl */ `
+  uniform vec3  uStarPos;
   uniform float uHue;
   uniform float uSeed;
   uniform float uTime;
@@ -62,7 +63,7 @@ export const FRAG = /* glsl */ `
     vec3 seed3 = vec3(uSeed*13.7, uSeed*7.3, uSeed*5.1);
 
     // ── Lighting ─────────────────────────────────────────
-    vec3 lightDir = normalize(-vWorldPos);
+    vec3 lightDir = normalize(uStarPos - vWorldPos);
     vec3 viewDir  = normalize(cameraPosition - vWorldPos);
 
     // ── Bump normals ─────────────────────────────────────

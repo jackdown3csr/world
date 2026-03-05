@@ -21,7 +21,7 @@ export function computePlanetSizing(planetEntries: RankedEntry[]): {
   const typeMap   = new Map<string, PlanetType>();
 
   const byType: Record<PlanetType, { addr: string; idx: number }[]> = {
-    gas_giant: [], ice_giant: [], terrestrial: [], rocky: [],
+    gas_giant: [], ice_giant: [], terrestrial: [], rocky: [], molten: [], lava_ocean: [], protoplanetary: [],
   };
 
   planetEntries.forEach(({ w }, i) => {
@@ -73,7 +73,7 @@ export function computeOrbits(
   } else {
     // Solar mode: type bands (rocky inner → gas giant outer)
     const TYPE_ORDER: Record<PlanetType, number> = {
-      rocky: 0, terrestrial: 1, ice_giant: 2, gas_giant: 3,
+      rocky: 0, terrestrial: 1, ice_giant: 2, gas_giant: 3, molten: 4, lava_ocean: 5, protoplanetary: 6,
     };
 
     const entries = planetEntries.map(({ w }, i) => ({

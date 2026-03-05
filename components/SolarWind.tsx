@@ -35,15 +35,23 @@ const FRAG = /* glsl */ `
   void main() {
     float d = length(gl_PointCoord - 0.5) * 2.0;
     float a = smoothstep(1.0, 0.1, d) * vAlpha;
-    /* warm white-gold colour — like real solar wind plasma */
-    vec3 col = mix(vec3(1.0, 0.92, 0.65), vec3(1.0, 0.78, 0.42), d);
+    vec3 col = mix(__LO__, __HI__, d);
     gl_FragColor = vec4(col, a * 0.70);
   }
 `;
 
-export default function SolarWind() {
+export default function SolarWind({ origin = [0, 0, 0], color = "warm" }: {
+  origin?: [number, number, number];
+  color?:  "warm" | "cool";
+}) {
   /* Per-particle state (NOT reactive — mutated in useFrame) */
   const vels = useRef<Float32Array>(null as unknown as Float32Array);
+  const originVec = useMemo(() => new THREE.Vector3(...origin), [origin[0], origin[1], origin[2]]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Warm: white-gold solar wind; Cool: blue-white O-type stellar wind
+  const windColor = color === "cool"
+    ? { lo: "vec3(0.75, 0.90, 1.00)", hi: "vec3(0.55, 0.75, 1.00)" }
+    : { lo: "vec3(1.0, 0.92, 0.65)",  hi: "vec3(1.0, 0.78, 0.42)"  };
 
   const { geo, mat } = useMemo(() => {
     const pos   = new Float32Array(N * 3);
@@ -54,9 +62,9 @@ export default function SolarWind() {
       const r   = MIN_DIST + Math.random() * (MAX_DIST - MIN_DIST);
       const dir = randDir();
       const spd = SPEED_LO + Math.random() * (SPEED_HI - SPEED_LO);
-      pos[i * 3]     = dir.x * r;
-      pos[i * 3 + 1] = dir.y * r;
-      pos[i * 3 + 2] = dir.z * r;
+      pos[i * 3]     = origin[0] + dir.x * r;
+      pos[i * 3 + 1] = origin[1] + dir.y * r;
+      pos[i * 3 + 2] = origin[2] + dir.z * r;
       vel[i * 3]     = dir.x * spd;
       vel[i * 3 + 1] = dir.y * spd;
       vel[i * 3 + 2] = dir.z * spd;
@@ -71,14 +79,14 @@ export default function SolarWind() {
 
     const m = new THREE.ShaderMaterial({
       vertexShader:   VERT,
-      fragmentShader: FRAG,
+      fragmentShader: FRAG.replace("__LO__", windColor.lo).replace("__HI__", windColor.hi),
       transparent:    true,
       depthWrite:     false,
       blending:       THREE.AdditiveBlending,
     });
 
     return { geo: g, mat: m };
-  }, []);
+  }, [windColor.lo, windColor.hi]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useFrame((_, delta) => {
     const pos = geo.attributes.position as THREE.BufferAttribute;
@@ -91,15 +99,17 @@ export default function SolarWind() {
       pos.array[ix + 1] += vel[ix + 1] * dt;
       pos.array[ix + 2] += vel[ix + 2] * dt;
 
-      const x = pos.array[ix], y = pos.array[ix + 1], z = pos.array[ix + 2];
-      if (x * x + y * y + z * z > MAX_DIST * MAX_DIST) {
-        // respawn near sun, new random direction
+      const dx = pos.array[ix] - originVec.x;
+      const dy = pos.array[ix + 1] - originVec.y;
+      const dz = pos.array[ix + 2] - originVec.z;
+      if (dx * dx + dy * dy + dz * dz > MAX_DIST * MAX_DIST) {
+        // respawn near star, new random direction
         const dir = randDir();
         const spd = SPEED_LO + Math.random() * (SPEED_HI - SPEED_LO);
         const r   = MIN_DIST + Math.random() * 6;
-        pos.array[ix]     = dir.x * r;
-        pos.array[ix + 1] = dir.y * r;
-        pos.array[ix + 2] = dir.z * r;
+        pos.array[ix]     = originVec.x + dir.x * r;
+        pos.array[ix + 1] = originVec.y + dir.y * r;
+        pos.array[ix + 2] = originVec.z + dir.z * r;
         vel[ix]     = dir.x * spd;
         vel[ix + 1] = dir.y * spd;
         vel[ix + 2] = dir.z * spd;

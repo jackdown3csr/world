@@ -290,14 +290,39 @@ const cmeFrag = /* glsl */ `
   }
 `;
 
+/* ── Colour palettes ─────────────────────────────────────── */
+export const SUN_PALETTES = {
+  warm: {
+    // veGNET — orange/gold
+    surface: { white: "#fff8f0", yellow: "#ffe070", orange: "#ff9922", dark: "#8c2800" },
+    halo:    ["#fffef0", "#fff4c8", "#ffe080", "#ffaa33", "#ff7711"],
+    flare:   { warm: "#ff9a18", orange: "#ff6610" },
+    label:   { name: "#ffc860", accent: "#00e5ff", sub: "#c0a050" },
+    point:   "#fff5e0",
+  },
+  cool: {
+    // Vesting — blue/cyan O-type star
+    surface: { white: "#f0f8ff", yellow: "#a8d8ff", orange: "#4488ff", dark: "#001a8c" },
+    halo:    ["#e8f4ff", "#b8d8ff", "#7ab0ff", "#4488ee", "#2255bb"],
+    flare:   { warm: "#8ab8ff", orange: "#5577ee" },
+    label:   { name: "#88ccff", accent: "#00ffee", sub: "#6699cc" },
+    point:   "#d0e8ff",
+  },
+} as const;
+export type StarPalette = keyof typeof SUN_PALETTES;
+
 /* == Sun component == */
 interface SunProps {
   totalVotingPower?: string;
   totalLocked?: string;
   blockNumber?: number;   // changes each block → triggers a flash
+  position?: [number, number, number];
+  palette?: StarPalette;
+  label?: string;
 }
 
-export default function Sun({ totalVotingPower, totalLocked, blockNumber }: SunProps) {
+export default function Sun({ totalVotingPower, totalLocked, blockNumber, position = [0, 0, 0], palette = "warm", label }: SunProps) {
+  const pal = SUN_PALETTES[palette];
   const surfaceMat = useMemo(
     () => new THREE.ShaderMaterial({
       vertexShader: surfaceVert, fragmentShader: surfaceFrag,
@@ -360,7 +385,7 @@ export default function Sun({ totalVotingPower, totalLocked, blockNumber }: SunP
   });
 
   return (
-    <group>
+    <group position={position}>
       {/* photosphere */}
       <mesh>
         <sphereGeometry args={[SUN_RADIUS, 128, 128]} />
@@ -377,13 +402,13 @@ export default function Sun({ totalVotingPower, totalLocked, blockNumber }: SunP
       <LensFlare />
 
       {/* corona layers */}
-      <HaloLayer scale={1.12} color="#fffef0" alpha={0.90} falloff={4.0} />
-      <HaloLayer scale={1.45} color="#fff4c8" alpha={0.55} falloff={3.0} />
-      <HaloLayer scale={2.20} color="#ffe080" alpha={0.30} falloff={2.2} />
-      <HaloLayer scale={3.80} color="#ffaa33" alpha={0.14} falloff={1.5} />
-      <HaloLayer scale={7.00} color="#ff7711" alpha={0.05} falloff={1.0} />
+      <HaloLayer scale={1.12} color={pal.halo[0]} alpha={0.90} falloff={4.0} />
+      <HaloLayer scale={1.45} color={pal.halo[1]} alpha={0.55} falloff={3.0} />
+      <HaloLayer scale={2.20} color={pal.halo[2]} alpha={0.30} falloff={2.2} />
+      <HaloLayer scale={3.80} color={pal.halo[3]} alpha={0.14} falloff={1.5} />
+      <HaloLayer scale={7.00} color={pal.halo[4]} alpha={0.05} falloff={1.0} />
 
-      <pointLight intensity={28} distance={12000} decay={0.10} color="#fff5e0" />
+      <pointLight intensity={28} distance={12000} decay={0.10} color={pal.point} />
 
       {/* Strength label */}
       {(totalVotingPower || totalLocked) && (
@@ -404,16 +429,16 @@ export default function Sun({ totalVotingPower, totalLocked, blockNumber }: SunP
             lineHeight: 1.8,
             textTransform: "uppercase",
           }}>
-            <div style={{ color: "#ffc860", fontSize: 13, fontWeight: 700, letterSpacing: "0.18em", marginBottom: 2 }}>
-              VESCROW
+            <div style={{ color: pal.label.name, fontSize: 13, fontWeight: 700, letterSpacing: "0.18em", marginBottom: 2 }}>
+              {label ?? "VESCROW"}
             </div>
             {totalVotingPower && (
-              <div style={{ color: "#00e5ff", fontSize: 11, fontWeight: 600 }}>
+              <div style={{ color: pal.label.accent, fontSize: 11, fontWeight: 600 }}>
                 {totalVotingPower}
               </div>
             )}
             {totalLocked && (
-              <div style={{ color: "#c0a050" }}>
+              <div style={{ color: pal.label.sub }}>
                 {totalLocked}
               </div>
             )}

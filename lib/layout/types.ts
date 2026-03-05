@@ -6,7 +6,7 @@ import type { WalletEntry } from "../types";
 
 /* ── Planet ────────────────────────────────────────────────── */
 
-export type PlanetType = "rocky" | "terrestrial" | "ice_giant" | "gas_giant";
+export type PlanetType = "rocky" | "terrestrial" | "ice_giant" | "gas_giant" | "molten" | "lava_ocean" | "protoplanetary";
 
 /** Layout mode: "solar" = real-solar-system bands, "ranked" = VP rank → distance, "ranked-gnet" = locked GNET rank → distance */
 export type LayoutMode = "solar" | "ranked" | "ranked-gnet";

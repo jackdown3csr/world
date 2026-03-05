@@ -86,7 +86,7 @@ export const MOON_SHADOW_GLSL = /* glsl */ `
 
   // Returns shadow intensity [0..1] from any moon transiting in front of sun.
   float moonTransitShadow(vec3 fragPos) {
-    vec3 toSun = normalize(-fragPos);
+    vec3 toSun = normalize(uStarPos - fragPos);
     float shadow = 0.0;
     for (int i = 0; i < 6; i++) {
       if (float(i) >= uMoonCount) break;

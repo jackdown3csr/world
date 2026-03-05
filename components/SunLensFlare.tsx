@@ -114,9 +114,14 @@ const BURST_FRAG = /* glsl */ `
 
 /* ── Component ────────────────────────────────────────────── */
 
-export default function SunLensFlare() {
+export default function SunLensFlare({ starPosition = [0, 0, 0] }: { starPosition?: [number, number, number] }) {
   const { camera, size } = useThree();
   const groupRef = useRef<THREE.Group>(null);
+  const starWorldPos = useMemo(
+    () => new THREE.Vector3(...starPosition),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [starPosition[0], starPosition[1], starPosition[2]],
+  );
 
   // Ghost sprites (planes positioned in world space, face camera)
   const ghostMats = useMemo(() => GHOSTS.map((g, i) => new THREE.ShaderMaterial({
@@ -174,7 +179,7 @@ export default function SunLensFlare() {
   const planeGeo = useMemo(() => new THREE.PlaneGeometry(1, 1), []);
 
   useFrame((state) => {
-    const sunWorldPos = new THREE.Vector3(0, 0, 0);  // sun is at origin
+    const sunWorldPos = starWorldPos;  // star at given position
 
     // Project sun to NDC (-1..1)
     const sunNDC = sunWorldPos.clone().project(camera);
@@ -193,7 +198,7 @@ export default function SunLensFlare() {
     const edgeFade  = offScreen ? 0 : Math.max(0, 1.0 - ndcDist * 0.7);
 
     // Distance-based intensity: stronger when closer to sun
-    const dist = camera.position.length();
+    const dist = camera.position.distanceTo(starWorldPos);
     const distFade = Math.min(1.0, 600 / Math.max(dist, 1));
 
     const intensity = edgeFade * distFade;

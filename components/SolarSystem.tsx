@@ -12,24 +12,22 @@ import { useWallets } from "@/hooks/useWallets";
 import { useWalletConnection } from "@/hooks/useWalletConnection";
 import { useIsMobile } from "@/hooks/useIsMobile";
 import { useBlock } from "@/hooks/useBlock";
+import { useFaucet } from "@/hooks/useFaucet";
 import { buildSolarSystem } from "@/lib/layout";
 import type { LayoutMode } from "@/lib/layout";
 import { formatBalance } from "@/lib/formatBalance";
 
-import Sun from "./Sun";
-import PlanetWallet from "./PlanetWallet";
-import OrbitRing from "./OrbitRing";
-import AsteroidBelt from "./AsteroidBelt";
+import StarSystem from "./StarSystem";
 import GalaxyBackground from "./GalaxyBackground";
 import CameraController from "./CameraController";
 import Comet from "./Comet";
-import SolarWind from "./SolarWind";
 import SplashScreen from "./SplashScreen";
 import HudToolbar from "./HudToolbar";
 import WalletPanel from "./WalletPanel";
 import DirectoryPanel from "./DirectoryPanel";
 import HelpPanel from "./HelpPanel";
 import RoguePlanet, { ROGUE_HASH } from "./RoguePlanet";
+import FaucetSatellite from "./FaucetSatellite";
 import type { WalletEntry } from "@/lib/types";
 
 /* ── Screenshot helper (lives inside Canvas to access gl) ── */
@@ -59,6 +57,7 @@ export default function SolarSystem() {
 
   /* ── Data ── */
   const { wallets, loading, refetch, updatedAt } = useWallets();
+  const faucetStats = useFaucet();
   const [layoutMode, setLayoutMode] = useState<LayoutMode>("solar");
   const solarData = useMemo(() => buildSolarSystem(wallets, layoutMode), [wallets, layoutMode]);
 
@@ -164,58 +163,33 @@ export default function SolarSystem() {
       >
         <ambientLight intensity={0.025} />
         <GalaxyBackground />
-        <SolarWind />
         <Comet onSelect={handleSceneSelect} showLabel={showAllNames && !photoMode} />
         <RoguePlanet onRogueClick={() => setRogueClicked(true)} />
-        <Sun
-          totalVotingPower={showAllNames && !photoMode ? totalVotingPower : undefined}
-          totalLocked={showAllNames && !photoMode ? totalLocked : undefined}
+        <FaucetSatellite stats={faucetStats} showLabel={showAllNames && !photoMode} onSelect={handleSceneSelect} />
+
+        <StarSystem
+          solarData={solarData}
+          palette="warm"
+          starLabel="VESCROW"
+          totalVotingPower={totalVotingPower}
+          totalLocked={totalLocked}
           blockNumber={blockFlash}
-        />
-
-        {solarData.planets.map((p) => (
-          <React.Fragment key={p.wallet.address}>
-            {/* Skip orbit ring for Saturn — wallet ring is its visual identity */}
-            {showOrbits && !photoMode && p.ringWallets.length === 0 && (
-              <OrbitRing radius={p.orbitRadius} tilt={p.tilt} />
-            )}
-            <PlanetWallet
-              data={p}
-              selected={
-                selectedAddress?.toLowerCase() ===
-                p.wallet.address.toLowerCase()
-              }
-              onSelect={() => handleSceneSelect(p.wallet.address)}
-              onDeselect={() => setPanelOpen(false)}
-              panelOpen={panelOpen}
-              selectedAddress={selectedAddress}
-              onSelectAddress={handleSceneSelect}
-              showLabel={showAllNames && !photoMode}
-              showMoonLabels={showAllNames && !photoMode}
-              showRingLabels={showAllNames && !photoMode}
-              showRenamedOnly={showRenamedOnly}
-              showTrails={showTrails && !photoMode}
-              onShiftSelect={(addr) => {
-                const w = wallets.find(
-                  (x) => x.address.toLowerCase() === addr.toLowerCase(),
-                );
-                setStorageWallet(w ?? null);
-              }}
-            />
-          </React.Fragment>
-        ))}
-
-        <AsteroidBelt
-          asteroids={solarData.asteroids}
-          beltInnerRadius={solarData.beltInnerRadius}
-          beltOuterRadius={solarData.beltOuterRadius}
-          selectedAddress={selectedAddress}
-          onSelectAddress={handleSceneSelect}
-          onDeselect={() => setPanelOpen(false)}
-          panelOpen={panelOpen}
-          showAllNames={showAllNames && !photoMode}
+          showOrbits={showOrbits}
+          showAllNames={showAllNames}
           showRenamedOnly={showRenamedOnly}
-          showOrbits={showOrbits && !photoMode}
+          showTrails={showTrails}
+          photoMode={photoMode}
+          showSolarWind
+          selectedAddress={selectedAddress}
+          panelOpen={panelOpen}
+          onSelect={handleSceneSelect}
+          onDeselect={() => setPanelOpen(false)}
+          onShiftSelect={(addr) => {
+            const w = wallets.find(
+              (x) => x.address.toLowerCase() === addr.toLowerCase(),
+            );
+            setStorageWallet(w ?? null);
+          }}
         />
 
         <OrbitControls

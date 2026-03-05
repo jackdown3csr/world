@@ -179,6 +179,7 @@ const VERT = /* glsl */ `
 `;
 
 const FRAG = /* glsl */ `
+  uniform vec3  uStarPos;
   uniform float uMoonType;   // 0–5
   uniform float uHue;        // 0–1 per-wallet colour shift
   uniform float uSeed;       // 0–1 per-wallet noise seed
@@ -203,7 +204,7 @@ const FRAG = /* glsl */ `
     vec3 seed3 = vec3(uSeed * 13.7, uSeed * 7.3, uSeed * 5.1);
 
     // ── Lighting ──────────────────────────────────────────
-    vec3 lightDir = normalize(-vWorldPos);
+    vec3 lightDir = normalize(uStarPos - vWorldPos);
     vec3 viewDir  = normalize(cameraPosition - vWorldPos);
 
     // ── Type-specific bump normal from shared height field ─
@@ -415,7 +416,7 @@ const FRAG = /* glsl */ `
     // ── Shadow from host planet ───────────────────────────
     // Ray from fragment toward sun (origin); check if planet sphere blocks the light.
     if (uHostRadius > 0.0) {
-      vec3 toSun = normalize(-vWorldPos);
+      vec3 toSun = normalize(uStarPos - vWorldPos);
       vec3 oc    = vWorldPos - uHostPos;
       float b    = dot(oc, toSun);
       float c    = dot(oc, oc) - uHostRadius * uHostRadius;
@@ -460,6 +461,7 @@ export function createMoonMaterial(
       uTime:       { value: 0 },
       uHostPos:    { value: new THREE.Vector3() },
       uHostRadius: { value: 0.0 },
+      uStarPos:    { value: new THREE.Vector3(0, 0, 0) },
     },
   });
 }
