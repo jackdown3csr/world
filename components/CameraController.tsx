@@ -130,7 +130,19 @@ export default function CameraController({
     if (externalMode !== mode.current) {
       mode.current = externalMode;
       const ctrl = controlsRef.current;
-      if (ctrl) ctrl.enabled = (externalMode === "orbit");
+      if (ctrl) {
+        ctrl.enabled = (externalMode === "orbit");
+        if (externalMode === "orbit") {
+          // Set orbit target to a point in front of the camera so it doesn't
+          // snap back to the Sun at (0,0,0)
+          const dir = new THREE.Vector3();
+          camera.getWorldDirection(dir);
+          const dist = camera.position.distanceTo(ctrl.target);
+          const lookDist = Math.max(dist * 0.5, 50);
+          ctrl.target.copy(camera.position).addScaledVector(dir, lookDist);
+          ctrl.update();
+        }
+      }
       if (externalMode === "fly") {
         freelookRef.current?.syncFromCamera();
       }
