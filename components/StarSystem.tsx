@@ -17,6 +17,7 @@ import SolarWind from "./SolarWind";
 import PlanetWallet from "./PlanetWallet";
 import OrbitRing from "./OrbitRing";
 import AsteroidBelt from "./AsteroidBelt";
+import ProtoplanetaryDisk from "./ProtoplanetaryDisk";
 
 import type { SolarSystemData } from "@/lib/layout/types";
 import type { StarPalette } from "./Sun";
@@ -50,6 +51,8 @@ export interface StarSystemProps {
   onSelect?: (address: string) => void;
   onDeselect?: () => void;
   onShiftSelect?: (address: string) => void;
+  /** Replace the flat asteroid belt with the protoplanetary disk (vesting system) */
+  diskMode?: boolean;
 }
 
 export default function StarSystem({
@@ -71,6 +74,7 @@ export default function StarSystem({
   onSelect,
   onDeselect,
   onShiftSelect,
+  diskMode = false,
 }: StarSystemProps) {
   return (
     <>
@@ -115,18 +119,32 @@ export default function StarSystem({
           </React.Fragment>
         ))}
 
-        <AsteroidBelt
-          asteroids={solarData.asteroids}
-          beltInnerRadius={solarData.beltInnerRadius}
-          beltOuterRadius={solarData.beltOuterRadius}
-          selectedAddress={selectedAddress}
-          onSelectAddress={(addr) => onSelect?.(addr)}
-          onDeselect={() => onDeselect?.()}
-          panelOpen={panelOpen}
-          showAllNames={showAllNames && !photoMode}
-          showRenamedOnly={showRenamedOnly}
-          showOrbits={showOrbits && !photoMode}
-        />
+        {diskMode ? (
+          <ProtoplanetaryDisk
+            asteroids={solarData.asteroids}
+            beltInnerRadius={solarData.beltInnerRadius}
+            beltOuterRadius={solarData.beltOuterRadius}
+            selectedAddress={selectedAddress}
+            onSelectAddress={(addr) => onSelect?.(addr)}
+            onDeselect={() => onDeselect?.()}
+            panelOpen={panelOpen}
+            showAllNames={showAllNames && !photoMode}
+            showRenamedOnly={showRenamedOnly}
+          />
+        ) : (
+          <AsteroidBelt
+            asteroids={solarData.asteroids}
+            beltInnerRadius={solarData.beltInnerRadius}
+            beltOuterRadius={solarData.beltOuterRadius}
+            selectedAddress={selectedAddress}
+            onSelectAddress={(addr) => onSelect?.(addr)}
+            onDeselect={() => onDeselect?.()}
+            panelOpen={panelOpen}
+            showAllNames={showAllNames && !photoMode}
+            showRenamedOnly={showRenamedOnly}
+            showOrbits={showOrbits && !photoMode}
+          />
+        )}
       </group>
     </>
   );

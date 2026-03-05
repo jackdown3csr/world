@@ -37,3 +37,30 @@ export interface WalletsPayload {
   updatedAt: number; // unix ms
   wallets: WalletEntry[];
 }
+
+/* ── Vesting system types ────────────────────────────────── */
+
+/**
+ * One claimant in the vesting / RewardDistributor system.
+ * Extends WalletEntry so it can be passed to the shared layout builder.
+ * The `votingPower` field is repurposed to hold `totalEntitled` for
+ * rank ordering (the layout builder sorts by this value).
+ */
+export interface VestingWalletEntry extends WalletEntry {
+  /** Raw wei string of total vesting reward the address is entitled to */
+  totalEntitled: string;
+  totalEntitledFormatted: string;
+  /** Raw wei string of total reward already claimed */
+  totalClaimed: string;
+  totalClaimedFormatted: string;
+  /** Last epoch in which this address claimed */
+  lastClaimedEpoch: number;
+  /** Raw wei string of unclaimed (claimable right now) reward */
+  unclaimedReward: string;
+  unclaimedRewardFormatted: string;
+}
+
+export interface VestingPayload {
+  updatedAt: number; // unix ms
+  wallets: VestingWalletEntry[];
+}

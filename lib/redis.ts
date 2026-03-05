@@ -27,5 +27,8 @@ export const KEY_WALLET_TIERS = "wallet:tiers";
 /** Hash map: address(lowercase) -> orbit slot index (0-19). Persistent across refreshes. */
 export const KEY_PLANET_ORBITS = "planet:orbits";
 
+/** JSON wrapper: { updatedAt, wallets[] } for the vesting / RewardDistributor system */
+export const KEY_VESTING_PAYLOAD = "vesting:payload";
+
 /** Prefix for temporary SIWE-like nonces: auth:nonce:<address> */
 export const KEY_AUTH_NONCE_PREFIX = "auth:nonce:";

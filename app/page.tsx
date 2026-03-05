@@ -2,6 +2,7 @@
 
 import dynamic from "next/dynamic";
 import { WalletProvider, useWallets } from "@/hooks/useWallets";
+import { VestingProvider } from "@/hooks/useVestingWallets";
 
 // three.js must only run client‑side
 const SolarSystem = dynamic(() => import("@/components/SolarSystem"), {
@@ -81,7 +82,9 @@ function GlobePage() {
 export default function Page() {
   return (
     <WalletProvider>
-      <GlobePage />
+      <VestingProvider>
+        <GlobePage />
+      </VestingProvider>
     </WalletProvider>
   );
 }

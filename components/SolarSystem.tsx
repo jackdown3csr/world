@@ -9,11 +9,12 @@ import type { FreeLookHandle } from "./FreeLookControls";
 import type { CameraMode } from "./CameraController";
 
 import { useWallets } from "@/hooks/useWallets";
+import { useVestingWallets } from "@/hooks/useVestingWallets";
 import { useWalletConnection } from "@/hooks/useWalletConnection";
 import { useIsMobile } from "@/hooks/useIsMobile";
 import { useBlock } from "@/hooks/useBlock";
 import { useFaucet } from "@/hooks/useFaucet";
-import { buildSolarSystem } from "@/lib/layout";
+import { buildSolarSystem, buildVestingSystem } from "@/lib/layout";
 import type { LayoutMode } from "@/lib/layout";
 import { formatBalance } from "@/lib/formatBalance";
 
@@ -57,9 +58,11 @@ export default function SolarSystem() {
 
   /* ── Data ── */
   const { wallets, loading, refetch, updatedAt } = useWallets();
+  const { wallets: vestingWallets } = useVestingWallets();
   const faucetStats = useFaucet();
   const [layoutMode, setLayoutMode] = useState<LayoutMode>("solar");
   const solarData = useMemo(() => buildSolarSystem(wallets, layoutMode), [wallets, layoutMode]);
+  const vestingData = useMemo(() => buildVestingSystem(vestingWallets), [vestingWallets]);
 
   /* ── Aggregate stats for Sun label ── */
   const { totalVotingPower, totalLocked } = useMemo(() => {
@@ -192,11 +195,36 @@ export default function SolarSystem() {
           }}
         />
 
+        {/* ── Vesting system — blue O-type star at [4000, 200, 0] ── */}
+        <StarSystem
+          solarData={vestingData}
+          position={[4000, 200, 0]}
+          palette="cool"
+          starLabel="VESTING"
+          showOrbits={showOrbits}
+          showAllNames={showAllNames}
+          showRenamedOnly={showRenamedOnly}
+          showTrails={showTrails}
+          photoMode={photoMode}
+          showSolarWind
+          diskMode
+          selectedAddress={selectedAddress}
+          panelOpen={panelOpen}
+          onSelect={handleSceneSelect}
+          onDeselect={() => setPanelOpen(false)}
+          onShiftSelect={(addr) => {
+            const w = vestingWallets.find(
+              (x) => x.address.toLowerCase() === addr.toLowerCase(),
+            );
+            setStorageWallet(w ?? null);
+          }}
+        />
+
         <OrbitControls
           ref={controlsRef}
           enablePan={false}
           minDistance={0.3}
-          maxDistance={1805}
+          maxDistance={6000}
           enableDamping
           dampingFactor={0.05}
           enabled={cameraMode === "orbit"}
