@@ -150,6 +150,9 @@ interface HudToolbarProps {
   onToggleLayout?: () => void;
   gnetRanked?: boolean;
   onToggleGnet?: () => void;
+  nearVesting?: boolean;
+  vestingClaimed?: boolean;
+  onToggleVestingClaimed?: () => void;
   mobile?: boolean;
 }
 
@@ -174,6 +177,9 @@ export default function HudToolbar({
   onToggleLayout,
   gnetRanked = false,
   onToggleGnet,
+  nearVesting = false,
+  vestingClaimed = false,
+  onToggleVestingClaimed,
   mobile = false,
 }: HudToolbarProps) {
   return (
@@ -202,11 +208,14 @@ export default function HudToolbar({
       </Group>
 
       <Group label="layout" mobile={mobile}>
-        {onToggleLayout && (
+        {!nearVesting && onToggleLayout && (
           <HudBtn active={rankedLayout} onClick={onToggleLayout} icon={icons.ranked} label="ranked" shortcut="K" mobile={mobile} />
         )}
-        {onToggleGnet && (
+        {!nearVesting && onToggleGnet && (
           <HudBtn active={gnetRanked} onClick={onToggleGnet} icon={icons.gnet} label="gnet" shortcut="J" disabled={!rankedLayout} mobile={mobile} />
+        )}
+        {nearVesting && onToggleVestingClaimed && (
+          <HudBtn active={vestingClaimed} onClick={onToggleVestingClaimed} icon={icons.gnet} label="claimed" shortcut="K" mobile={mobile} />
         )}
       </Group>
 

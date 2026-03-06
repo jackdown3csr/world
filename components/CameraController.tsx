@@ -58,16 +58,16 @@ function lookAtQuat(eye: THREE.Vector3, target: THREE.Vector3): THREE.Quaternion
 function findBody(
   scene: THREE.Scene,
   addr: string,
+  camera?: THREE.Camera,
 ): { position: THREE.Vector3; bodyRadius: number; bodyType: string } | null {
-  let result: { position: THREE.Vector3; bodyRadius: number; bodyType: string } | null = null;
+  const matches: { position: THREE.Vector3; bodyRadius: number; bodyType: string }[] = [];
   scene.traverse((obj) => {
-    if (result) return;
     const ud = obj.userData;
     if (!ud) return;
     if (ud.walletAddress === addr) {
       const wp = new THREE.Vector3();
       obj.getWorldPosition(wp);
-      result = { position: wp, bodyRadius: ud.bodyRadius ?? 1, bodyType: ud.bodyType ?? "planet" };
+      matches.push({ position: wp, bodyRadius: ud.bodyRadius ?? 1, bodyType: ud.bodyType ?? "planet" });
       return;
     }
     if (ud.walletAddresses && Array.isArray(ud.walletAddresses) && obj instanceof THREE.InstancedMesh) {
@@ -77,11 +77,20 @@ function findBody(
         _pos.setFromMatrixPosition(_mat4);
         obj.localToWorld(_pos);
         _mat4.decompose(_v3, _quat, _scale);
-        result = { position: _pos.clone(), bodyRadius: _scale.x, bodyType: ud.bodyType ?? "asteroid" };
+        matches.push({ position: _pos.clone(), bodyRadius: _scale.x, bodyType: ud.bodyType ?? "asteroid" });
       }
     }
   });
-  return result;
+  if (matches.length === 0) return null;
+  if (matches.length === 1 || !camera) return matches[0];
+  // Multiple matches (address exists in both systems) → pick closest to camera
+  let best = matches[0];
+  let bestDist = camera.position.distanceToSquared(best.position);
+  for (let i = 1; i < matches.length; i++) {
+    const d = camera.position.distanceToSquared(matches[i].position);
+    if (d < bestDist) { best = matches[i]; bestDist = d; }
+  }
+  return best;
 }
 
 export default function CameraController({
@@ -228,7 +237,7 @@ export default function CameraController({
       }
 
       const addr = selectedAddress.toLowerCase();
-      const body = findBody(scene, addr);
+      const body = findBody(scene, addr, camera);
       if (!body) return;
 
       /* Zoom distance by body type */
@@ -282,7 +291,7 @@ export default function CameraController({
 
       // Keep lastBodyPos synced during snap
       if (trackingAddr.current) {
-        const b = findBody(scene, trackingAddr.current);
+        const b = findBody(scene, trackingAddr.current, camera);
         if (b) lastBodyPos.current.copy(b.position);
       }
 
@@ -303,7 +312,7 @@ export default function CameraController({
 
     /* ── Orbit mode: continuous tracking ── */
     if (mode.current === "orbit" && ctrl && trackingAddr.current) {
-      const body = findBody(scene, trackingAddr.current);
+      const body = findBody(scene, trackingAddr.current, camera);
       if (!body) { trackingAddr.current = null; return; }
 
       const dx = body.position.x - lastBodyPos.current.x;

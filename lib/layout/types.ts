@@ -11,6 +11,9 @@ export type PlanetType = "rocky" | "terrestrial" | "ice_giant" | "gas_giant" | "
 /** Layout mode: "solar" = real-solar-system bands, "ranked" = VP rank → distance, "ranked-gnet" = locked GNET rank → distance */
 export type LayoutMode = "solar" | "ranked" | "ranked-gnet";
 
+/** Vesting layout mode: "entitled" = rank by totalEntitled, "claimed" = rank by totalClaimed */
+export type VestingLayoutMode = "entitled" | "claimed";
+
 export interface PlanetData {
   wallet:       WalletEntry;
   radius:       number;

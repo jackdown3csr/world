@@ -3,10 +3,12 @@
 import React, { useRef, useMemo, useState, useCallback, useEffect } from "react";
 import { useFrame, type ThreeEvent } from "@react-three/fiber";
 import { Html } from "@react-three/drei";
+import SpriteLabel from "./SpriteLabel";
 import * as THREE from "three";
 
 import type { MoonData } from "@/lib/layout";
 import { createMoonMaterial } from "@/lib/shaders/moonShader";
+import { MOON_GEOS } from "@/lib/geometryPool";
 import WalletTooltip from "./WalletTooltip";
 
 interface MoonBodyProps {
@@ -19,9 +21,10 @@ interface MoonBodyProps {
   onDeselect:  () => void;
   showLabel?:  boolean;
   showRenamedOnly?: boolean;
+  vesting?: boolean;
 }
 
-export default function MoonBody({ data, planetOrbit, hostRadius, selected, panelOpen, onSelect, onDeselect, showLabel, showRenamedOnly }: MoonBodyProps) {
+export default function MoonBody({ data, planetOrbit, hostRadius, selected, panelOpen, onSelect, onDeselect, showLabel, showRenamedOnly, vesting }: MoonBodyProps) {
   const hostGroupRef = useRef<THREE.Group>(null);
   const moonOrbitRef = useRef<THREE.Group>(null);
   const meshRef      = useRef<THREE.Mesh>(null);
@@ -36,15 +39,9 @@ export default function MoonBody({ data, planetOrbit, hostRadius, selected, pane
     [data.moonType, data.hue, data.seed],
   );
 
-  // LOD geometries
+  // LOD geometries (shared unit-sphere pool, scaled by mesh.scale)
   const _lodPos = useMemo(() => new THREE.Vector3(), []);
-  const moonGeos = useMemo(() => [
-    new THREE.SphereGeometry(data.radius, 48, 48),
-    new THREE.SphereGeometry(data.radius, 24, 24),
-    new THREE.SphereGeometry(data.radius, 12, 12),
-  ], [data.radius]);
   const lodRef = useRef(0);
-  useEffect(() => () => { moonGeos.forEach(g => g.dispose()); }, [moonGeos]);
 
   useFrame((state) => {
     const t = state.clock.elapsedTime;
@@ -61,7 +58,7 @@ export default function MoonBody({ data, planetOrbit, hostRadius, selected, pane
       const lod = d < 50 ? 0 : d < 200 ? 1 : 2;
       if (lod !== lodRef.current) {
         lodRef.current = lod;
-        meshRef.current.geometry = moonGeos[lod];
+        meshRef.current.geometry = MOON_GEOS[lod];
       }
     }
 
@@ -90,12 +87,13 @@ export default function MoonBody({ data, planetOrbit, hostRadius, selected, pane
         <mesh
           ref={meshRef}
           position={[data.orbitRadius, 0, 0]}
+          scale={data.radius}
           userData={{ walletAddress: data.wallet.address.toLowerCase(), bodyRadius: data.radius, bodyType: "moon" }}
           onPointerEnter={onPointerEnter}
           onPointerLeave={onPointerLeave}
           onClick={onClick}
         >
-          <primitive object={moonGeos[lodRef.current]} attach="geometry" />
+          <primitive object={MOON_GEOS[lodRef.current]} attach="geometry" />
           <primitive object={material} attach="material" />
         </mesh>
 
@@ -106,32 +104,20 @@ export default function MoonBody({ data, planetOrbit, hostRadius, selected, pane
             zIndexRange={[10000, 0]}
             style={{ pointerEvents: (selected && panelOpen) ? "auto" : "none" }}
           >
-            <WalletTooltip wallet={data.wallet} onClose={(selected && panelOpen) ? onDeselect : undefined} />
+            <WalletTooltip wallet={data.wallet} onClose={(selected && panelOpen) ? onDeselect : undefined} vesting={vesting} />
           </Html>
         )}
 
         {/* Persistent name label */}
         {showLabel && (!showRenamedOnly || data.wallet.customName) && !hovered && !(selected && panelOpen) && (
-          <Html
+          <SpriteLabel
             position={[data.orbitRadius, data.radius + 0.15, 0]}
-            center
-            zIndexRange={[5000, 0]}
-            style={{ pointerEvents: "none" }}
-          >
-            <div style={{
-              color: "#506878",
-              fontSize: 8,
-              fontFamily: "'JetBrains Mono', 'SF Mono', monospace",
-              fontWeight: 500,
-              whiteSpace: "nowrap",
-              textShadow: "0 0 6px rgba(0,0,0,0.95), 0 0 14px rgba(0,0,0,0.7)",
-              letterSpacing: "0.08em",
-              textTransform: "uppercase",
-              opacity: 0.8,
-            }}>
-              {data.wallet.customName || `${data.wallet.address.slice(0, 6)}\u2026${data.wallet.address.slice(-4)}`}
-            </div>
-          </Html>
+            text={`${vesting ? "◈ " : ""}${data.wallet.customName || `${data.wallet.address.slice(0, 6)}\u2026${data.wallet.address.slice(-4)}`}`}
+            color={vesting ? "#7ccedd" : "#80a8b8"}
+            fontSize={0.3}
+            opacity={0.8}
+            onClick={onSelect}
+          />
         )}
       </group>
     </group>

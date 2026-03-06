@@ -1,5 +1,8 @@
 /**
  * Planet material factory — picks the right per-type shader.
+ *
+ * Uses a prototype-cache so Three.js reuses the compiled WebGL program
+ * for all planets of the same type (clone shares the GPU program).
  */
 
 import * as THREE from "three";
@@ -39,7 +42,23 @@ function makeUniforms(hue: number, seed: number, hasRing = false) {
   };
 }
 
-/** One ShaderMaterial per planet — independent uniforms per instance. */
+/* ── Prototype cache: one compiled program per planet type ──────── */
+const protoCache = new Map<string, THREE.ShaderMaterial>();
+
+function getProto(vert: string, frag: string, key: string): THREE.ShaderMaterial {
+  let proto = protoCache.get(key);
+  if (!proto) {
+    proto = new THREE.ShaderMaterial({
+      vertexShader: vert,
+      fragmentShader: frag,
+      uniforms: makeUniforms(0, 0),
+    });
+    protoCache.set(key, proto);
+  }
+  return proto;
+}
+
+/** One ShaderMaterial per planet — cloned from prototype so GPU program is shared. */
 export function createPlanetMaterial(
   type: PlanetType,
   hue:  number,
@@ -47,11 +66,10 @@ export function createPlanetMaterial(
   hasRing = false,
 ): THREE.ShaderMaterial {
   const { VERT, FRAG } = SHADER_MAP[type];
-  return new THREE.ShaderMaterial({
-    vertexShader:   VERT,
-    fragmentShader: FRAG,
-    uniforms: makeUniforms(hue, seed, hasRing),
-  });
+  const mat = getProto(VERT, FRAG, `planet_${type}`).clone();
+  const u = makeUniforms(hue, seed, hasRing);
+  for (const [k, v] of Object.entries(u)) mat.uniforms[k] = v;
+  return mat;
 }
 
 /** Dedicated material for the Mars planet (highest-ranked rocky). */
@@ -59,9 +77,8 @@ export function createMarsMaterial(
   hue:  number,
   seed: number,
 ): THREE.ShaderMaterial {
-  return new THREE.ShaderMaterial({
-    vertexShader:   mars.VERT,
-    fragmentShader: mars.FRAG,
-    uniforms: makeUniforms(hue, seed, false),
-  });
+  const mat = getProto(mars.VERT, mars.FRAG, "planet_mars").clone();
+  const u = makeUniforms(hue, seed, false);
+  for (const [k, v] of Object.entries(u)) mat.uniforms[k] = v;
+  return mat;
 }

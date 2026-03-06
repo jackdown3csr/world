@@ -28,7 +28,7 @@ interface FreeLookControlsProps {
 }
 
 const SENSITIVITY   = 0.002;           // rad / pixel
-const MAX_DIST      = 7000;
+const MAX_DIST      = 20000;
 
 /* Speed tiers — each tier is a multiplier of the adaptive base speed */
 const SPEED_TIERS   = [0.5, 1.5, 4.0];

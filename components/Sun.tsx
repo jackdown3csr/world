@@ -2,10 +2,20 @@
 
 import React, { useMemo, useRef } from "react";
 import { useFrame, useThree } from "@react-three/fiber";
-import { Html } from "@react-three/drei";
+import SpriteLabel from "./SpriteLabel";
 import * as THREE from "three";
 import { NOISE_GLSL } from "@/lib/glsl";
 import { SUN_RADIUS } from "@/lib/layout";
+
+/* ── Palette GLSL colour constants (injected at compile-time) ── */
+const SURFACE_GLSL = {
+  warm: { white:"vec3(1.00,0.99,0.94)", yellow:"vec3(1.00,0.88,0.45)", orange:"vec3(1.00,0.60,0.15)", dark:"vec3(0.55,0.20,0.04)", edge:"vec3(1.00,0.40,0.06)", filLo:"vec3(1.00,0.35,0.05)", filHi:"vec3(1.00,0.80,0.30)" },
+  cool: { white:"vec3(0.94,0.97,1.00)", yellow:"vec3(0.66,0.85,1.00)", orange:"vec3(0.27,0.53,1.00)", dark:"vec3(0.00,0.10,0.55)", edge:"vec3(0.20,0.50,1.00)", filLo:"vec3(0.10,0.30,1.00)", filHi:"vec3(0.50,0.70,1.00)" },
+} as const;
+const FLARE_GLSL = {
+  warm: { white:"vec3(1.00,0.99,0.95)", warm:"vec3(1.00,0.90,0.60)", orange:"vec3(1.00,0.65,0.25)" },
+  cool: { white:"vec3(0.94,0.97,1.00)", warm:"vec3(0.70,0.85,1.00)", orange:"vec3(0.40,0.60,1.00)" },
+} as const;
 
 /* == surface shader (photosphere) == */
 const surfaceVert = /* glsl */ `
@@ -20,7 +30,9 @@ const surfaceVert = /* glsl */ `
   }
 `;
 
-const surfaceFrag = /* glsl */ `
+function makeSurfaceFrag(pal: StarPalette) {
+  const c = SURFACE_GLSL[pal];
+  return /* glsl */ `
   uniform float uTime;
   varying vec3 vPos;
   varying vec3 vNorm;
@@ -51,10 +63,10 @@ const surfaceFrag = /* glsl */ `
     float spots    = smoothstep(0.52, 0.68, activity) * 0.35;
     float fac = smoothstep(0.60, 0.80, activity) * 0.25;
 
-    vec3 white  = vec3(1.00, 0.99, 0.94);
-    vec3 yellow = vec3(1.00, 0.88, 0.45);
-    vec3 orange = vec3(1.00, 0.60, 0.15);
-    vec3 dark   = vec3(0.55, 0.20, 0.04);
+    vec3 white  = ${c.white};
+    vec3 yellow = ${c.yellow};
+    vec3 orange = ${c.orange};
+    vec3 dark   = ${c.dark};
 
     vec3 col = mix(orange, yellow, bright);
     col      = mix(col, white, bright * bright * 0.70);
@@ -69,23 +81,21 @@ const surfaceFrag = /* glsl */ `
     col *= limb;
 
     float edge = pow(1.0 - mu, 4.0);
-    col = mix(col, vec3(1.0, 0.40, 0.06), edge * 0.45);
+    col = mix(col, ${c.edge}, edge * 0.45);
 
     /* ── subtle prominence / filament highlights ── */
     float fn = fbm(p * 3.0 + vec3(uTime*0.012, uTime*0.007, 0.0));
     float faceMask = pow(mu, 0.4);
     float filament = smoothstep(0.35, 0.65, fn) * faceMask;
-    vec3 filCol = mix(vec3(1.0, 0.35, 0.05), vec3(1.0, 0.80, 0.30), fn);
+    vec3 filCol = mix(${c.filLo}, ${c.filHi}, fn);
     col += filCol * filament * 0.45;
 
     col *= 1.1;
 
     gl_FragColor = vec4(col, 1.0);
-    /* Halos use renderOrder -99 so they render before the depth buffer
-       has any data — no need to push depth to far plane here.
-       Normal depth ensures planets behind the sun are properly occluded. */
   }
 `;
+}
 
 /* prominence / filament effect is now integrated into surfaceFrag above */
 
@@ -119,7 +129,9 @@ const flareVert = /* glsl */ `
   }
 `;
 
-const flareFrag = /* glsl */ `
+function makeFlareFrag(pal: StarPalette) {
+  const f = FLARE_GLSL[pal];
+  return /* glsl */ `
   uniform float uTime;
   varying vec2 vUv;
 
@@ -158,9 +170,9 @@ const flareFrag = /* glsl */ `
     /* ── combine everything ── */
     float brightness = core + innerGlow + outerGlow + hStretch + vStretch + wisps + softRays;
 
-    vec3 white  = vec3(1.00, 0.99, 0.95);
-    vec3 warm   = vec3(1.00, 0.90, 0.60);
-    vec3 orange = vec3(1.00, 0.65, 0.25);
+    vec3 white  = ${f.white};
+    vec3 warm   = ${f.warm};
+    vec3 orange = ${f.orange};
 
     /* colour shifts from white core → warm middle → orange edge */
     vec3 col = mix(orange, warm, exp(-d * 4.0));
@@ -172,6 +184,7 @@ const flareFrag = /* glsl */ `
     gl_FragColor = vec4(col, alpha);
   }
 `;
+}
 
 
 /* == HaloLayer (billboard) == */
@@ -201,19 +214,19 @@ function HaloLayer({ scale, color, alpha, falloff }:
 }
 
 /* == LensFlare (camera-facing billboard) == */
-function LensFlare() {
+function LensFlare({ palette = "warm" }: { palette?: StarPalette }) {
   const ref = useRef<THREE.Mesh>(null);
   const { camera } = useThree();
   const mat = useMemo(
     () => new THREE.ShaderMaterial({
-      vertexShader: flareVert, fragmentShader: flareFrag,
+      vertexShader: flareVert, fragmentShader: makeFlareFrag(palette),
       uniforms: { uTime: { value: 0 } },
       blending: THREE.AdditiveBlending,
       transparent: true,
       depthWrite: false,
       depthTest: true,
       side: THREE.DoubleSide,
-    }), []);
+    }), [palette]);
 
   useFrame((state) => {
     if (ref.current) ref.current.quaternion.copy(camera.quaternion);
@@ -297,7 +310,7 @@ export const SUN_PALETTES = {
     surface: { white: "#fff8f0", yellow: "#ffe070", orange: "#ff9922", dark: "#8c2800" },
     halo:    ["#fffef0", "#fff4c8", "#ffe080", "#ffaa33", "#ff7711"],
     flare:   { warm: "#ff9a18", orange: "#ff6610" },
-    label:   { name: "#ffc860", accent: "#00e5ff", sub: "#c0a050" },
+    label:   { name: "#ffd888", accent: "#40eeff", sub: "#d8c080" },
     point:   "#fff5e0",
   },
   cool: {
@@ -305,7 +318,7 @@ export const SUN_PALETTES = {
     surface: { white: "#f0f8ff", yellow: "#a8d8ff", orange: "#4488ff", dark: "#001a8c" },
     halo:    ["#e8f4ff", "#b8d8ff", "#7ab0ff", "#4488ee", "#2255bb"],
     flare:   { warm: "#8ab8ff", orange: "#5577ee" },
-    label:   { name: "#88ccff", accent: "#00ffee", sub: "#6699cc" },
+    label:   { name: "#aaddff", accent: "#40ffee", sub: "#88bbdd" },
     point:   "#d0e8ff",
   },
 } as const;
@@ -329,12 +342,12 @@ export default function Sun({ totalVotingPower, totalLocked, blockNumber, positi
   const pal = SUN_PALETTES[palette];
   const surfaceMat = useMemo(
     () => new THREE.ShaderMaterial({
-      vertexShader: surfaceVert, fragmentShader: surfaceFrag,
+      vertexShader: surfaceVert, fragmentShader: makeSurfaceFrag(palette),
       uniforms: { uTime: { value: 0 } },
       transparent: false,
       depthWrite: true,
       depthTest: true,
-    }), []);
+    }), [palette]);
 
 
 
@@ -408,7 +421,7 @@ export default function Sun({ totalVotingPower, totalLocked, blockNumber, positi
       </mesh>
 
       {/* soft bloom billboard */}
-      <LensFlare />
+      <LensFlare palette={palette} />
 
       {/* corona layers */}
       <HaloLayer scale={1.12} color={pal.halo[0]} alpha={0.90} falloff={4.0} />
@@ -421,38 +434,34 @@ export default function Sun({ totalVotingPower, totalLocked, blockNumber, positi
 
       {/* Strength label */}
       {(totalVotingPower || totalLocked) && (
-        <Html
-          position={[0, -(SUN_RADIUS + 16), 0]}
-          center
-          zIndexRange={[6000, 0]}
-          style={{ pointerEvents: "none" }}
-        >
-          <div style={{
-            color: "#5a7a90",
-            fontFamily: "'JetBrains Mono', 'SF Mono', monospace",
-            fontSize: 10,
-            textAlign: "center",
-            whiteSpace: "nowrap",
-            textShadow: "0 0 12px rgba(0,0,0,0.95), 0 0 30px rgba(0,0,0,0.7)",
-            letterSpacing: "0.08em",
-            lineHeight: 1.8,
-            textTransform: "uppercase",
-          }}>
-            <div style={{ color: pal.label.name, fontSize: 13, fontWeight: 700, letterSpacing: "0.18em", marginBottom: 2 }}>
-              {label ?? "VESCROW"}
-            </div>
-            {totalVotingPower && (
-              <div style={{ color: pal.label.accent, fontSize: 11, fontWeight: 600 }}>
-                {totalVotingPower}
-              </div>
-            )}
-            {totalLocked && (
-              <div style={{ color: pal.label.sub }}>
-                {totalLocked}
-              </div>
-            )}
-          </div>
-        </Html>
+        <group position={[0, -(SUN_RADIUS + 40), 0]}>
+          <SpriteLabel
+            text={label ?? "VESCROW"}
+            color={pal.label.name}
+            fontSize={0.55}
+            opacity={1}
+            onClick={onSelect}
+            alwaysVisible
+          />
+          {totalVotingPower && (
+            <SpriteLabel
+              localOffset={[0, -0.8, 0]}
+              text={totalVotingPower}
+              color={pal.label.accent}
+              fontSize={0.42}
+              opacity={0.9}
+            />
+          )}
+          {totalLocked && (
+            <SpriteLabel
+              localOffset={[0, -1.5, 0]}
+              text={totalLocked}
+              color={pal.label.sub}
+              fontSize={0.38}
+              opacity={0.85}
+            />
+          )}
+        </group>
       )}
     </group>
   );

@@ -1,17 +1,24 @@
 "use client";
 
 import React from "react";
-import type { WalletEntry } from "@/lib/types";
+import type { WalletEntry, VestingWalletEntry } from "@/lib/types";
+
+interface WalletTooltipProps {
+  wallet: WalletEntry;
+  onClose?: () => void;
+  /** When true, show vesting fields instead of veGNET fields */
+  vesting?: boolean;
+}
 
 /**
  * HUD-style tooltip rendered as a drei <Html> child.
- * Sci-fi data readout: address, locked GNET, veGNET power, lock expiry.
+ * Shows veGNET or vesting fields based on the `vesting` prop.
  */
-export default function WalletTooltip({ wallet, onClose }: { wallet: WalletEntry; onClose?: () => void }) {
+export default function WalletTooltip({ wallet, onClose, vesting = false }: WalletTooltipProps) {
   const short = `${wallet.address.slice(0, 6)}\u2026${wallet.address.slice(-4)}`;
 
   const lockEndStr =
-    wallet.lockEnd > 0
+    !vesting && wallet.lockEnd > 0
       ? new Date(wallet.lockEnd * 1000).toLocaleDateString("en-US", {
           year: "numeric",
           month: "short",
@@ -83,18 +90,37 @@ export default function WalletTooltip({ wallet, onClose }: { wallet: WalletEntry
       }} />
 
       {/* Data rows */}
-      <div style={{ display: "flex", justifyContent: "space-between", gap: 16 }}>
-        <span style={{ color: "#5a7a90", fontSize: 9, letterSpacing: "0.1em", textTransform: "uppercase" }}>power</span>
-        <span style={{ color: "#00e5ff", fontVariantNumeric: "tabular-nums" }}>{wallet.votingPowerFormatted}</span>
-      </div>
-      <div style={{ display: "flex", justifyContent: "space-between", gap: 16 }}>
-        <span style={{ color: "#5a7a90", fontSize: 9, letterSpacing: "0.1em", textTransform: "uppercase" }}>locked</span>
-        <span style={{ color: "#c0a050", fontVariantNumeric: "tabular-nums" }}>{wallet.lockedFormatted}</span>
-      </div>
-      <div style={{ display: "flex", justifyContent: "space-between", gap: 16 }}>
-        <span style={{ color: "#5a7a90", fontSize: 9, letterSpacing: "0.1em", textTransform: "uppercase" }}>unlock</span>
-        <span style={{ color: "#7a9ab0" }}>{lockEndStr}</span>
-      </div>
+      {vesting ? (
+        <>
+          <div style={{ display: "flex", justifyContent: "space-between", gap: 16 }}>
+            <span style={{ color: "#5a7a90", fontSize: 9, letterSpacing: "0.1em", textTransform: "uppercase" }}>allocated</span>
+            <span style={{ color: "#00e5ff", fontVariantNumeric: "tabular-nums" }}>{(wallet as VestingWalletEntry).totalEntitledFormatted}</span>
+          </div>
+          <div style={{ display: "flex", justifyContent: "space-between", gap: 16 }}>
+            <span style={{ color: "#5a7a90", fontSize: 9, letterSpacing: "0.1em", textTransform: "uppercase" }}>claimed</span>
+            <span style={{ color: "#4caf50", fontVariantNumeric: "tabular-nums" }}>{(wallet as VestingWalletEntry).totalClaimedFormatted}</span>
+          </div>
+          <div style={{ display: "flex", justifyContent: "space-between", gap: 16 }}>
+            <span style={{ color: "#5a7a90", fontSize: 9, letterSpacing: "0.1em", textTransform: "uppercase" }}>unclaimed</span>
+            <span style={{ color: "#c0a050", fontVariantNumeric: "tabular-nums" }}>{(wallet as VestingWalletEntry).unclaimedRewardFormatted}</span>
+          </div>
+        </>
+      ) : (
+        <>
+          <div style={{ display: "flex", justifyContent: "space-between", gap: 16 }}>
+            <span style={{ color: "#5a7a90", fontSize: 9, letterSpacing: "0.1em", textTransform: "uppercase" }}>power</span>
+            <span style={{ color: "#00e5ff", fontVariantNumeric: "tabular-nums" }}>{wallet.votingPowerFormatted}</span>
+          </div>
+          <div style={{ display: "flex", justifyContent: "space-between", gap: 16 }}>
+            <span style={{ color: "#5a7a90", fontSize: 9, letterSpacing: "0.1em", textTransform: "uppercase" }}>locked</span>
+            <span style={{ color: "#c0a050", fontVariantNumeric: "tabular-nums" }}>{wallet.lockedFormatted}</span>
+          </div>
+          <div style={{ display: "flex", justifyContent: "space-between", gap: 16 }}>
+            <span style={{ color: "#5a7a90", fontSize: 9, letterSpacing: "0.1em", textTransform: "uppercase" }}>unlock</span>
+            <span style={{ color: "#7a9ab0" }}>{lockEndStr}</span>
+          </div>
+        </>
+      )}
     </div>
   );
 }

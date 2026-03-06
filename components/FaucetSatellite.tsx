@@ -3,6 +3,7 @@
 import React, { useRef, useState, useCallback } from "react";
 import { useFrame, type ThreeEvent } from "@react-three/fiber";
 import { Html } from "@react-three/drei";
+import SpriteLabel from "./SpriteLabel";
 import * as THREE from "three";
 import type { FaucetStats } from "@/hooks/useFaucet";
 
@@ -22,7 +23,11 @@ const matBody   = new THREE.MeshStandardMaterial({ color: "#8aaabb", metalness: 
 const matPanel  = new THREE.MeshStandardMaterial({ color: "#1a3a6a", metalness: 0.3,  roughness: 0.55, emissive: "#0a1f42", emissiveIntensity: 0.4 });
 const matAntenna = new THREE.MeshStandardMaterial({ color: "#c0d8e0", metalness: 0.9, roughness: 0.15 });
 
-const _sunDir = new THREE.Vector3();
+const _worldQ = new THREE.Quaternion();
+const _panelFacingFix = new THREE.Quaternion().setFromEuler(new THREE.Euler(Math.PI / 2, 0, 0));
+const _styleOffset = new THREE.Quaternion().setFromEuler(
+  new THREE.Euler(0, 0, THREE.MathUtils.degToRad(8)),
+);
 
 interface FaucetSatelliteProps {
   stats: FaucetStats | null;
@@ -54,15 +59,14 @@ export default function FaucetSatellite({ stats, showLabel = true, onSelect }: F
     }
     // Orient body so panels face the Sun (origin)
     if (bodyRef.current && groupRef.current) {
-      _sunDir.copy(groupRef.current.position).negate().normalize();
-      bodyRef.current.getWorldPosition(_sunDir);
       bodyRef.current.lookAt(0, 0, 0);
+      bodyRef.current.quaternion.multiply(_panelFacingFix);
+      bodyRef.current.quaternion.multiply(_styleOffset);
     }
     // Counter-rotate label group so it stays upright in world space
     if (labelRef.current && groupRef.current) {
       labelRef.current.quaternion.identity();
-      const worldQ = groupRef.current.getWorldQuaternion(new THREE.Quaternion());
-      labelRef.current.quaternion.copy(worldQ.invert());
+      labelRef.current.quaternion.copy(groupRef.current.getWorldQuaternion(_worldQ).invert());
     }
   });
 
@@ -111,21 +115,14 @@ export default function FaucetSatellite({ stats, showLabel = true, onSelect }: F
       <group ref={labelRef}>
         {/* Label — same behaviour as planet labels: only when showLabel is true */}
         {showLabel && (
-          <Html position={[0, 5, 0]} center zIndexRange={[5000, 0]} style={{ pointerEvents: "none" }}>
-            <div style={{
-              color: "#7090a8",
-              fontSize: 10,
-              fontFamily: "'JetBrains Mono', 'SF Mono', monospace",
-              fontWeight: 500,
-              whiteSpace: "nowrap",
-              textShadow: "0 0 8px rgba(0,0,0,0.95), 0 0 20px rgba(0,0,0,0.7)",
-              letterSpacing: "0.08em",
-              textTransform: "uppercase",
-              opacity: 0.85,
-            }}>
-              FAUCET{stats ? ` · ${stats.totalClaims}` : ""}
-            </div>
-          </Html>
+          <SpriteLabel
+            position={[0, 5, 0]}
+            text={`FAUCET${stats ? ` · ${stats.totalClaims}` : ""}`}
+            color="#90b8d0"
+            fontSize={0.4}
+            opacity={0.85}
+            onClick={() => onSelect?.(FAUCET_ADDRESS)}
+          />
         )}
 
         {/* Hover tooltip: full stats */}

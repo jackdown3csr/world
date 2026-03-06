@@ -9,11 +9,13 @@ import { fnv1a, weiToFloat } from "./helpers";
 
 /**
  * Place asteroids in a toroidal belt between inner and outer radius.
+ * @param getValue  Optional extractor for the sizing metric (defaults to lockedGnet).
  */
 export function buildAsteroids(
   wallets:         WalletEntry[],
   beltInnerRadius: number,
   beltOuterRadius: number,
+  getValue?:       (w: WalletEntry) => number,
 ): AsteroidData[] {
   const beltWidth = beltOuterRadius - beltInnerRadius;
   const beltMid   = (beltInnerRadius + beltOuterRadius) / 2;
@@ -31,7 +33,7 @@ export function buildAsteroids(
     const yOffset = ((h3 / 0xffffffff) - 0.5) * 2.5;
     const r       = beltMid + rOffset;
 
-    const g        = weiToFloat(w.lockedGnet);
+    const g        = getValue ? getValue(w) : weiToFloat(w.lockedGnet);
     const sizeFrac = Math.min(g / 100, 1);
     const size     = BELT_MIN + sizeFrac * (BELT_MAX - BELT_MIN);
 

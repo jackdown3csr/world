@@ -12,19 +12,24 @@
  */
 
 import { useRef, useMemo } from "react";
-import { useFrame, useThree } from "@react-three/fiber";
+import { useFrame } from "@react-three/fiber";
 import * as THREE from "three";
-import { Html } from "@react-three/drei";
+import SpriteLabel from "./SpriteLabel";
 
 // ── Orbital elements ──────────────────────────────────────────────────
-//   Semi-major axis chosen so perihelion ≈ 85 (inside inner planets)
-//   and aphelion ≈ 1215 (well beyond asteroid belt).
-const A        = 650;                     // semi-major axis
-const ECC      = 0.87;                    // eccentricity (Halley-esque)
-const INC      = 22 * (Math.PI / 180);   // inclination
-const ARG_PERI = 0.8;                    // argument of perihelion (rad)
-const LAN      = 2.1;                    // longitude of ascending node (rad)
-const PERIOD   = 280;                    // orbital period (seconds, full loop)
+//   Interstellar-scale orbit: perihelion ≈ 100 (inside vescrow inner planets)
+//   aphelion ≈ 7900 (deep space, toward vesting star direction).
+//   Focus at origin (vescrow star). Rare, dramatic fly-by.
+const A        = 4000;                    // semi-major axis
+const ECC      = 0.975;                   // very eccentric — near-parabolic visitor
+const INC      = 28 * (Math.PI / 180);   // inclination
+const ARG_PERI = 0.3;                    // argument of perihelion (rad)
+const LAN      = 0.15;                   // longitude of ascending node — aphelion tilted toward +X
+const PERIOD   = 7200;                    // orbital period (seconds, full loop — rare event)
+
+// Stars for anti-solar computation
+const STAR_VESCROW: [number, number, number] = [0, 0, 0];
+const STAR_VESTING: [number, number, number] = [16000, 3000, 0];
 
 // Pre-compute rotation matrix constants
 const cosO = Math.cos(LAN), sinO = Math.sin(LAN);
@@ -247,8 +252,10 @@ const ION_N   = 700;
 const DUST_N  = 500;
 const SPRAY_N = 200;
 const NUCLEUS_R    = 0.45;
-const TAIL_VIS_DIST = 900;   // tail starts fading beyond this distance
-const TAIL_MIN     = 0.25;   // minimum tail strength (always faintly visible)
+const TAIL_VIS_DIST = 2500;   // tail starts fading beyond this distance from nearest star
+const TAIL_MIN     = 0.15;   // minimum tail strength (faint even at aphelion)
+const MAX_SIM_DELTA = 1 / 30; // cap large frame gaps so the comet does not jump on tab resume
+const START_PHASE = 0.68;     // deterministic spawn point along the orbit
 
 /** Seeded pseudo-random (deterministic, no Math.random) */
 function sr(s: number): number { const x = Math.sin(s * 127.1 + 311.7) * 43758.5; return x - Math.floor(x); }
@@ -262,6 +269,7 @@ export default function Comet({ onSelect, showLabel = true }: { onSelect?: (addr
   const ionGeoRef   = useRef<THREE.BufferGeometry>(null!);
   const dustGeoRef  = useRef<THREE.BufferGeometry>(null!);
   const sprayGeoRef = useRef<THREE.BufferGeometry>(null!);
+  const simTimeRef  = useRef(PERIOD * START_PHASE);
 
   // ── Nucleus mat ──
   const nucleusMat = useMemo(() => {
@@ -368,33 +376,46 @@ export default function Comet({ onSelect, showLabel = true }: { onSelect?: (addr
   const _rt   = useMemo(() => new THREE.Vector3(), []);   // perpendicular right
   const _up   = useMemo(() => new THREE.Vector3(), []);   // perpendicular up
   const _tmp  = useMemo(() => new THREE.Vector3(), []);
+  const _star = useMemo(() => new THREE.Vector3(), []);   // nearest star position
+  const initialPos = useMemo(() => {
+    const pos = new THREE.Vector3();
+    const vel = new THREE.Vector3();
+    getOrbitalState(PERIOD * START_PHASE, pos, vel);
+    return [pos.x, pos.y, pos.z] as [number, number, number];
+  }, []);
 
-  useFrame((state) => {
-    const t = state.clock.elapsedTime;
+  useFrame((state, delta) => {
+    const simDelta = Math.min(delta, MAX_SIM_DELTA);
+    simTimeRef.current = (simTimeRef.current + simDelta) % PERIOD;
+    const t = simTimeRef.current;
     const camera = state.camera;
     getOrbitalState(t, _pos, _vel);
-
-    const dist = _pos.length();
 
     // Move group to comet world position
     groupRef.current?.position.copy(_pos);
 
+    // Find nearest star for anti-solar computation
+    const dVescrow = _pos.distanceToSquared(_star.set(...STAR_VESCROW));
+    const dVesting = _pos.distanceToSquared(_star.set(...STAR_VESTING));
+    if (dVescrow <= dVesting) _star.set(...STAR_VESCROW); // else _star already has STAR_VESTING
+    const dist = Math.sqrt(Math.min(dVescrow, dVesting));
+
     // Billboard coma — always face camera
     if (comaRef.current) comaRef.current.quaternion.copy(camera.quaternion);
 
-    // Sun-facing direction (for nucleus shader lighting)
-    _tmp.copy(_pos).negate().normalize();
+    // Sun-facing direction (for nucleus shader lighting) — toward nearest star
+    _tmp.copy(_star).sub(_pos).normalize();
     if (nucMatRef.current) nucMatRef.current.uniforms.uSunDir.value.copy(_tmp);
 
-    // Anti-solar direction (tail points away from origin/sun)
-    _anti.copy(_pos).normalize();
+    // Anti-solar direction (tail points away from nearest star)
+    _anti.copy(_pos).sub(_star).normalize();
 
     // Perpendicular basis (right/up axes of tail cross-section)
     if (Math.abs(_anti.y) < 0.95) _tmp.set(0, 1, 0); else _tmp.set(1, 0, 0);
     _rt.crossVectors(_anti, _tmp).normalize();
     _up.crossVectors(_rt, _anti).normalize();
 
-    // Tail length & brightness scale with proximity to sun
+    // Tail length & brightness scale with proximity to nearest star
     const proximity  = Math.max(TAIL_MIN, Math.pow(Math.max(0, 1 - dist / TAIL_VIS_DIST), 0.7));
     const ionLength  = 120  + proximity * 600;
     const dustLength = 80  + proximity * 400;
@@ -452,7 +473,7 @@ export default function Comet({ onSelect, showLabel = true }: { onSelect?: (addr
       const s = spraySeeds[i];
       const sunFacing = s.dx * sunX + s.dy * sunY + s.dz * sunZ;
       const activity  = Math.max(0.1, sunFacing * s.sunHeat + (1 - s.sunHeat) * 0.35);
-      const at = ((s.t + t * s.speed) % 1);
+      const at = (s.t + t * s.speed) % 1;
       const d  = NUCLEUS_R + at * JET_LEN;
       // Gentle tailward drift as particle ages
       const drift = at * at * 4.0;
@@ -469,14 +490,25 @@ export default function Comet({ onSelect, showLabel = true }: { onSelect?: (addr
   });
 
   return (
-    <group ref={groupRef}>
-      {/* Nucleus */}
+    <group ref={groupRef} position={initialPos}>
+      {/* Invisible hit-detection sphere — nucleus is sub-pixel at typical distances */}
       <mesh
         userData={{ walletAddress: COMET_ADDRESS, bodyRadius: NUCLEUS_R, bodyType: "comet" }}
         onClick={(e) => { e.stopPropagation(); onSelect?.(COMET_ADDRESS); }}
       >
+        <sphereGeometry args={[12, 8, 8]} />
+        <meshBasicMaterial transparent opacity={0} depthWrite={false} />
+      </mesh>
+
+      {/* Nucleus */}
+      <mesh>
         <sphereGeometry args={[NUCLEUS_R, 32, 24]} />
         <primitive object={nucleusMat} attach="material" />
+      </mesh>
+
+      {/* Coma glow billboard */}
+      <mesh ref={comaRef} material={comaMat}>
+        <planeGeometry args={[14, 14]} />
       </mesh>
 
       {/* Spray / jet particles — active outgassing */}
@@ -490,18 +522,16 @@ export default function Comet({ onSelect, showLabel = true }: { onSelect?: (addr
 
       {/* Label */}
       {showLabel && (
-      <Html position={[0, NUCLEUS_R + 6, 0]} center zIndexRange={[10000, 0]} style={{ pointerEvents: "none", whiteSpace: "nowrap" }}>
-        <div style={{
-          fontFamily: "'JetBrains Mono','SF Mono',monospace",
-          fontSize: 9,
-          letterSpacing: "0.18em",
-          textTransform: "uppercase",
-          color: "rgba(140,190,255,0.45)",
-          textShadow: "none",
-        }}>
-          cascopea
-        </div>
-      </Html>
+        <SpriteLabel
+          position={[0, NUCLEUS_R + 6, 0]}
+          text="CASCOPEA"
+          color="#a8d0ff"
+          fontSize={0.35}
+          opacity={0.45}
+          outlineWidth={0}
+          onClick={() => onSelect?.(COMET_ADDRESS)}
+          alwaysVisible
+        />
       )}
     </group>
   );

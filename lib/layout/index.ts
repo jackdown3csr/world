@@ -107,5 +107,6 @@ export type {
   AsteroidData,
   SolarSystemData,
   LayoutMode,
+  VestingLayoutMode,
 } from "./types";
 export { SUN_RADIUS } from "./constants";

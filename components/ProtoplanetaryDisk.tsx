@@ -17,6 +17,7 @@
 import React, { useRef, useEffect, useState, useCallback, useMemo } from "react";
 import { useFrame, type ThreeEvent } from "@react-three/fiber";
 import { Html } from "@react-three/drei";
+import SpriteLabel from "./SpriteLabel";
 import * as THREE from "three";
 
 import type { AsteroidData } from "@/lib/layout";
@@ -69,6 +70,7 @@ interface ProtoplanetaryDiskProps {
   panelOpen?: boolean;
   showAllNames?: boolean;
   showRenamedOnly?: boolean;
+  vesting?: boolean;
 }
 
 export default function ProtoplanetaryDisk({
@@ -81,6 +83,7 @@ export default function ProtoplanetaryDisk({
   panelOpen,
   showAllNames,
   showRenamedOnly,
+  vesting,
 }: ProtoplanetaryDiskProps) {
   const groupRef = useRef<THREE.Group>(null);
   const count    = asteroids.length;
@@ -118,10 +121,10 @@ export default function ProtoplanetaryDisk({
         const diskZ = a.position[2];
         const diskY = a.position[1] * 0.10;   // compress height to ≈10%
 
-        // Disk pebbles are smaller than meteor belt rocks
-        const base = a.size * 0.55;
+        // Disk pebbles — scale up so they're visible at belt radius
+        const base = a.size * 8.0;
         const sx   = base * (0.60 + a.seed * 0.80);
-        const sy   = base * (0.15 + a.hue  * 0.25);   // very flat
+        const sy   = base * (0.20 + a.hue  * 0.30);   // flat-ish
         const sz   = base * (0.60 + a.seed * 0.70);
 
         // Rotation mostly around Y (lying flat in disk)
@@ -215,6 +218,7 @@ export default function ProtoplanetaryDisk({
             key={v}
             ref={(el) => { meshRefs.current[v] = el; }}
             args={[PEBBLE_GEOS[v], PEBBLE_MAT, globalIndices.length]}
+            frustumCulled={false}
             onPointerMove={makePointerMove(v)}
             onPointerLeave={onPointerLeave}
             onClick={makeClick(v)}
@@ -231,6 +235,7 @@ export default function ProtoplanetaryDisk({
         >
           <WalletTooltip
             wallet={activeAsteroid.wallet}
+            vesting={vesting}
           />
         </Html>
       )}
@@ -244,9 +249,28 @@ export default function ProtoplanetaryDisk({
         >
           <WalletTooltip
             wallet={asteroids[selectedIndex].wallet}
+            vesting={vesting}
           />
         </Html>
       )}
+
+      {/* Persistent labels for disk particles */}
+      {showAllNames && asteroids.map((a, i) => {
+        if (showRenamedOnly && !a.wallet.customName) return null;
+        if (activeIndex === i) return null;
+        const label = a.wallet.customName || `${a.wallet.address.slice(0, 6)}\u2026${a.wallet.address.slice(-4)}`;
+        return (
+          <SpriteLabel
+            key={a.wallet.address}
+            position={a.position as [number, number, number]}
+            text={`◈ ${label}`}
+            color="#7ccedd"
+            fontSize={0.3}
+            opacity={0.7}
+            onClick={() => onSelectAddress(a.wallet.address)}
+          />
+        );
+      })}
     </group>
   );
 }

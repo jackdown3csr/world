@@ -445,23 +445,38 @@ const FRAG = /* glsl */ `
   }
 `;
 
-/** Create a moon shader material. moonType 0–5, hue/seed 0–1. */
+/* ── Prototype cache: one compiled program for all moons ────────── */
+let moonProto: THREE.ShaderMaterial | null = null;
+
+/** Create a moon shader material. moonType 0–5, hue/seed 0–1.
+ *  Cloned from a single prototype so Three.js reuses the compiled GPU program. */
 export function createMoonMaterial(
   moonType: MoonType,
   hue: number,
   seed: number,
 ): THREE.ShaderMaterial {
-  return new THREE.ShaderMaterial({
-    vertexShader: VERT,
-    fragmentShader: FRAG,
-    uniforms: {
-      uMoonType:   { value: moonType },
-      uHue:        { value: hue },
-      uSeed:       { value: seed },
-      uTime:       { value: 0 },
-      uHostPos:    { value: new THREE.Vector3() },
-      uHostRadius: { value: 0.0 },
-      uStarPos:    { value: new THREE.Vector3(0, 0, 0) },
-    },
-  });
+  if (!moonProto) {
+    moonProto = new THREE.ShaderMaterial({
+      vertexShader: VERT,
+      fragmentShader: FRAG,
+      uniforms: {
+        uMoonType:   { value: 0 },
+        uHue:        { value: 0 },
+        uSeed:       { value: 0 },
+        uTime:       { value: 0 },
+        uHostPos:    { value: new THREE.Vector3() },
+        uHostRadius: { value: 0.0 },
+        uStarPos:    { value: new THREE.Vector3(0, 0, 0) },
+      },
+    });
+  }
+  const mat = moonProto.clone();
+  mat.uniforms.uMoonType   = { value: moonType };
+  mat.uniforms.uHue        = { value: hue };
+  mat.uniforms.uSeed       = { value: seed };
+  mat.uniforms.uTime       = { value: 0 };
+  mat.uniforms.uHostPos    = { value: new THREE.Vector3() };
+  mat.uniforms.uHostRadius = { value: 0.0 };
+  mat.uniforms.uStarPos    = { value: new THREE.Vector3(0, 0, 0) };
+  return mat;
 }

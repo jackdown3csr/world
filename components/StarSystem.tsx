@@ -9,15 +9,27 @@
  * position.copy() internally and must live at the scene root level.
  */
 
-import React from "react";
+import React, { useState, useEffect } from "react";
 
 import Sun from "./Sun";
-import SunLensFlare from "./SunLensFlare";
 import SolarWind from "./SolarWind";
 import PlanetWallet from "./PlanetWallet";
 import OrbitRing from "./OrbitRing";
 import AsteroidBelt from "./AsteroidBelt";
 import ProtoplanetaryDisk from "./ProtoplanetaryDisk";
+
+/** Mount items in batches of `batchSize` per animation frame to avoid a first-frame stall. */
+function useProgressiveMount(total: number, batchSize = 20): number {
+  const [count, setCount] = useState(batchSize);
+  useEffect(() => {
+    if (count >= total) return;
+    const id = requestAnimationFrame(() =>
+      setCount((c) => Math.min(c + batchSize, total)),
+    );
+    return () => cancelAnimationFrame(id);
+  }, [count, total, batchSize]);
+  return Math.min(count, total);
+}
 
 import type { SolarSystemData } from "@/lib/layout/types";
 import type { StarPalette } from "./Sun";
@@ -79,10 +91,11 @@ export default function StarSystem({
   onStarSelect,
   diskMode = false,
 }: StarSystemProps) {
+  const visibleCount = useProgressiveMount(solarData.planets.length);
+
   return (
     <>
-      {/* Screen-space effects — must be at scene root (not inside the offset group) */}
-      <SunLensFlare starPosition={position} />
+      {/* SolarWind at scene root (not inside the offset group) */}
       {showSolarWind && (
         <SolarWind origin={position} color={palette === "cool" ? "cool" : "warm"} />
       )}
@@ -99,7 +112,7 @@ export default function StarSystem({
           onSelect={onStarSelect}
         />
 
-        {solarData.planets.map((p) => (
+        {solarData.planets.slice(0, visibleCount).map((p) => (
           <React.Fragment key={p.wallet.address}>
             {showOrbits && !photoMode && p.ringWallets.length === 0 && (
               <OrbitRing radius={p.orbitRadius} tilt={p.tilt} />
@@ -120,6 +133,7 @@ export default function StarSystem({
               showRenamedOnly={showRenamedOnly}
               showTrails={showTrails && !photoMode}
               onShiftSelect={(addr) => onShiftSelect?.(addr)}
+              vesting={diskMode}
             />
           </React.Fragment>
         ))}
@@ -135,6 +149,7 @@ export default function StarSystem({
             panelOpen={panelOpen}
             showAllNames={showAllNames && !photoMode}
             showRenamedOnly={showRenamedOnly}
+            vesting
           />
         ) : (
           <AsteroidBelt

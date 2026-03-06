@@ -11,7 +11,9 @@
 import React, { useRef, useMemo, useState, useCallback, useEffect } from "react";
 import { useFrame, useThree, type ThreeEvent } from "@react-three/fiber";
 import { Html } from "@react-three/drei";
+import SpriteLabel from "./SpriteLabel";
 import * as THREE from "three";
+import { MOON_GEOS } from "@/lib/geometryPool";
 
 import type { PlanetData, MoonData, RingParticleData } from "@/lib/layout";
 import { createSaturnRingMaterial } from "@/lib/shaders/saturnRingShader";
@@ -146,21 +148,12 @@ export default function SaturnSystem({
     [moons],
   );
 
-  /* ── Moon LOD geometries (3 levels per moon) ── */
+  /* ── Moon LOD (shared unit-sphere pool, scaled by mesh.scale) ── */
   const _lodPos = useMemo(() => new THREE.Vector3(), []);
-  const moonGeoLODs = useMemo(
-    () => moons.map(m => [
-      new THREE.SphereGeometry(m.radius, 48, 48),
-      new THREE.SphereGeometry(m.radius, 24, 24),
-      new THREE.SphereGeometry(m.radius, 12, 12),
-    ]),
-    [moons],
-  );
   const moonLodRefs = useRef<number[]>([]);
   useEffect(() => {
     moonLodRefs.current = moons.map(() => 0);
-    return () => { moonGeoLODs.forEach(set => set.forEach(g => g.dispose())); };
-  }, [moonGeoLODs, moons]);
+  }, [moons]);
 
   /* ── Ring particle positions (XZ plane, gap-aware) ── */
   const positions = useMemo(() => ringWallets.map(rp => {
@@ -228,7 +221,7 @@ export default function SaturnSystem({
         const lod = d < 50 ? 0 : d < 200 ? 1 : 2;
         if (moonLodRefs.current[i] !== lod) {
           moonLodRefs.current[i] = lod;
-          mesh.geometry = moonGeoLODs[i][lod];
+          mesh.geometry = MOON_GEOS[lod];
         }
       }
     });
@@ -382,27 +375,15 @@ export default function SaturnSystem({
           const label = rp.wallet.customName
             || `${rp.wallet.address.slice(0, 6)}\u2026${rp.wallet.address.slice(-4)}`;
           return (
-            <Html
+            <SpriteLabel
               key={rp.wallet.address}
               position={[pos.x, pos.y + rp.size + 0.12, pos.z]}
-              center
-              zIndexRange={[isSelected ? 9000 : 4500, 0]}
-              style={{ pointerEvents: "none" }}
-            >
-              <div style={{
-                color:      isSelected ? "#a0d8ff" : "#506878",
-                fontSize:   isSelected ? 9 : 7,
-                fontFamily: "'JetBrains Mono', 'SF Mono', monospace",
-                fontWeight: isSelected ? 700 : 500,
-                whiteSpace: "nowrap",
-                textShadow: "0 0 6px rgba(0,0,0,0.95), 0 0 12px rgba(0,0,0,0.7)",
-                letterSpacing: "0.08em",
-                textTransform: "uppercase",
-                opacity:    isSelected ? 1.0 : 0.65,
-              }}>
-                {label}
-              </div>
-            </Html>
+              text={label}
+              color={isSelected ? "#b0e0ff" : "#80a8b8"}
+              fontSize={isSelected ? 0.35 : 0.25}
+              opacity={isSelected ? 1.0 : 0.65}
+              onClick={() => onSelectAddress(rp.wallet.address)}
+            />
           );
         })}
       </group>
@@ -420,6 +401,7 @@ export default function SaturnSystem({
             <mesh
               ref={el => { moonMeshRefs.current[i] = el; }}
               position={[moon.orbitRadius, 0, 0]}
+              scale={moon.radius}
               userData={{
                 walletAddress: moon.wallet.address.toLowerCase(),
                 bodyRadius: moon.radius,
@@ -429,7 +411,7 @@ export default function SaturnSystem({
               onPointerLeave={onMoonLeave}
               onClick={onMoonClick(i)}
             >
-              <primitive object={moonGeoLODs[i]?.[0] ?? moonGeoLODs[0]?.[0]} attach="geometry" />
+              <primitive object={MOON_GEOS[0]} attach="geometry" />
               <primitive object={moonMaterials[i]} attach="material" />
             </mesh>
 
@@ -450,26 +432,14 @@ export default function SaturnSystem({
 
             {/* Moon persistent label */}
             {showMoonLabels && (!showRenamedOnly || moon.wallet.customName) && !isMoonHovered && !(isMoonSelected && panelOpen) && (
-              <Html
+              <SpriteLabel
                 position={[moon.orbitRadius, moon.radius + 0.15, 0]}
-                center
-                zIndexRange={[5000, 0]}
-                style={{ pointerEvents: "none" }}
-              >
-                <div style={{
-                  color: "#506878",
-                  fontSize: 8,
-                  fontFamily: "'JetBrains Mono', 'SF Mono', monospace",
-                  fontWeight: 500,
-                  whiteSpace: "nowrap",
-                  textShadow: "0 0 6px rgba(0,0,0,0.95), 0 0 14px rgba(0,0,0,0.7)",
-                  letterSpacing: "0.08em",
-                  textTransform: "uppercase",
-                  opacity: 0.8,
-                }}>
-                  {moon.wallet.customName || `${moon.wallet.address.slice(0, 6)}\u2026${moon.wallet.address.slice(-4)}`}
-                </div>
-              </Html>
+                text={moon.wallet.customName || `${moon.wallet.address.slice(0, 6)}\u2026${moon.wallet.address.slice(-4)}`}
+                color="#80a8b8"
+                fontSize={0.3}
+                opacity={0.8}
+                onClick={() => onSelectAddress(moon.wallet.address)}
+              />
             )}
           </group>
         );

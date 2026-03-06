@@ -3,6 +3,7 @@
 import React, { useRef, useEffect, useState, useCallback, useMemo } from "react";
 import { useFrame, type ThreeEvent } from "@react-three/fiber";
 import { Html } from "@react-three/drei";
+import SpriteLabel from "./SpriteLabel";
 import * as THREE from "three";
 
 import type { AsteroidData } from "@/lib/layout";
@@ -257,33 +258,21 @@ export default function AsteroidBelt({
         </Html>
       )}
 
-      {/* Persistent name labels (only named asteroids) */}
+      {/* Persistent name labels */}
       {showAllNames && asteroids.map((a, i) => {
         if (showRenamedOnly && !a.wallet.customName) return null;
-        if (!showRenamedOnly && !a.wallet.customName) return null;
         if (activeIndex === i) return null;
+        const label = a.wallet.customName || `${a.wallet.address.slice(0, 6)}\u2026${a.wallet.address.slice(-4)}`;
         return (
-          <Html
+          <SpriteLabel
             key={a.wallet.address}
-            position={a.position}
-            center
-            zIndexRange={[4000, 0]}
-            style={{ pointerEvents: "none" }}
-          >
-            <div style={{
-              color: "#405868",
-              fontSize: 8,
-              fontFamily: "'JetBrains Mono', 'SF Mono', monospace",
-              fontWeight: 500,
-              whiteSpace: "nowrap",
-              textShadow: "0 0 6px rgba(0,0,0,0.95)",
-              letterSpacing: "0.08em",
-              textTransform: "uppercase",
-              opacity: 0.7,
-            }}>
-              {a.wallet.customName}
-            </div>
-          </Html>
+            position={a.position as [number, number, number]}
+            text={label}
+            color="#7098a8"
+            fontSize={0.3}
+            opacity={0.7}
+            onClick={() => onSelectAddress(a.wallet.address)}
+          />
         );
       })}
     </group>

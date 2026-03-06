@@ -3,6 +3,7 @@
 import React, { useRef, useMemo, useEffect, useState, useCallback } from "react";
 import { useFrame, useThree, type ThreeEvent } from "@react-three/fiber";
 import { Html } from "@react-three/drei";
+import SpriteLabel from "./SpriteLabel";
 import * as THREE from "three";
 import type { RingParticleData } from "@/lib/layout";
 import WalletTooltip from "./WalletTooltip";
@@ -262,27 +263,15 @@ export default function WalletRing({
           || `${rp.wallet.address.slice(0, 6)}\u2026${rp.wallet.address.slice(-4)}`;
 
         return (
-          <Html
+          <SpriteLabel
             key={rp.wallet.address}
             position={[pos.x, pos.y + rp.size + 0.12, pos.z]}
-            center
-            zIndexRange={[isSelected ? 9000 : 4500, 0]}
-            style={{ pointerEvents: "none" }}
-          >
-            <div style={{
-              color:      isSelected ? "#a0d8ff" : "#506878",
-              fontSize:   isSelected ? 9 : 7,
-              fontFamily: "'JetBrains Mono', 'SF Mono', monospace",
-              fontWeight: isSelected ? 700 : 500,
-              whiteSpace: "nowrap",
-              textShadow: "0 0 6px rgba(0,0,0,0.95), 0 0 12px rgba(0,0,0,0.7)",
-              letterSpacing: "0.08em",
-              textTransform: "uppercase",
-              opacity:    isSelected ? 1.0 : 0.65,
-            }}>
-              {label}
-            </div>
-          </Html>
+            text={label}
+            color={isSelected ? "#b0e0ff" : "#80a8b8"}
+            fontSize={isSelected ? 0.35 : 0.25}
+            opacity={isSelected ? 1.0 : 0.65}
+            onClick={() => onSelectAddress(rp.wallet.address)}
+          />
         );
       })}
     </group>
