@@ -1,6 +1,6 @@
 ﻿"use client";
 
-import React, { useMemo, useRef, useCallback, useState } from "react";
+import React, { useMemo, useRef, useCallback, useState, useEffect } from "react";
 import type { OrbitControls as OrbitControlsImpl } from "three-stdlib";
 import type { FreeLookHandle } from "./FreeLookControls";
 import type { CameraMode } from "./CameraController";
