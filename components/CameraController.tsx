@@ -5,6 +5,7 @@ import { useFrame, useThree } from "@react-three/fiber";
 import * as THREE from "three";
 import type { OrbitControls as OrbitControlsImpl } from "three-stdlib";
 import type { FreeLookHandle } from "./FreeLookControls";
+import { lookupSceneBody } from "@/lib/sceneRegistry";
 
 /**
  * Hybrid camera controller:
@@ -122,43 +123,7 @@ function getSnapProfile(bodyType: FocusBodyType, travelDistance: number) {
   };
 }
 
-function findBody(
-  scene: THREE.Scene,
-  addr: string,
-  camera?: THREE.Camera,
-): { position: THREE.Vector3; bodyRadius: number; focusRadius?: number; bodyType: string } | null {
-  const matches: { position: THREE.Vector3; bodyRadius: number; focusRadius?: number; bodyType: string }[] = [];
-  scene.traverse((obj) => {
-    const ud = obj.userData;
-    if (!ud) return;
-    if (ud.walletAddress === addr) {
-      const wp = new THREE.Vector3();
-      obj.getWorldPosition(wp);
-      matches.push({ position: wp, bodyRadius: ud.bodyRadius ?? 1, focusRadius: ud.focusRadius, bodyType: ud.bodyType ?? "planet" });
-      return;
-    }
-    if (ud.walletAddresses && Array.isArray(ud.walletAddresses) && obj instanceof THREE.InstancedMesh) {
-      const idx = (ud.walletAddresses as string[]).indexOf(addr);
-      if (idx >= 0) {
-        obj.getMatrixAt(idx, _mat4);
-        _pos.setFromMatrixPosition(_mat4);
-        obj.localToWorld(_pos);
-        _mat4.decompose(_v3, _quat, _scale);
-        matches.push({ position: _pos.clone(), bodyRadius: _scale.x, focusRadius: ud.focusRadius, bodyType: ud.bodyType ?? "asteroid" });
-      }
-    }
-  });
-  if (matches.length === 0) return null;
-  if (matches.length === 1 || !camera) return matches[0];
-  // Multiple matches (address exists in both systems) → pick closest to camera
-  let best = matches[0];
-  let bestDist = camera.position.distanceToSquared(best.position);
-  for (let i = 1; i < matches.length; i++) {
-    const d = camera.position.distanceToSquared(matches[i].position);
-    if (d < bestDist) { best = matches[i]; bestDist = d; }
-  }
-  return best;
-}
+// findBody replaced by lookupSceneBody from @/lib/sceneRegistry
 
 export default function CameraController({
   selectedAddress,
@@ -173,7 +138,7 @@ export default function CameraController({
   resetRequested,
   onResetDone,
 }: CameraControllerProps) {
-  const { camera, scene, gl } = useThree();
+  const { camera, gl } = useThree();
   const prevVersion = useRef(0);
   const lastDist    = useRef(-1);
   const prevReset   = useRef(false);
@@ -324,7 +289,7 @@ export default function CameraController({
       }
 
       const addr = selectedAddress.toLowerCase();
-      const body = findBody(scene, addr, camera);
+      const body = lookupSceneBody(addr);
       if (!body) return;
       const bodyType = (body.bodyType ?? "unknown") as FocusBodyType;
 
@@ -419,7 +384,7 @@ export default function CameraController({
 
       // Keep lastBodyPos synced during snap
       if (trackingAddr.current) {
-        const b = findBody(scene, trackingAddr.current, camera);
+        const b = lookupSceneBody(trackingAddr.current);
         if (b) lastBodyPos.current.copy(b.position);
       }
 
@@ -445,7 +410,7 @@ export default function CameraController({
 
     /* ── Orbit mode: continuous tracking ── */
     if (mode.current === "orbit" && ctrl && trackingAddr.current) {
-      const body = findBody(scene, trackingAddr.current, camera);
+      const body = lookupSceneBody(trackingAddr.current);
       if (!body) { trackingAddr.current = null; return; }
 
       const dx = body.position.x - lastBodyPos.current.x;

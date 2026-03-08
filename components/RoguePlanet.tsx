@@ -1,8 +1,9 @@
 "use client";
 
-import { useRef, useMemo } from "react";
+import { useEffect, useRef, useMemo } from "react";
 import { useFrame } from "@react-three/fiber";
 import * as THREE from "three";
+import { registerSceneObject, unregisterSceneObject } from "@/lib/sceneRegistry";
 
 /* ── Orbital parameters ── */
 const ORBIT_R  = 580;          // AU-scale units, outer system
@@ -117,6 +118,12 @@ export default function RoguePlanet({ starPositions, onSelect, paused = false }:
   const groupRef = useRef<THREE.Group>(null);
   const meshRef  = useRef<THREE.Mesh>(null);
   const simTimeRef = useRef(0);
+
+  useEffect(() => {
+    if (!groupRef.current) return;
+    registerSceneObject(ROGUE_ADDRESS, groupRef.current, ROGUE_R, "rogue");
+    return () => unregisterSceneObject(ROGUE_ADDRESS);
+  }, []);
   const worldPos = useMemo(() => new THREE.Vector3(), []);
   const nearestStar = useMemo(() => new THREE.Vector3(), []);
   const sceneStars = useMemo(

@@ -1,9 +1,11 @@
 "use client";
 
-import React, { useCallback, type ReactNode } from "react";
+import React, { useCallback, useEffect, useRef, type ReactNode } from "react";
 import { type ThreeEvent } from "@react-three/fiber";
 import SpriteLabel from "./SpriteLabel";
 import type { BridgeSceneObject } from "@/lib/bridges";
+import * as THREE from "three";
+import { registerSceneObject, unregisterSceneObject } from "@/lib/sceneRegistry";
 
 interface BridgeObjectProps {
   bridge: BridgeSceneObject;
@@ -13,6 +15,14 @@ interface BridgeObjectProps {
 }
 
 export default function BridgeObject({ bridge, onSelect, showLabel = true, children }: BridgeObjectProps) {
+  const groupRef = useRef<THREE.Group>(null);
+
+  useEffect(() => {
+    if (!groupRef.current) return;
+    registerSceneObject(bridge.id, groupRef.current, bridge.bodyRadius, "bridge");
+    return () => unregisterSceneObject(bridge.id);
+  }, [bridge.id, bridge.bodyRadius]);
+
   const handleClick = useCallback((e: ThreeEvent<MouseEvent>) => {
     e.stopPropagation();
     onSelect(bridge.id);
@@ -28,7 +38,7 @@ export default function BridgeObject({ bridge, onSelect, showLabel = true, child
   }, []);
 
   return (
-    <group position={bridge.position}>
+    <group ref={groupRef} position={bridge.position}>
       <mesh
         userData={{
           walletAddress: bridge.id,

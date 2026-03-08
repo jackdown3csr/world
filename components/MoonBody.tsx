@@ -10,6 +10,7 @@ import type { MoonData } from "@/lib/layout";
 import { createMoonMaterial } from "@/lib/shaders/moonShader";
 import { MOON_GEOS } from "@/lib/geometryPool";
 import WalletTooltip, { type WalletTooltipVariant } from "./WalletTooltip";
+import { registerSceneObject, unregisterSceneObject } from "@/lib/sceneRegistry";
 
 interface MoonBodyProps {
   data:        MoonData;
@@ -31,6 +32,13 @@ export default function MoonBody({ data, starWorldPosition, planetOrbit, hostRad
   const moonOrbitRef = useRef<THREE.Group>(null);
   const meshRef      = useRef<THREE.Mesh>(null);
   const simTimeRef = useRef(0);
+
+  useEffect(() => {
+    if (!meshRef.current) return;
+    const id = data.wallet.address.toLowerCase();
+    registerSceneObject(id, meshRef.current, data.radius, "moon");
+    return () => unregisterSceneObject(id);
+  }, [data.wallet.address, data.radius]);
   const [hovered, setHovered] = useState(false);
   const starWorldPos = useMemo(
     () => new THREE.Vector3(starWorldPosition[0], starWorldPosition[1], starWorldPosition[2]),

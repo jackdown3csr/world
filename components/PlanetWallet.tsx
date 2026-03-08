@@ -12,6 +12,7 @@ import { PLANET_GEOS, ATMOS_HAZE_GEO, ATMOS_RIM_GEO, ATMOS_EXPIRY_GEO } from "@/
 import WalletTooltip, { type WalletTooltipVariant } from "./WalletTooltip";
 import MoonBody from "./MoonBody";
 import SaturnSystem from "./SaturnSystem";
+import { registerSceneObject, unregisterSceneObject } from "@/lib/sceneRegistry";
 
 /* ── Shared atmosphere shader source (extracted for prototype caching) ─── */
 const ATMOS_VERT = /* glsl */ `
@@ -157,6 +158,13 @@ export default function PlanetWallet({ data, starWorldPosition, selected, panelO
   const orbitRef = useRef<THREE.Group>(null);
   const meshRef  = useRef<THREE.Mesh>(null);
   const simTimeRef = useRef(0);
+
+  useEffect(() => {
+    if (!meshRef.current) return;
+    const id = data.wallet.address.toLowerCase();
+    registerSceneObject(id, meshRef.current, data.radius, "planet");
+    return () => unregisterSceneObject(id);
+  }, [data.wallet.address, data.radius]);
   const [hovered, setHovered] = useState(false);
   const starWorldPos = useMemo(
     () => new THREE.Vector3(starWorldPosition[0], starWorldPosition[1], starWorldPosition[2]),

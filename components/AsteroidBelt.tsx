@@ -9,6 +9,7 @@ import * as THREE from "three";
 import type { AsteroidData } from "@/lib/layout";
 import WalletTooltip from "./WalletTooltip";
 import OrbitRing from "./OrbitRing";
+import { registerInstancedSceneObject, unregisterInstancedSceneObject } from "@/lib/sceneRegistry";
 
 /* ── Potato geometry variants ────────────────────────────────────────────── */
 
@@ -175,6 +176,22 @@ export default function AsteroidBelt({
       if (mesh.instanceColor) mesh.instanceColor.needsUpdate = true;
     });
   }, [asteroids, beltTone, variantGroups]);
+
+  // Register each interactive asteroid in the scene registry for O(1) lookup
+  useEffect(() => {
+    if (!interactive) return;
+    const ids: string[] = [];
+    variantGroups.forEach((globalIndices, v) => {
+      const mesh = meshRefs.current[v];
+      if (!mesh) return;
+      globalIndices.forEach((gi, localIdx) => {
+        const id = asteroids[gi].wallet.address.toLowerCase();
+        registerInstancedSceneObject(id, mesh, localIdx, "asteroid");
+        ids.push(id);
+      });
+    });
+    return () => { ids.forEach(unregisterInstancedSceneObject); };
+  }, [asteroids, interactive, variantGroups]);
 
   /* ── Slow belt rotation ─────────────────────────────────── */
   useFrame((_, delta) => {

@@ -1,11 +1,12 @@
 "use client";
 
-import React, { useRef, useState, useCallback } from "react";
+import React, { useEffect, useRef, useState, useCallback } from "react";
 import { useFrame, type ThreeEvent } from "@react-three/fiber";
 import { Html } from "@react-three/drei";
 import SpriteLabel from "./SpriteLabel";
 import * as THREE from "three";
 import type { FaucetStats } from "@/hooks/useFaucet";
+import { registerSceneObject, unregisterSceneObject } from "@/lib/sceneRegistry";
 
 export const FAUCET_ADDRESS = "faucet";
 export const FAUCET_DEFAULT_ORBIT_RADIUS = 195;
@@ -43,6 +44,12 @@ export default function FaucetSatellite({ stats, orbitRadius = FAUCET_DEFAULT_OR
   const labelRef  = useRef<THREE.Group>(null);
   const angleRef  = useRef(Math.PI * 0.7); // start offset from other bodies
   const [hovered, setHovered] = useState(false);
+
+  useEffect(() => {
+    if (!groupRef.current) return;
+    registerSceneObject(FAUCET_ADDRESS, groupRef.current, BODY_RADIUS, "satellite");
+    return () => unregisterSceneObject(FAUCET_ADDRESS);
+  }, []);
 
   const onClick = useCallback((e: ThreeEvent<MouseEvent>) => {
     e.stopPropagation();

@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useMemo, useRef } from "react";
+import React, { useEffect, useMemo, useRef } from "react";
 import { useFrame } from "@react-three/fiber";
 import * as THREE from "three";
 
@@ -27,6 +27,7 @@ import {
   type StarPalette,
 } from "./sun/config";
 import { createCmeMaterial, createSurfaceMaterial } from "./sun/starMaterials";
+import { registerSceneObject, unregisterSceneObject } from "@/lib/sceneRegistry";
 
 export type { StarPalette } from "./sun/config";
 
@@ -63,11 +64,18 @@ export default function Sun({
   const variant = getStarVariant(palette);
   const surfaceMat = useMemo(() => createSurfaceMaterial(palette), [palette]);
   const cmeMat = useMemo(() => createCmeMaterial(), []);
+  const starMeshRef = useRef<THREE.Mesh>(null);
   const cmeRef = useRef<THREE.Mesh>(null);
   const simTimeRef = useRef(0);
   const cmeProgress = useRef(1.0);
   const cmeActive = useRef(false);
   const prevBlock = useRef<number>(-1);
+
+  useEffect(() => {
+    if (!starMeshRef.current) return;
+    registerSceneObject(starId, starMeshRef.current, SUN_RADIUS * scale, "star", overviewRadius);
+    return () => unregisterSceneObject(starId);
+  }, [starId, scale, overviewRadius]);
 
   useFrame((_, delta) => {
     if (!paused) simTimeRef.current += delta;
@@ -105,6 +113,7 @@ export default function Sun({
     <group position={position}>
       <group scale={scale}>
         <mesh
+          ref={starMeshRef}
           userData={{ walletAddress: starId, bodyRadius: SUN_RADIUS * scale, focusRadius: overviewRadius, bodyType: "star" }}
           onClick={onSelect ? (e) => { e.stopPropagation(); onSelect(); } : undefined}
           onPointerOver={onSelect ? () => { document.body.style.cursor = "pointer"; } : undefined}

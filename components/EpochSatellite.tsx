@@ -8,11 +8,12 @@
  * RTG boom, and instrument scan platform.
  */
 
-import React, { useRef, useState, useCallback, useMemo } from "react";
+import React, { useEffect, useRef, useState, useCallback, useMemo } from "react";
 import { useFrame, type ThreeEvent } from "@react-three/fiber";
 import { Html } from "@react-three/drei";
 import SpriteLabel from "./SpriteLabel";
 import * as THREE from "three";
+import { registerSceneObject, unregisterSceneObject } from "@/lib/sceneRegistry";
 
 export const EPOCH_ADDRESS = "__epoch__";
 const BODY_RADIUS   = 4;
@@ -53,6 +54,12 @@ export default function EpochSatellite({
   const angleRef   = useRef(Math.PI * 1.3);
   const scanTimeRef = useRef(0);
   const [hovered, setHovered] = useState(false);
+
+  useEffect(() => {
+    if (!groupRef.current) return;
+    registerSceneObject(EPOCH_ADDRESS, groupRef.current, BODY_RADIUS, "satellite");
+    return () => unregisterSceneObject(EPOCH_ADDRESS);
+  }, []);
 
   const orbitSpeed = 0.005;
   const tilt       = 18 * (Math.PI / 180);

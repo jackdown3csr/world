@@ -14,6 +14,7 @@
 import { useEffect, useRef, useMemo } from "react";
 import { useFrame } from "@react-three/fiber";
 import * as THREE from "three";
+import { registerSceneObject, unregisterSceneObject } from "@/lib/sceneRegistry";
 import SpriteLabel from "./SpriteLabel";
 
 // ── Orbital elements ──────────────────────────────────────────────────
@@ -293,6 +294,12 @@ export default function Comet({ starPositions, onSelect, showLabel = true, pause
       window.removeEventListener("blur", resetTick);
       document.removeEventListener("visibilitychange", handleVisibilityChange);
     };
+  }, []);
+
+  useEffect(() => {
+    if (!groupRef.current) return;
+    registerSceneObject(COMET_ADDRESS, groupRef.current, NUCLEUS_R, "comet");
+    return () => unregisterSceneObject(COMET_ADDRESS);
   }, []);
 
   // ── Nucleus mat ──

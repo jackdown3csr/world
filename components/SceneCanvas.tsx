@@ -26,6 +26,8 @@ import EpochSatellite from "./EpochSatellite";
 import CanonicalBridgePortal from "./CanonicalBridgePortal";
 import HyperlanePortal from "./HyperlanePortal";
 import { SpriteLabelManager } from "./SpriteLabel";
+import { lookupSceneBody } from "@/lib/sceneRegistry";
+import type { SceneFocusBody } from "@/lib/sceneRegistry";
 
 import type {
   SceneEffectDefinition,
@@ -35,69 +37,7 @@ import type {
   SceneSystemId,
 } from "@/lib/sceneSystems";
 
-type SceneFocusBody = {
-  position: THREE.Vector3;
-  bodyRadius: number;
-  focusRadius?: number;
-  bodyType: string;
-};
-
-const _lookupMat4 = new THREE.Matrix4();
-const _lookupPos = new THREE.Vector3();
-const _lookupScale = new THREE.Vector3();
-const _lookupQuat = new THREE.Quaternion();
-const _lookupV3 = new THREE.Vector3();
-
-function findSceneBody(
-  scene: THREE.Scene,
-  addr: string,
-  camera?: THREE.Camera,
-): SceneFocusBody | null {
-  const matches: SceneFocusBody[] = [];
-  scene.traverse((obj) => {
-    const ud = obj.userData;
-    if (!ud) return;
-    if (ud.walletAddress === addr) {
-      obj.getWorldPosition(_lookupV3);
-      matches.push({
-        position: _lookupV3.clone(),
-        bodyRadius: ud.bodyRadius ?? 1,
-        focusRadius: ud.focusRadius,
-        bodyType: ud.bodyType ?? "planet",
-      });
-      return;
-    }
-    if (ud.walletAddresses && Array.isArray(ud.walletAddresses) && obj instanceof THREE.InstancedMesh) {
-      const idx = (ud.walletAddresses as string[]).indexOf(addr);
-      if (idx >= 0) {
-        obj.getMatrixAt(idx, _lookupMat4);
-        _lookupPos.setFromMatrixPosition(_lookupMat4);
-        obj.localToWorld(_lookupPos);
-        _lookupMat4.decompose(_lookupV3, _lookupQuat, _lookupScale);
-        matches.push({
-          position: _lookupPos.clone(),
-          bodyRadius: _lookupScale.x,
-          focusRadius: ud.focusRadius,
-          bodyType: ud.bodyType ?? "asteroid",
-        });
-      }
-    }
-  });
-
-  if (matches.length === 0) return null;
-  if (matches.length === 1 || !camera) return matches[0];
-
-  let best = matches[0];
-  let bestDist = camera.position.distanceToSquared(best.position);
-  for (let i = 1; i < matches.length; i += 1) {
-    const dist = camera.position.distanceToSquared(matches[i].position);
-    if (dist < bestDist) {
-      best = matches[i];
-      bestDist = dist;
-    }
-  }
-  return best;
-}
+// findSceneBody replaced by lookupSceneBody from @/lib/sceneRegistry
 
 function getFocusPingColor(bodyType: string) {
   switch (bodyType) {
@@ -135,7 +75,6 @@ function FocusPing({
   selectedAddress: string | null;
   selectionVersion: number;
 }) {
-  const { scene, camera } = useThree();
   const groupRef = useRef<THREE.Group>(null);
   const coreRef = useRef<THREE.Mesh>(null);
   const echoRef = useRef<THREE.Mesh>(null);
@@ -159,7 +98,7 @@ function FocusPing({
       return;
     }
 
-    const body = findSceneBody(scene, selectedAddress.toLowerCase(), camera);
+    const body = lookupSceneBody(selectedAddress.toLowerCase());
     if (!body) {
       liveRef.current = false;
       targetAddrRef.current = null;
@@ -177,7 +116,7 @@ function FocusPing({
       groupRef.current.visible = true;
       groupRef.current.position.copy(body.position);
     }
-  }, [camera, scene, selectedAddress, selectionVersion]);
+  }, [selectedAddress, selectionVersion]);
 
   useFrame(({ camera: frameCamera }) => {
     if (!liveRef.current || !groupRef.current || !targetAddrRef.current) return;
@@ -189,7 +128,7 @@ function FocusPing({
       return;
     }
 
-    const body = findSceneBody(scene, targetAddrRef.current, frameCamera);
+    const body = lookupSceneBody(targetAddrRef.current);
     if (!body) {
       liveRef.current = false;
       groupRef.current.visible = false;
