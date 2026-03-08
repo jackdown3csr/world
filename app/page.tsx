@@ -3,12 +3,11 @@
 import dynamic from "next/dynamic";
 import AppStateScreen from "@/components/AppStateScreen";
 import { CanonicalBridgeProvider, useCanonicalBridge } from "@/hooks/useCanonicalBridge";
-import { HyperlaneBridgeProvider } from "@/hooks/useHyperlaneBridge";
+import { HyperlaneBridgeProvider, useHyperlaneBridge } from "@/hooks/useHyperlaneBridge";
 import { StakingRemnantProvider, useStakingRemnant } from "@/hooks/useStakingRemnant";
 import { WalletProvider, useWallets } from "@/hooks/useWallets";
 import { VestingProvider, useVestingWallets } from "@/hooks/useVestingWallets";
 import { PoolProvider, usePoolTokens } from "@/hooks/usePoolTokens";
-import { useHyperlaneBridge } from "@/hooks/useHyperlaneBridge";
 
 // three.js must only run client‑side
 const SolarSystem = dynamic(() => import("@/components/SolarSystem"), {
@@ -17,9 +16,7 @@ const SolarSystem = dynamic(() => import("@/components/SolarSystem"), {
 
 /* Loading screen removed — SolarSystem handles its own splash overlay */
 
-/* ── Inner page (reads context) ───────────────────────────── */
-
-function GlobePage() {
+function DataErrorGate() {
   const wallets = useWallets();
   const vesting = useVestingWallets();
   const pool = usePoolTokens();
@@ -36,30 +33,24 @@ function GlobePage() {
     { label: "canonical bridge telemetry", message: canonical.error, retry: canonical.refetch },
   ].find((entry) => entry.message);
 
-  if (dataError) {
-    const isHtmlResponse = dataError.message?.includes("Unexpected token '<'") ?? false;
+  if (!dataError) return null;
 
-    return (
-      <AppStateScreen
-        eyebrow="loading problem"
-        title="Could Not Load Scene Data"
-        description={isHtmlResponse
-          ? "The local server answered before one of the data routes was ready. Press try again once the app has fully started."
-          : "The app could not load one of the required data feeds. Press try again."}
-        detail={`Problem loading ${dataError.label}.`}
-        tone="error"
-        primaryAction={{
-          label: "try again",
-          onClick: () => { void dataError.retry(); },
-        }}
-      />
-    );
-  }
+  const isHtmlResponse = dataError.message?.includes("Unexpected token '<'") ?? false;
 
   return (
-    <div style={{ width: "100vw", height: "100vh" }}>
-      <SolarSystem />
-    </div>
+    <AppStateScreen
+      eyebrow="loading problem"
+      title="Could Not Load Scene Data"
+      description={isHtmlResponse
+        ? "The local server answered before one of the data routes was ready. Press try again once the app has fully started."
+        : "The app could not load one of the required data feeds. Press try again."}
+      detail={`Problem loading ${dataError.label}.`}
+      tone="error"
+      primaryAction={{
+        label: "try again",
+        onClick: () => { void dataError.retry(); },
+      }}
+    />
   );
 }
 
@@ -73,7 +64,10 @@ export default function Page() {
           <StakingRemnantProvider>
             <HyperlaneBridgeProvider>
               <CanonicalBridgeProvider>
-                <GlobePage />
+                <div style={{ width: "100vw", height: "100vh" }}>
+                  <SolarSystem />
+                </div>
+                <DataErrorGate />
               </CanonicalBridgeProvider>
             </HyperlaneBridgeProvider>
           </StakingRemnantProvider>
