@@ -5,7 +5,7 @@
  * All state flows in via props; no hooks except refs forwarded from SolarSystem.
  */
 
-import React, { forwardRef, useImperativeHandle, useRef, useState } from "react";
+import React, { forwardRef, useImperativeHandle, useMemo, useRef, useState } from "react";
 import { Canvas, useThree, useFrame } from "@react-three/fiber";
 import { OrbitControls } from "@react-three/drei";
 import * as THREE from "three";
@@ -58,10 +58,9 @@ function findSceneBody(
     const ud = obj.userData;
     if (!ud) return;
     if (ud.walletAddress === addr) {
-      const wp = new THREE.Vector3();
-      obj.getWorldPosition(wp);
+      obj.getWorldPosition(_lookupV3);
       matches.push({
-        position: wp,
+        position: _lookupV3.clone(),
         bodyRadius: ud.bodyRadius ?? 1,
         focusRadius: ud.focusRadius,
         bodyType: ud.bodyType ?? "planet",
@@ -298,18 +297,19 @@ function ActiveSystemDetector({
   onChange: (id: SceneSystemId) => void;
 }) {
   const lastRef = useRef<SceneSystemId>(systems[0]?.id ?? "vescrow");
+  const systemPositions = useMemo(
+    () => systems.map((system) => new THREE.Vector3(...system.position)),
+    [systems],
+  );
+
   useFrame(({ camera }) => {
-    if (!systems.length) return;
+    if (!systems.length || !systemPositions.length) return;
 
     let active = systems[0].id;
-    let bestDist = camera.position.distanceToSquared(
-      new THREE.Vector3(...systems[0].position),
-    );
+    let bestDist = camera.position.distanceToSquared(systemPositions[0]);
 
     for (let index = 1; index < systems.length; index += 1) {
-      const dist = camera.position.distanceToSquared(
-        new THREE.Vector3(...systems[index].position),
-      );
+      const dist = camera.position.distanceToSquared(systemPositions[index]);
       if (dist < bestDist) {
         bestDist = dist;
         active = systems[index].id;
@@ -402,6 +402,7 @@ export default function SceneCanvas({
 }: SceneCanvasProps) {
   const [activeSystem, setActiveSystem] = useState<SceneSystemId>(systems[0]?.id ?? "vescrow");
   const activeFlyMode = cinematicFlyEnabled ? "cinematic" : flyModeEnabled ? "flight" : null;
+  const starPositions = useMemo(() => systems.map((system) => system.position), [systems]);
 
   const getBlockPulseTick = (systemId: SceneSystemId) => (
     effects.find((effect) => effect.kind === "block-pulse" && effect.systemId === systemId)?.tick
@@ -439,7 +440,6 @@ export default function SceneCanvas({
   };
 
   const renderGlobalObject = (sceneObject: SceneGlobalObject) => {
-    const starPositions = systems.map((system) => system.position);
     switch (sceneObject.kind) {
       case "comet":
         return (
