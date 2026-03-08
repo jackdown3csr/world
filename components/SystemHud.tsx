@@ -21,8 +21,10 @@ import DirectoryPanel from "./DirectoryPanel";
 import HelpPanel from "./HelpPanel";
 import BridgeInfoCard from "./systemHud/BridgeInfoCard";
 import SystemInfoCard from "./systemHud/SystemInfoCard";
+import PhotoObjectPicker from "./systemHud/PhotoObjectPicker";
 import { TopStrip, TopStripChip, TopStripDivider, TopStripGroup } from "./TopStrip";
 import type { WalletConnectionState, WalletConnectionActions } from "@/hooks/useWalletConnection";
+import type { PhotoTargetSection } from "@/lib/photoTargets";
 import { getShortcutByKey, photoModeShortcuts, toolbarShortcuts } from "@/lib/shortcuts";
 
 type PhotoOverlayMode = "clean" | "grid" | "scope";
@@ -46,6 +48,10 @@ export interface SystemHudProps {
   isMobile: boolean;
   photoMode: boolean;
   photoHudVisible: boolean;
+  photoPickerOpen: boolean;
+  photoFocusMode: "focused" | "detached";
+  photoTargetLabel: string | null;
+  photoTargetSections: PhotoTargetSection[];
   flashCapture: boolean;
   photoSavedToast: boolean;
   simulationPaused: boolean;
@@ -70,6 +76,10 @@ export interface SystemHudProps {
   wc: WalletConnectionState & WalletConnectionActions;
   onCapturePhoto: () => void;
   onExitPhotoMode: () => void;
+  onPhotoTargetSelect: (address: string) => void;
+  onPhotoDetach: () => void;
+  onPhotoRefocus: () => void;
+  onTogglePhotoPicker: () => void;
   onSetPhotoSimulationMode: (mode: "frozen" | "live") => void;
   onSetPhotoFov: (fov: number) => void;
   onTogglePhotoHud: () => void;
@@ -94,6 +104,10 @@ export default function SystemHud({
   isMobile,
   photoMode,
   photoHudVisible,
+  photoPickerOpen,
+  photoFocusMode,
+  photoTargetLabel,
+  photoTargetSections,
   flashCapture,
   photoSavedToast,
   simulationPaused,
@@ -118,6 +132,10 @@ export default function SystemHud({
   wc,
   onCapturePhoto,
   onExitPhotoMode,
+  onPhotoTargetSelect,
+  onPhotoDetach,
+  onPhotoRefocus,
+  onTogglePhotoPicker,
   onSetPhotoSimulationMode,
   onSetPhotoFov,
   onTogglePhotoHud,
@@ -162,6 +180,9 @@ export default function SystemHud({
     hud: getShortcutByKey(photoModeShortcuts, "H")?.keys ?? "H",
     exit: getShortcutByKey(photoModeShortcuts, "Esc")?.keys ?? "Esc",
     capture: getShortcutByKey(photoModeShortcuts, "Space")?.keys ?? "Space",
+    targets: getShortcutByKey(photoModeShortcuts, "T")?.keys ?? "T",
+    detach: getShortcutByKey(photoModeShortcuts, "V")?.keys ?? "V",
+    refocus: getShortcutByKey(photoModeShortcuts, "F")?.keys ?? "F",
   }), []);
   const connectedLabel = wc.connectedAddress
     ? `${wc.connectedAddress.slice(0, 4)}...${wc.connectedAddress.slice(-4)}`
@@ -252,6 +273,24 @@ export default function SystemHud({
         return;
       }
 
+      if (e.key.toLowerCase() === "t") {
+        e.preventDefault();
+        onTogglePhotoPicker();
+        return;
+      }
+
+      if (e.key.toLowerCase() === "v") {
+        e.preventDefault();
+        onPhotoDetach();
+        return;
+      }
+
+      if (e.key.toLowerCase() === "f") {
+        e.preventDefault();
+        onPhotoRefocus();
+        return;
+      }
+
       if (e.key === " ") {
         e.preventDefault();
         onCapturePhoto();
@@ -266,7 +305,17 @@ export default function SystemHud({
 
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
-  }, [photoMode, photoSimulationMode, onCapturePhoto, onExitPhotoMode, onSetPhotoSimulationMode, onTogglePhotoHud]);
+  }, [
+    onCapturePhoto,
+    onExitPhotoMode,
+    onPhotoDetach,
+    onPhotoRefocus,
+    onSetPhotoSimulationMode,
+    onTogglePhotoHud,
+    onTogglePhotoPicker,
+    photoMode,
+    photoSimulationMode,
+  ]);
 
   // Reset dismissal when the watched target changes so a new selection auto-shows.
   React.useEffect(() => {
@@ -661,6 +710,17 @@ export default function SystemHud({
                 </TopStripGroup>
                 <TopStripDivider />
                 <TopStripGroup padding="0 2px">
+                  <TopStripChip label={photoFocusMode === "focused" ? "focused" : "detached"} active variant="status" />
+                  <TopStripChip label={photoTargetLabel ?? "no target"} active={Boolean(photoTargetLabel)} accent="#9cc9d8" title={photoTargetLabel ?? "No focused object selected"} />
+                </TopStripGroup>
+                <TopStripDivider />
+                <TopStripGroup padding="0 2px">
+                  <TopStripChip label="targets" active={photoPickerOpen} onClick={onTogglePhotoPicker} title={`Open object picker (${photoShortcutMap.targets})`} />
+                  <TopStripChip label="detach" active={photoFocusMode === "detached"} onClick={onPhotoDetach} title={`Detach focus for cinematic fly (${photoShortcutMap.detach})`} />
+                  <TopStripChip label="refocus" active={photoFocusMode === "focused"} onClick={onPhotoRefocus} title={`Snap back to current target (${photoShortcutMap.refocus})`} />
+                </TopStripGroup>
+                <TopStripDivider />
+                <TopStripGroup padding="0 2px">
                   <TopStripChip label="frozen" active={photoSimulationMode === "frozen"} onClick={() => onSetPhotoSimulationMode("frozen")} title="Freeze scene simulation" />
                   <TopStripChip label="live" active={photoSimulationMode === "live"} onClick={() => onSetPhotoSimulationMode("live")} title="Live scene simulation" />
                   <TopStripChip label={simulationPaused ? "paused" : "live scene"} active={simulationPaused} variant="status" />
@@ -773,6 +833,26 @@ export default function SystemHud({
                 </button>
               )}
             </>
+          )}
+
+          {photoHudVisible && photoPickerOpen && !isMobile && (
+            <div style={{
+              position: "fixed",
+              right: 18,
+              top: 42,
+              width: 336,
+              zIndex: 36,
+              fontFamily: "'JetBrains Mono', 'SF Mono', 'Fira Code', Menlo, monospace",
+              fontSize: 12,
+              color: "#8a9bb0",
+              boxShadow: "0 18px 42px rgba(0,0,0,0.28)",
+            }}>
+              <PhotoObjectPicker
+                sections={photoTargetSections}
+                selectedId={selectedAddress}
+                onSelect={(item) => onPhotoTargetSelect(item.id)}
+              />
+            </div>
           )}
 
           {!photoHudVisible && (

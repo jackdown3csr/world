@@ -11,7 +11,7 @@
  *   • Dust tail — golden points, slightly curved along orbit, scales near sun
  */
 
-import { useRef, useMemo } from "react";
+import { useEffect, useRef, useMemo } from "react";
 import { useFrame } from "@react-three/fiber";
 import * as THREE from "three";
 import SpriteLabel from "./SpriteLabel";
@@ -251,6 +251,7 @@ const NUCLEUS_R    = 0.45;
 const TAIL_VIS_DIST = 2500;   // tail starts fading beyond this distance from nearest star
 const TAIL_MIN     = 0.15;   // minimum tail strength (faint even at aphelion)
 const MAX_SIM_DELTA = 1 / 30; // cap large frame gaps so the comet does not jump on tab resume
+const RESET_DELTA_THRESHOLD = 0.25; // large gaps are treated as a resume/reset instead of motion
 const START_PHASE = 0.68;     // deterministic spawn point along the orbit
 
 /** Seeded pseudo-random (deterministic, no Math.random) */
@@ -266,6 +267,33 @@ export default function Comet({ starPositions, onSelect, showLabel = true, pause
   const dustGeoRef  = useRef<THREE.BufferGeometry>(null!);
   const sprayGeoRef = useRef<THREE.BufferGeometry>(null!);
   const simTimeRef  = useRef(PERIOD * START_PHASE);
+  const lastTickMsRef = useRef<number | null>(null);
+
+  useEffect(() => {
+    const resetTick = () => {
+      lastTickMsRef.current = null;
+    };
+
+    const handleVisibilityChange = () => {
+      if (document.hidden) {
+        resetTick();
+      } else {
+        lastTickMsRef.current = performance.now();
+      }
+    };
+
+    window.addEventListener("focus", resetTick);
+    window.addEventListener("pageshow", resetTick);
+    window.addEventListener("blur", resetTick);
+    document.addEventListener("visibilitychange", handleVisibilityChange);
+
+    return () => {
+      window.removeEventListener("focus", resetTick);
+      window.removeEventListener("pageshow", resetTick);
+      window.removeEventListener("blur", resetTick);
+      document.removeEventListener("visibilitychange", handleVisibilityChange);
+    };
+  }, []);
 
   // ── Nucleus mat ──
   const nucleusMat = useMemo(() => {
@@ -384,9 +412,21 @@ export default function Comet({ starPositions, onSelect, showLabel = true, pause
     return [pos.x, pos.y, pos.z] as [number, number, number];
   }, []);
 
-  useFrame((state, delta) => {
-    const simDelta = Math.min(delta, MAX_SIM_DELTA);
-    if (!paused) simTimeRef.current = (simTimeRef.current + simDelta) % PERIOD;
+  useFrame((state) => {
+    const nowMs = performance.now();
+    let simDelta = 0;
+
+    if (lastTickMsRef.current != null) {
+      const rawDelta = Math.max(0, (nowMs - lastTickMsRef.current) / 1000);
+      simDelta = rawDelta > RESET_DELTA_THRESHOLD ? 0 : Math.min(rawDelta, MAX_SIM_DELTA);
+    }
+
+    lastTickMsRef.current = nowMs;
+
+    if (!paused && simDelta > 0) {
+      simTimeRef.current = (simTimeRef.current + simDelta) % PERIOD;
+    }
+
     const t = simTimeRef.current;
     const camera = state.camera;
     getOrbitalState(t, _pos, _vel);

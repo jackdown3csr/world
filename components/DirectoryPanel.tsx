@@ -2,6 +2,7 @@
 
 import React from "react";
 import type { SolarSystemData } from "@/lib/layout";
+import SceneListPanel, { type SceneListSection } from "./systemHud/SceneListPanel";
 
 interface DirectoryPanelProps {
   solarData: SolarSystemData;
@@ -10,37 +11,67 @@ interface DirectoryPanelProps {
   attached?: boolean;
 }
 
-/* ── Shared styles ── */
-
-const sectionHeader: React.CSSProperties = {
-  padding: "8px 10px 4px",
-  color: "#5a7a90",
-  fontSize: 9,
-  fontWeight: 600,
-  letterSpacing: "0.15em",
-  textTransform: "uppercase",
-  borderBottom: "1px solid rgba(0,229,255,0.04)",
-};
-
-function rowStyle(isSelected: boolean, indent = false): React.CSSProperties {
-  return {
-    display: "flex",
-    alignItems: "center",
-    gap: 8,
-    width: "100%",
-    padding: indent ? "2px 10px 2px 18px" : "4px 10px",
-    border: "none",
-    fontFamily: "inherit",
-    background: isSelected ? "rgba(0,229,255,0.06)" : "transparent",
-    cursor: "pointer",
-    textAlign: "left",
-    borderBottom: "1px solid rgba(255,255,255,0.02)",
-    transition: "background 0.1s",
-  };
+function addrLabel(w: { customName?: string; address: string }) {
+  return w.customName || `${w.address.slice(0, 6)}...${w.address.slice(-4)}`;
 }
 
-function addrLabel(w: { customName?: string; address: string }) {
-  return w.customName || `${w.address.slice(0, 6)}\u2026${w.address.slice(-4)}`;
+function buildSections(solarData: SolarSystemData): SceneListSection[] {
+  const moonItems = solarData.planets.flatMap((planet) => planet.moons.map((moon) => moon.wallet));
+  const ringItems = solarData.planets.flatMap((planet) => planet.ringWallets.map((ring) => ring.wallet));
+
+  return [{
+    key: "directory",
+    groups: [
+      {
+        key: "planets",
+        label: "planets",
+        count: solarData.planets.length,
+        items: solarData.planets.map((planet) => ({
+          id: planet.wallet.address,
+          label: addrLabel(planet.wallet),
+          metric: planet.wallet.votingPowerFormatted,
+          dotColor: `hsl(${planet.hue * 360}, 45%, 50%)`,
+          detail: planet.wallet.address,
+        })),
+      },
+      {
+        key: "moons",
+        label: "moons",
+        count: moonItems.length,
+        items: moonItems.map((moon) => ({
+          id: moon.address,
+          label: addrLabel(moon),
+          metric: moon.votingPowerFormatted,
+          dotColor: "rgba(148,190,210,0.75)",
+          detail: moon.address,
+        })),
+      },
+      ...(ringItems.length > 0 ? [{
+        key: "ring",
+        label: "ring",
+        count: ringItems.length,
+        items: ringItems.map((ring) => ({
+          id: ring.address,
+          label: addrLabel(ring),
+          metric: ring.votingPowerFormatted,
+          dotColor: "rgba(176,176,176,0.72)",
+          detail: ring.address,
+        })),
+      }] : []),
+      ...(solarData.asteroids.length > 0 ? [{
+        key: "asteroids",
+        label: "asteroids",
+        count: solarData.asteroids.length,
+        items: solarData.asteroids.map((asteroid) => ({
+          id: asteroid.wallet.address,
+          label: addrLabel(asteroid.wallet),
+          metric: asteroid.wallet.votingPowerFormatted,
+          dotColor: "rgba(138,138,138,0.72)",
+          detail: asteroid.wallet.address,
+        })),
+      }] : []),
+    ],
+  }];
 }
 
 export default function DirectoryPanel({
@@ -49,109 +80,20 @@ export default function DirectoryPanel({
   onSelect,
   attached = false,
 }: DirectoryPanelProps) {
-  const sel = selectedAddress?.toLowerCase() ?? "";
+  const sections = React.useMemo(() => buildSections(solarData), [solarData]);
 
   return (
-    <div
-      style={{
-        background: "rgba(2, 6, 14, 0.92)",
-        border: "1px solid rgba(0,229,255,0.12)",
-        borderTop: attached ? "none" : undefined,
-        borderLeft: "2px solid rgba(0,229,255,0.25)",
-        borderRadius: attached ? "0 0 0 8px" : undefined,
-        maxHeight: "60vh",
-        overflowY: "auto",
-        padding: 0,
+    <SceneListPanel
+      sections={sections}
+      selectedId={selectedAddress}
+      attached={attached}
+      onSelect={(item) => {
+        const entry = solarData.planets.find((planet) => planet.wallet.address === item.id)?.wallet
+          ?? solarData.planets.flatMap((planet) => planet.moons.map((moon) => moon.wallet)).find((wallet) => wallet.address === item.id)
+          ?? solarData.planets.flatMap((planet) => planet.ringWallets.map((ring) => ring.wallet)).find((wallet) => wallet.address === item.id)
+          ?? solarData.asteroids.find((asteroid) => asteroid.wallet.address === item.id)?.wallet;
+        onSelect(item.id, entry?.customName);
       }}
-    >
-      {/* ── Planets ── */}
-      <div style={sectionHeader}>planets // {solarData.planets.length}</div>
-      {solarData.planets.map((p) => (
-        <button
-          key={p.wallet.address}
-          onClick={() => onSelect(p.wallet.address, p.wallet.customName)}
-          style={rowStyle(sel === p.wallet.address.toLowerCase())}
-        >
-          <span style={{ width: 6, height: 6, flexShrink: 0, background: `hsl(${p.hue * 360}, 45%, 50%)`, boxShadow: `0 0 4px hsla(${p.hue * 360}, 50%, 50%, 0.4)` }} />
-          <span style={{ color: "#8a9bb0", fontSize: 11, flex: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-            {addrLabel(p.wallet)}
-          </span>
-          <span style={{ color: "#00e5ff", fontSize: 9, flexShrink: 0, fontVariantNumeric: "tabular-nums", opacity: 0.7 }}>
-            {p.wallet.votingPowerFormatted}
-          </span>
-        </button>
-      ))}
-
-      {/* ── Moons ── */}
-      <div style={sectionHeader}>
-        moons // {solarData.planets.reduce((n, p) => n + p.moons.length, 0)}
-      </div>
-      {solarData.planets.flatMap((p) =>
-        p.moons.map((m) => (
-          <button
-            key={m.wallet.address}
-            onClick={() => onSelect(m.wallet.address, m.wallet.customName)}
-            style={rowStyle(sel === m.wallet.address.toLowerCase(), true)}
-          >
-            <span style={{ width: 4, height: 4, flexShrink: 0, background: `hsl(${m.hue * 360}, 30%, 42%)` }} />
-            <span style={{ color: "#8a9bb0", fontSize: 10, flex: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-              {addrLabel(m.wallet)}
-            </span>
-            <span style={{ color: "#00e5ff", fontSize: 9, flexShrink: 0, fontVariantNumeric: "tabular-nums", opacity: 0.6 }}>
-              {m.wallet.votingPowerFormatted}
-            </span>
-          </button>
-        )),
-      )}
-
-      {/* ── Ring ── */}
-      {solarData.planets.some((p) => p.ringWallets.length > 0) && (
-        <>
-          <div style={sectionHeader}>
-            ring //{" "}
-            {solarData.planets.reduce((n, p) => n + p.ringWallets.length, 0)}
-          </div>
-          {solarData.planets.flatMap((p) =>
-            p.ringWallets.map((r) => (
-              <button
-                key={r.wallet.address}
-                onClick={() => onSelect(r.wallet.address, r.wallet.customName)}
-                style={rowStyle(sel === r.wallet.address.toLowerCase(), true)}
-              >
-                <span style={{ color: "#7a8e9e", fontSize: 10, flex: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                  {addrLabel(r.wallet)}
-                </span>
-                <span style={{ color: "#00e5ff", fontSize: 9, flexShrink: 0, fontVariantNumeric: "tabular-nums", opacity: 0.6 }}>
-                  {r.wallet.votingPowerFormatted}
-                </span>
-              </button>
-            )),
-          )}
-        </>
-      )}
-
-      {/* ── Asteroids ── */}
-      {solarData.asteroids.length > 0 && (
-        <>
-          <div style={sectionHeader}>
-            asteroids // {solarData.asteroids.length}
-          </div>
-          {solarData.asteroids.map((a) => (
-            <button
-              key={a.wallet.address}
-              onClick={() => onSelect(a.wallet.address, a.wallet.customName)}
-              style={rowStyle(sel === a.wallet.address.toLowerCase(), true)}
-            >
-              <span style={{ color: "#7a8e9e", fontSize: 10, flex: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                {addrLabel(a.wallet)}
-              </span>
-              <span style={{ color: "#00e5ff", fontSize: 9, flexShrink: 0, fontVariantNumeric: "tabular-nums", opacity: 0.6 }}>
-                {a.wallet.votingPowerFormatted}
-              </span>
-            </button>
-          ))}
-        </>
-      )}
-    </div>
+    />
   );
 }

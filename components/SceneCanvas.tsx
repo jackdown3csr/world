@@ -350,9 +350,11 @@ export interface SceneCanvasProps {
   photoFov: number;
   simulationPaused: boolean;
   selectedAddress: string | null;
+  cameraFocusAddress: string | null;
   panelOpen: boolean;
   cameraMode: CameraMode;
   flyModeEnabled: boolean;
+  cinematicFlyEnabled: boolean;
   resetRequested: boolean;
   controlsRef: RefObject<OrbitControlsImpl>;
   freelookRef: RefObject<FreeLookHandle>;
@@ -380,9 +382,11 @@ export default function SceneCanvas({
   photoFov,
   simulationPaused,
   selectedAddress,
+  cameraFocusAddress,
   panelOpen,
   cameraMode,
   flyModeEnabled,
+  cinematicFlyEnabled,
   resetRequested,
   controlsRef,
   freelookRef,
@@ -397,6 +401,7 @@ export default function SceneCanvas({
   selectionVersion,
 }: SceneCanvasProps) {
   const [activeSystem, setActiveSystem] = useState<SceneSystemId>(systems[0]?.id ?? "vescrow");
+  const activeFlyMode = cinematicFlyEnabled ? "cinematic" : flyModeEnabled ? "flight" : null;
 
   const getBlockPulseTick = (systemId: SceneSystemId) => (
     effects.find((effect) => effect.kind === "block-pulse" && effect.systemId === systemId)?.tick
@@ -529,7 +534,7 @@ export default function SceneCanvas({
       )}
 
       <FocusPing
-        selectedAddress={selectedAddress}
+        selectedAddress={cameraFocusAddress}
         selectionVersion={selectionVersion}
       />
 
@@ -543,12 +548,12 @@ export default function SceneCanvas({
         enabled={cameraMode === "orbit"}
       />
 
-      {flyModeEnabled && (
-        <FreeLookControls ref={freelookRef} enabled={cameraMode === "fly"} />
+      {activeFlyMode && (
+        <FreeLookControls ref={freelookRef} enabled={cameraMode === "fly"} mode={activeFlyMode} />
       )}
 
       <CameraController
-        selectedAddress={selectedAddress}
+        selectedAddress={cameraFocusAddress}
         selectionVersion={selectionVersion}
         cameraMode={cameraMode}
         frameInsetRight={frameInsetRight}

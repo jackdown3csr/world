@@ -18,6 +18,7 @@ import { useFaucet } from "@/hooks/useFaucet";
 import { buildPoolSystem, buildSolarSystem, buildStakingRemnantSystem, buildVestingSystem } from "@/lib/layout";
 import type { LayoutMode, VestingLayoutMode } from "@/lib/layout";
 import { formatBalance } from "@/lib/formatBalance";
+import { buildPhotoTargetSections, findPhotoTargetById } from "@/lib/photoTargets";
 import { getNearestSystemId, type SceneSystemDefinition, type SceneSystemId } from "@/lib/sceneSystems";
 
 import SplashScreen from "./SplashScreen";
@@ -150,6 +151,8 @@ export default function SolarSystem() {
   const [showOrbits, setShowOrbits] = useState(true);
   const [photoMode, setPhotoMode] = useState(false);
   const [photoHudVisible, setPhotoHudVisible] = useState(true);
+  const [photoPickerOpen, setPhotoPickerOpen] = useState(false);
+  const [photoFocusMode, setPhotoFocusMode] = useState<"focused" | "detached">("focused");
   const [photoSimulationMode, setPhotoSimulationMode] = useState<"frozen" | "live">("live");
   const [photoFov, setPhotoFov] = useState(55);
   const [resetRequested, setResetRequested] = useState(false);
@@ -360,6 +363,21 @@ export default function SolarSystem() {
     [camDebug, systems],
   );
 
+  const photoTargetSections = useMemo(
+    () => buildPhotoTargetSections(systems, globalObjects),
+    [globalObjects, systems],
+  );
+  const photoTarget = useMemo(
+    () => findPhotoTargetById(photoTargetSections, selectedAddress),
+    [photoTargetSections, selectedAddress],
+  );
+  const cameraFocusAddress = photoMode && photoFocusMode === "detached" ? null : selectedAddress;
+  const sceneCameraMode: CameraMode = photoMode
+    ? (photoFocusMode === "detached" ? "fly" : "orbit")
+    : cameraMode;
+  const sceneFlyModeEnabled = !photoMode && flyModeEnabled;
+  const sceneCinematicFlyEnabled = photoMode && photoFocusMode === "detached";
+
   const allEntries = useMemo(
     () => systems.flatMap((system) => system.entries),
     [systems],
@@ -375,6 +393,10 @@ export default function SolarSystem() {
 
   /* ── Handlers ── */
   const handleSceneSelect = useCallback((address: string) => {
+    if (photoMode) {
+      setPhotoFocusMode("focused");
+      setPhotoPickerOpen(false);
+    }
     if (address === ROGUE_ADDRESS) {
       focusSceneTarget(address, false);
       setRogueClicked(true);
@@ -388,7 +410,7 @@ export default function SolarSystem() {
     const entry = allEntries.find((item) => item.address.toLowerCase() === address.toLowerCase());
     focusSceneTarget(address, Boolean(entry));
     wc.setNameInput(entry?.customName || "");
-  }, [allEntries, bridges, focusSceneTarget, wc]);
+  }, [allEntries, bridges, focusSceneTarget, photoMode, wc]);
 
   const handleDirectorySelect = useCallback((address: string, customName?: string) => {
     focusSceneTarget(address, true);
@@ -403,8 +425,11 @@ export default function SolarSystem() {
   const handleClearSelection = useCallback(() => {
     setPanelOpen(false);
     setSelectedAddress(null);
+    if (photoMode) {
+      setPhotoFocusMode("detached");
+    }
     setSelectionVersion((v) => v + 1);
-  }, []);
+  }, [photoMode]);
 
   const handleToggleFlyMode = useCallback(() => {
     const next = !flyModeEnabled;
@@ -419,14 +444,36 @@ export default function SolarSystem() {
       setCameraMode("orbit");
     }
     setPhotoHudVisible(true);
+    setPhotoFocusMode(selectedAddress ? "focused" : "detached");
+    setPhotoPickerOpen(false);
     setPhotoMode(true);
-  }, [cameraMode, flyModeEnabled]);
+  }, [cameraMode, flyModeEnabled, selectedAddress]);
 
   const handleExitPhotoMode = useCallback(() => {
     setPhotoMode(false);
     setPhotoHudVisible(true);
+    setPhotoPickerOpen(false);
+    setPhotoFocusMode("focused");
     setPhotoSavedToast(false);
   }, []);
+
+  const handlePhotoTargetSelect = useCallback((address: string) => {
+    const entry = allEntries.find((item) => item.address.toLowerCase() === address.toLowerCase());
+    setPhotoFocusMode("focused");
+    setPhotoPickerOpen(false);
+    focusSceneTarget(address, false);
+    wc.setNameInput(entry?.customName || "");
+  }, [allEntries, focusSceneTarget, wc]);
+
+  const handlePhotoDetach = useCallback(() => {
+    setPhotoFocusMode("detached");
+  }, []);
+
+  const handlePhotoRefocus = useCallback(() => {
+    if (!selectedAddress) return;
+    setPhotoFocusMode("focused");
+    setSelectionVersion((value) => value + 1);
+  }, [selectedAddress]);
 
   const handleDisconnect = useCallback(() => {
     wc.disconnect();
@@ -469,9 +516,11 @@ export default function SolarSystem() {
         photoFov={photoMode ? photoFov : 55}
         simulationPaused={simulationPaused}
         selectedAddress={selectedAddress}
+        cameraFocusAddress={cameraFocusAddress}
         panelOpen={panelOpen}
-        cameraMode={cameraMode}
-        flyModeEnabled={flyModeEnabled}
+        cameraMode={sceneCameraMode}
+        flyModeEnabled={sceneFlyModeEnabled}
+        cinematicFlyEnabled={sceneCinematicFlyEnabled}
         resetRequested={resetRequested}
         controlsRef={controlsRef}
         freelookRef={freelookRef}
@@ -490,6 +539,10 @@ export default function SolarSystem() {
         isMobile={isMobile}
         photoMode={photoMode}
         photoHudVisible={photoHudVisible}
+        photoPickerOpen={photoPickerOpen}
+        photoFocusMode={photoFocusMode}
+        photoTargetLabel={photoTarget?.label ?? null}
+        photoTargetSections={photoTargetSections}
         flashCapture={flashCapture}
         photoSavedToast={photoSavedToast}
         simulationPaused={simulationPaused}
@@ -514,6 +567,10 @@ export default function SolarSystem() {
         wc={wc}
         onCapturePhoto={doCapture}
         onExitPhotoMode={handleExitPhotoMode}
+        onPhotoTargetSelect={handlePhotoTargetSelect}
+        onPhotoDetach={handlePhotoDetach}
+        onPhotoRefocus={handlePhotoRefocus}
+        onTogglePhotoPicker={() => setPhotoPickerOpen((value) => !value)}
         onSetPhotoSimulationMode={setPhotoSimulationMode}
         onSetPhotoFov={setPhotoFov}
         onTogglePhotoHud={() => setPhotoHudVisible((v) => !v)}
@@ -534,7 +591,7 @@ export default function SolarSystem() {
         onDisconnect={handleDisconnect}
       />
 
-      <FlyHud freelookRef={freelookRef} visible={showFlightHud && flyModeEnabled && cameraMode === "fly"} />
+  <FlyHud freelookRef={freelookRef} visible={showFlightHud && flyModeEnabled && cameraMode === "fly"} />
 
       {storageWallet && (
         <StorageSlotPopup wallet={storageWallet} onClose={() => setStorageWallet(null)} />

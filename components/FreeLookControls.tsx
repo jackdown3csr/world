@@ -49,6 +49,7 @@ export interface FreeLookHandle {
 
 interface FreeLookControlsProps {
   enabled: boolean;
+  mode?: "flight" | "cinematic";
 }
 
 const SENSITIVITY   = 0.0015;
@@ -66,11 +67,13 @@ const ANG_DAMPING   = 4.5;
 const THROTTLE_RAMP = 0.4;
 
 const FreeLookControls = forwardRef<FreeLookHandle, FreeLookControlsProps>(
-  function FreeLookControlsInner({ enabled }, ref) {
+  function FreeLookControlsInner({ enabled, mode = "flight" }, ref) {
     const { camera, gl, scene } = useThree();
 
     const enabledRef = useRef(enabled);
     enabledRef.current = enabled;
+    const modeRef = useRef(mode);
+    modeRef.current = mode;
 
     const yaw   = useRef(0);
     const pitch  = useRef(0);
@@ -138,9 +141,9 @@ const FreeLookControls = forwardRef<FreeLookHandle, FreeLookControlsProps>(
           pitch:       pitch.current,
           roll:        roll.current,
           speed:       lastSpeed.current,
-          thrust:      throttle.current,
+          thrust:      modeRef.current === "flight" ? throttle.current : 0,
           fineControl: fineControl.current,
-          rcsEnabled:  rcsEnabled.current,
+          rcsEnabled:  modeRef.current === "flight" ? rcsEnabled.current : false,
           altitude:    camera.position.y,
           distance:    camera.position.length(),
         };
@@ -171,6 +174,41 @@ const FreeLookControls = forwardRef<FreeLookHandle, FreeLookControlsProps>(
       const k  = keys.current;
       const av = angVel.current;
       const rotationFactor = fineControl.current ? FINE_FACTOR : 1;
+
+      if (modeRef.current === "cinematic") {
+        _move.current.set(0, 0, 0);
+
+        const dist = camera.position.length();
+        const baseSpeed = Math.min(Math.max(dist * 0.14, 4), 260);
+        const step = baseSpeed * SPEED_MULT * delta * rotationFactor;
+
+        camera.getWorldDirection(_fwd.current);
+        _up.current.set(0, 1, 0).applyQuaternion(camera.quaternion).normalize();
+        _right.current.crossVectors(_fwd.current, _up.current).normalize();
+
+        const forward = (k.w ? 1 : 0) - (k.s ? 1 : 0);
+        const strafe = (k.d ? 1 : 0) - (k.a ? 1 : 0);
+        const vertical = (k.e ? 1 : 0) - (k.q ? 1 : 0);
+
+        _move.current
+          .addScaledVector(_fwd.current, forward * step)
+          .addScaledVector(_right.current, strafe * step)
+          .addScaledVector(_up.current, vertical * step);
+
+        if (_move.current.lengthSq() > 0) {
+          _nextPos.current.copy(camera.position).add(_move.current);
+          keepOutsideStars(_nextPos.current);
+          camera.position.copy(_nextPos.current);
+          lastSpeed.current = _move.current.length() / Math.max(delta, 0.0001);
+        } else {
+          lastSpeed.current = 0;
+        }
+
+        const d2 = camera.position.length();
+        if (d2 < 0.5) camera.position.setLength(0.5);
+        if (d2 > MAX_DIST) camera.position.setLength(MAX_DIST);
+        return;
+      }
 
       /* W = pitch down (nose down), S = pitch up (nose up) */
       const targetPitch = ((k.s ? 1 : 0) - (k.w ? 1 : 0)) * PITCH_RATE * rotationFactor;
@@ -269,7 +307,7 @@ const FreeLookControls = forwardRef<FreeLookHandle, FreeLookControlsProps>(
           e.preventDefault();
           return;
         }
-        if (k === "r" && !e.repeat) {
+        if (modeRef.current === "flight" && k === "r" && !e.repeat) {
           rcsEnabled.current = !rcsEnabled.current;
           e.preventDefault();
           return;
@@ -289,8 +327,8 @@ const FreeLookControls = forwardRef<FreeLookHandle, FreeLookControlsProps>(
         if (k === "shift") keys.current.shift = true;
         if (k === "control") keys.current.ctrl = true;
         /* Z = full throttle, X = cut throttle */
-        if (k === "z") { throttle.current = 1; e.preventDefault(); }
-        if (k === "x") { throttle.current = 0; e.preventDefault(); }
+        if (modeRef.current === "flight" && k === "z") { throttle.current = 1; e.preventDefault(); }
+        if (modeRef.current === "flight" && k === "x") { throttle.current = 0; e.preventDefault(); }
       }
 
       function onKeyUp(e: KeyboardEvent) {
@@ -402,6 +440,20 @@ const FreeLookControls = forwardRef<FreeLookHandle, FreeLookControlsProps>(
         }
       }
 
+      function onWheel(e: WheelEvent) {
+        if (!enabledRef.current || modeRef.current !== "cinematic") return;
+        e.preventDefault();
+
+        const dist = camera.position.length();
+        const zoomStep = Math.min(Math.max(dist * 0.045, 6), 180);
+        const amount = THREE.MathUtils.clamp(-e.deltaY * 0.012, -4, 4) * zoomStep;
+
+        camera.getWorldDirection(_fwd.current);
+        _nextPos.current.copy(camera.position).addScaledVector(_fwd.current, amount);
+        keepOutsideStars(_nextPos.current);
+        camera.position.copy(_nextPos.current);
+      }
+
       window.addEventListener("keydown", onKeyDown);
       window.addEventListener("keyup",   onKeyUp);
       window.addEventListener("blur",    onBlur);
@@ -409,6 +461,7 @@ const FreeLookControls = forwardRef<FreeLookHandle, FreeLookControlsProps>(
       canvas.addEventListener("pointermove",   onPointerMove);
       canvas.addEventListener("pointerup",     onPointerUp);
       canvas.addEventListener("pointercancel", onPointerUp);
+      canvas.addEventListener("wheel",         onWheel, { passive: false });
       canvas.addEventListener("touchstart",    onTouchStart,  { passive: false });
       canvas.addEventListener("touchmove",     onTouchMove,   { passive: false });
       canvas.addEventListener("touchend",      onTouchEnd,    { passive: false });
@@ -421,6 +474,7 @@ const FreeLookControls = forwardRef<FreeLookHandle, FreeLookControlsProps>(
         canvas.removeEventListener("pointermove",   onPointerMove);
         canvas.removeEventListener("pointerup",     onPointerUp);
         canvas.removeEventListener("pointercancel", onPointerUp);
+        canvas.removeEventListener("wheel",         onWheel);
         canvas.removeEventListener("touchstart",    onTouchStart);
         canvas.removeEventListener("touchmove",     onTouchMove);
         canvas.removeEventListener("touchend",      onTouchEnd);
