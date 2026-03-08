@@ -1,6 +1,6 @@
 ﻿"use client";
 
-import React, { useMemo, useRef, useCallback, useState, useEffect } from "react";
+import React, { useMemo, useRef, useCallback, useState } from "react";
 import type { OrbitControls as OrbitControlsImpl } from "three-stdlib";
 import type { FreeLookHandle } from "./FreeLookControls";
 import type { CameraMode } from "./CameraController";
@@ -139,13 +139,8 @@ export default function SolarSystem() {
   const [showAllNames, setShowAllNames] = useState(true);
   const [showRenamedOnly, setShowRenamedOnly] = useState(true);
   const [showNamesList, setShowNamesList] = useState(false);
-  /* ── Scene-ready gate: wait for progressive mount + shader compile ── */
-  const [sceneReady, setSceneReady] = useState(false);
-  useEffect(() => {
-    if (loading || vestingLoading || poolLoading || stakingRemnant.loading || sceneReady) return;
-    const timer = setTimeout(() => setSceneReady(true), 500);
-    return () => clearTimeout(timer);
-  }, [loading, vestingLoading, poolLoading, stakingRemnant.loading, sceneReady]);
+  const sceneLoading = loading || vestingLoading || poolLoading || stakingRemnant.loading;
+  const sceneReady = !sceneLoading;
 
   const [showHelp, setShowHelp] = useState(false);
   const [showOrbits, setShowOrbits] = useState(true);
@@ -501,7 +496,7 @@ export default function SolarSystem() {
 
   return (
     <>
-      <SplashScreen loading={loading || vestingLoading || poolLoading || stakingRemnant.loading || !sceneReady} />
+      <SplashScreen loading={sceneLoading} />
 
       <SceneCanvas
         isMobile={isMobile}
