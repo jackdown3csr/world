@@ -5,7 +5,7 @@
  * All state flows in via props; no hooks except refs forwarded from SolarSystem.
  */
 
-import React, { forwardRef, useImperativeHandle, useMemo, useRef, useState } from "react";
+import React, { forwardRef, useImperativeHandle, useEffect, useMemo, useRef, useState } from "react";
 import { Canvas, useThree, useFrame } from "@react-three/fiber";
 import { OrbitControls } from "@react-three/drei";
 import * as THREE from "three";
@@ -263,6 +263,20 @@ function ActiveSystemDetector({
   return null;
 }
 
+/** Pre-compile every shader program in the scene graph on mount so the GPU
+ *  doesn't stall when distant star systems first enter the camera frustum. */
+function ShaderWarmup() {
+  const { gl, scene, camera } = useThree();
+  const done = useRef(false);
+  useEffect(() => {
+    if (done.current) return;
+    done.current = true;
+    // compile() walks the full scene hierarchy regardless of frustum culling
+    gl.compile(scene, camera);
+  }, [gl, scene, camera]);
+  return null;
+}
+
 function CameraLensController({ fov }: { fov: number }) {
   const { camera } = useThree();
 
@@ -430,6 +444,7 @@ export default function SceneCanvas({
       dpr={[1, isMobile ? 1.5 : 2]}
     >
       <ambientLight intensity={0.025} />
+      <ShaderWarmup />
       <CameraLensController fov={photoFov} />
       <SpriteLabelManager />
       <ActiveSystemDetector systems={systems} onChange={setActiveSystem} />
