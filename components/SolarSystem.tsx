@@ -300,10 +300,9 @@ export default function SolarSystem() {
           { label: "state", value: stakingRemnant.data?.statusLabel ?? "scanner link pending", accent: "#d39b86" },
         ],
         descriptionLines: [
-          "frozen staking shell still holding locked GNET",
-          stakingRemnant.data?.rewardStateLabel ?? "no new rewards",
-          `${stakingRemnant.data?.nativeBalanceFormatted ?? "0 GNET"} still remains in the shell`,
-          "a swollen, unstable star shedding matter into the void",
+          "data read from the legacy staking shell",
+          "shows remaining staked GNET and the freeze window",
+          "state indicates whether exits are still draining the shell",
         ],
         updatedAt: stakingRemnant.data?.updatedAt,
       },
