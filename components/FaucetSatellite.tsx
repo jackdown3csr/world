@@ -7,8 +7,8 @@ import SpriteLabel from "./SpriteLabel";
 import * as THREE from "three";
 import type { FaucetStats } from "@/hooks/useFaucet";
 
-const FAUCET_ADDRESS = "faucet";
-const ORBIT_RADIUS  = 195;   // between Sun and first planet (FIRST_ORBIT ~224)
+export const FAUCET_ADDRESS = "faucet";
+export const FAUCET_DEFAULT_ORBIT_RADIUS = 195;
 const ORBIT_SPEED   = 0.018; // faster than planets
 const ORBIT_TILT    = 35 * (Math.PI / 180); // 35° inclination — clearly artificial
 const BODY_W        = 2.2;
@@ -31,11 +31,13 @@ const _styleOffset = new THREE.Quaternion().setFromEuler(
 
 interface FaucetSatelliteProps {
   stats: FaucetStats | null;
+  orbitRadius?: number;
   showLabel?: boolean;
   onSelect?: (addr: string) => void;
+  paused?: boolean;
 }
 
-export default function FaucetSatellite({ stats, showLabel = true, onSelect }: FaucetSatelliteProps) {
+export default function FaucetSatellite({ stats, orbitRadius = FAUCET_DEFAULT_ORBIT_RADIUS, showLabel = true, onSelect, paused = false }: FaucetSatelliteProps) {
   const groupRef  = useRef<THREE.Group>(null);
   const bodyRef   = useRef<THREE.Group>(null);
   const labelRef  = useRef<THREE.Group>(null);
@@ -48,13 +50,13 @@ export default function FaucetSatellite({ stats, showLabel = true, onSelect }: F
   }, [onSelect]);
 
   useFrame((_, delta) => {
-    angleRef.current += ORBIT_SPEED * delta;
+    if (!paused) angleRef.current += ORBIT_SPEED * delta;
     const a = angleRef.current;
     if (groupRef.current) {
       groupRef.current.position.set(
-        Math.cos(a) * ORBIT_RADIUS,
-        Math.sin(a) * ORBIT_RADIUS * Math.sin(ORBIT_TILT),
-        Math.sin(a) * ORBIT_RADIUS * Math.cos(ORBIT_TILT),
+        Math.cos(a) * orbitRadius,
+        Math.sin(a) * orbitRadius * Math.sin(ORBIT_TILT),
+        Math.sin(a) * orbitRadius * Math.cos(ORBIT_TILT),
       );
     }
     // Orient body so panels face the Sun (origin)

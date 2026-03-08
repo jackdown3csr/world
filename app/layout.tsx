@@ -13,9 +13,20 @@ export const viewport: Viewport = {
 };
 
 export const metadata: Metadata = {
-  title: "Vescrow System Alpha",
+  title: "Sector Galactica",
   description:
-    "Interactive 3D visualization of Galactica mainnet vEscrow wallets as a living solar system.",
+    "Interactive 3D map of the Galactica ecosystem. Contracts and capital flows. Visualized.",
+  openGraph: {
+    title: "Sector Galactica",
+    description: "Contracts and capital flows. Visualized.",
+    images: ["/image.png"],
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: "Sector Galactica",
+    description: "Contracts and capital flows. Visualized.",
+    images: ["/image.png"],
+  },
   icons: {
     icon: "/icon.svg",
     shortcut: "/icon.svg",

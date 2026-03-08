@@ -90,6 +90,7 @@ function saturnRingRadius(
 
 interface SaturnSystemProps {
   data:             PlanetData;       // full planet data (moons + ringWallets)
+  starWorldPosition: [number, number, number];
   selectedAddress:  string | null;
   onSelectAddress:  (address: string) => void;
   onDeselect:       () => void;
@@ -97,12 +98,14 @@ interface SaturnSystemProps {
   showMoonLabels?:  boolean;
   showRingLabels?:  boolean;
   showRenamedOnly?: boolean;
+  paused?:          boolean;
 }
 
 /* ── Component ────────────────────────────────────────────── */
 
 export default function SaturnSystem({
   data,
+  starWorldPosition,
   selectedAddress,
   onSelectAddress,
   onDeselect,
@@ -110,6 +113,7 @@ export default function SaturnSystem({
   showMoonLabels,
   showRingLabels,
   showRenamedOnly,
+  paused = false,
 }: SaturnSystemProps) {
 
   const hostR  = data.radius;
@@ -118,6 +122,11 @@ export default function SaturnSystem({
   const moons  = data.moons;
   const ringWallets = data.ringWallets;
   const count  = ringWallets.length;
+  const simTimeRef = useRef(0);
+  const starWorldPos = useMemo(
+    () => new THREE.Vector3(starWorldPosition[0], starWorldPosition[1], starWorldPosition[2]),
+    [starWorldPosition],
+  );
 
   /* ── Refs ── */
   const ringGroupRef  = useRef<THREE.Group>(null);       // slow rotation for ring + particles
@@ -203,8 +212,9 @@ export default function SaturnSystem({
   const LABEL_DIST = 35;
 
   /* ── Animation frame ── */
-  useFrame((state) => {
-    const t = state.clock.elapsedTime;
+  useFrame((state, delta) => {
+    if (!paused) simTimeRef.current += delta;
+    const t = simTimeRef.current;
     // Ring disc + particles: slow rotation
     if (ringGroupRef.current) ringGroupRef.current.rotation.y = 0.008 * t;
 
@@ -231,13 +241,15 @@ export default function SaturnSystem({
       hostGroupRef.current.getWorldPosition(hostWorldPos);
     }
     moonMaterials.forEach(mat => {
-      mat.uniforms.uTime.value = state.clock.elapsedTime;
+      mat.uniforms.uTime.value = t;
       mat.uniforms.uHostPos.value.copy(hostWorldPos);
       mat.uniforms.uHostRadius.value = hostR;
+      mat.uniforms.uStarPos.value.copy(starWorldPos);
     });
 
     // Ring disc time
-    ringDiscMat.uniforms.uTime.value = state.clock.elapsedTime;
+    ringDiscMat.uniforms.uTime.value = t;
+    ringDiscMat.uniforms.uStarPos.value.copy(starWorldPos);
 
     // Proximity check for ring labels (throttled)
     if (ringGroupRef.current && Math.random() < 0.17) {

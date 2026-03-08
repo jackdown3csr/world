@@ -175,6 +175,7 @@ export function createSaturnRingMaterial(
     vertexShader:   VERT,
     fragmentShader: FRAG,
     uniforms: {
+      uStarPos:     { value: new THREE.Vector3(0, 0, 0) },
       uInnerRadius: { value: innerRadius },
       uOuterRadius: { value: outerRadius },
       uSeed:        { value: seed },

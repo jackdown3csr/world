@@ -1,8 +1,14 @@
 "use client";
 
 import dynamic from "next/dynamic";
+import AppStateScreen from "@/components/AppStateScreen";
+import { CanonicalBridgeProvider, useCanonicalBridge } from "@/hooks/useCanonicalBridge";
+import { HyperlaneBridgeProvider } from "@/hooks/useHyperlaneBridge";
+import { StakingRemnantProvider, useStakingRemnant } from "@/hooks/useStakingRemnant";
 import { WalletProvider, useWallets } from "@/hooks/useWallets";
-import { VestingProvider } from "@/hooks/useVestingWallets";
+import { VestingProvider, useVestingWallets } from "@/hooks/useVestingWallets";
+import { PoolProvider, usePoolTokens } from "@/hooks/usePoolTokens";
+import { useHyperlaneBridge } from "@/hooks/useHyperlaneBridge";
 
 // three.js must only run client‑side
 const SolarSystem = dynamic(() => import("@/components/SolarSystem"), {
@@ -11,64 +17,44 @@ const SolarSystem = dynamic(() => import("@/components/SolarSystem"), {
 
 /* Loading screen removed — SolarSystem handles its own splash overlay */
 
-/* ── Error fallback ───────────────────────────────────────── */
-
-function ErrorScreen({ message }: { message: string }) {
-  return (
-    <div
-      style={{
-        position: "fixed",
-        inset: 0,
-        display: "flex",
-        flexDirection: "column",
-        alignItems: "center",
-        justifyContent: "center",
-        background: "#000",
-        zIndex: 50,
-        gap: 12,
-        padding: 24,
-      }}
-    >
-      <div
-        style={{
-          background: "rgba(20,10,30,0.9)",
-          border: "1px solid rgba(255,80,80,0.4)",
-          borderRadius: 12,
-          padding: "24px 32px",
-          maxWidth: 420,
-          textAlign: "center",
-        }}
-      >
-        <h2 style={{ color: "#ff6b6b", fontSize: 18, marginBottom: 8 }}>
-          Failed to load data
-        </h2>
-        <p style={{ color: "#aaa", fontSize: 13 }}>{message}</p>
-        <button
-          onClick={() => window.location.reload()}
-          style={{
-            marginTop: 16,
-            padding: "8px 20px",
-            background: "#4488ff",
-            color: "#fff",
-            border: "none",
-            borderRadius: 6,
-            cursor: "pointer",
-            fontSize: 13,
-          }}
-        >
-          Retry
-        </button>
-      </div>
-    </div>
-  );
-}
-
 /* ── Inner page (reads context) ───────────────────────────── */
 
 function GlobePage() {
-  const { error } = useWallets();
+  const wallets = useWallets();
+  const vesting = useVestingWallets();
+  const pool = usePoolTokens();
+  const hyperlane = useHyperlaneBridge();
+  const canonical = useCanonicalBridge();
+  const staking = useStakingRemnant();
 
-  if (error) return <ErrorScreen message={error} />;
+  const dataError = [
+    { label: "wallet registry", message: wallets.error, retry: wallets.refetch },
+    { label: "vesting registry", message: vesting.error, retry: vesting.refetch },
+    { label: "pool registry", message: pool.error, retry: pool.refetch },
+    { label: "staking telemetry", message: staking.error, retry: staking.refetch },
+    { label: "hyperlane nexus telemetry", message: hyperlane.error, retry: hyperlane.refetch },
+    { label: "canonical bridge telemetry", message: canonical.error, retry: canonical.refetch },
+  ].find((entry) => entry.message);
+
+  if (dataError) {
+    const isHtmlResponse = dataError.message?.includes("Unexpected token '<'") ?? false;
+
+    return (
+      <AppStateScreen
+        eyebrow="loading problem"
+        title="Could Not Load Scene Data"
+        description={isHtmlResponse
+          ? "The local server answered before one of the data routes was ready. Press try again once the app has fully started."
+          : "The app could not load one of the required data feeds. Press try again."}
+        detail={`Problem loading ${dataError.label}.`}
+        tone="error"
+        primaryAction={{
+          label: "try again",
+          onClick: () => { void dataError.retry(); },
+        }}
+      />
+    );
+  }
 
   return (
     <div style={{ width: "100vw", height: "100vh" }}>
@@ -83,7 +69,15 @@ export default function Page() {
   return (
     <WalletProvider>
       <VestingProvider>
-        <GlobePage />
+        <PoolProvider>
+          <StakingRemnantProvider>
+            <HyperlaneBridgeProvider>
+              <CanonicalBridgeProvider>
+                <GlobePage />
+              </CanonicalBridgeProvider>
+            </HyperlaneBridgeProvider>
+          </StakingRemnantProvider>
+        </PoolProvider>
       </VestingProvider>
     </WalletProvider>
   );

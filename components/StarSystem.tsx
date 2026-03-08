@@ -33,6 +33,7 @@ function useProgressiveMount(total: number, batchSize = 20): number {
 
 import type { SolarSystemData } from "@/lib/layout/types";
 import type { StarPalette } from "./Sun";
+import type { WalletTooltipVariant } from "./WalletTooltip";
 
 export interface StarSystemProps {
   /** Built layout data (from buildSolarSystem / buildVestingSystem) */
@@ -53,8 +54,8 @@ export interface StarSystemProps {
   /** Show body name labels */
   showAllNames?: boolean;
   showRenamedOnly?: boolean;
-  showTrails?: boolean;
   photoMode?: boolean;
+  paused?: boolean;
   /** Show SolarWind particle system around this star */
   showSolarWind?: boolean;
   /** Currently selected wallet address */
@@ -67,6 +68,12 @@ export interface StarSystemProps {
   onStarSelect?: () => void;
   /** Replace the flat asteroid belt with the protoplanetary disk (vesting system) */
   diskMode?: boolean;
+  starId?: string;
+  starScale?: number;
+  detailVariant?: WalletTooltipVariant;
+  interactiveBelt?: boolean;
+  showBeltLabels?: boolean;
+  beltTone?: "default" | "ash";
 }
 
 export default function StarSystem({
@@ -80,8 +87,8 @@ export default function StarSystem({
   showOrbits = true,
   showAllNames = true,
   showRenamedOnly = false,
-  showTrails = false,
   photoMode = false,
+  paused = false,
   showSolarWind = true,
   selectedAddress = null,
   panelOpen = false,
@@ -90,14 +97,28 @@ export default function StarSystem({
   onShiftSelect,
   onStarSelect,
   diskMode = false,
+  starId,
+  starScale = 1,
+  detailVariant = diskMode ? "vesting" : "wallet",
+  interactiveBelt = true,
+  showBeltLabels = true,
+  beltTone = "default",
 }: StarSystemProps) {
   const visibleCount = useProgressiveMount(solarData.planets.length);
+  const overviewRadius = React.useMemo(() => {
+    const farPlanetOrbit = solarData.planets.reduce(
+      (maxOrbit, planet) => Math.max(maxOrbit, planet.orbitRadius + planet.radius * 3.2),
+      0,
+    );
+
+    return Math.max(solarData.beltOuterRadius + 120, farPlanetOrbit + 140, 520);
+  }, [solarData]);
 
   return (
     <>
       {/* SolarWind at scene root (not inside the offset group) */}
       {showSolarWind && (
-        <SolarWind origin={position} color={palette === "cool" ? "cool" : "warm"} />
+        <SolarWind origin={position} color={palette === "cool" ? "cool" : "warm"} paused={paused} />
       )}
 
       {/* All 3D bodies in world-space offset group */}
@@ -108,8 +129,11 @@ export default function StarSystem({
           blockNumber={blockNumber}
           palette={palette}
           label={starLabel}
-          starId={`__star_${palette}__`}
+          starId={starId ?? `__star_${palette}__`}
+          scale={starScale}
+          overviewRadius={overviewRadius}
           onSelect={onStarSelect}
+          paused={paused}
         />
 
         {solarData.planets.slice(0, visibleCount).map((p) => (
@@ -119,6 +143,7 @@ export default function StarSystem({
             )}
             <PlanetWallet
               data={p}
+              starWorldPosition={position}
               selected={
                 selectedAddress?.toLowerCase() === p.wallet.address.toLowerCase()
               }
@@ -131,9 +156,9 @@ export default function StarSystem({
               showMoonLabels={showAllNames && !photoMode}
               showRingLabels={showAllNames && !photoMode}
               showRenamedOnly={showRenamedOnly}
-              showTrails={showTrails && !photoMode}
               onShiftSelect={(addr) => onShiftSelect?.(addr)}
-              vesting={diskMode}
+              detailVariant={detailVariant}
+              paused={paused}
             />
           </React.Fragment>
         ))}
@@ -150,6 +175,7 @@ export default function StarSystem({
             showAllNames={showAllNames && !photoMode}
             showRenamedOnly={showRenamedOnly}
             vesting
+            paused={paused}
           />
         ) : (
           <AsteroidBelt
@@ -163,6 +189,10 @@ export default function StarSystem({
             showAllNames={showAllNames && !photoMode}
             showRenamedOnly={showRenamedOnly}
             showOrbits={showOrbits && !photoMode}
+            paused={paused}
+            interactive={interactiveBelt}
+            showLabels={showBeltLabels}
+            beltTone={beltTone}
           />
         )}
       </group>

@@ -2,6 +2,7 @@
 
 import React, { useMemo } from "react";
 import { Line } from "@react-three/drei";
+import * as THREE from "three";
 
 interface OrbitRingProps {
   radius: number;
@@ -21,7 +22,7 @@ export default function OrbitRing({
 }: OrbitRingProps) {
   const points = useMemo(() => {
     const pts: [number, number, number][] = [];
-    const segments = 128;
+    const segments = 192;
     for (let i = 0; i <= segments; i++) {
       const angle = (i / segments) * Math.PI * 2;
       pts.push([Math.cos(angle) * radius, 0, Math.sin(angle) * radius]);
@@ -29,14 +30,52 @@ export default function OrbitRing({
     return pts;
   }, [radius]);
 
+  const radii = useMemo(() => {
+    const spread = Math.max(0.8, radius * 0.0016);
+    return {
+      outer: radius + spread,
+      base: radius,
+      inner: Math.max(0, radius - spread * 0.55),
+    };
+  }, [radius]);
+
+  const tones = useMemo(() => {
+    const base = new THREE.Color(color);
+    const haze = base.clone().lerp(new THREE.Color("#8ab8ff"), 0.18);
+    const core = base.clone().lerp(new THREE.Color("#d8e7ff"), 0.42);
+    return {
+      haze: `#${haze.getHexString()}`,
+      base: `#${base.getHexString()}`,
+      core: `#${core.getHexString()}`,
+    };
+  }, [color]);
+
   return (
     <group rotation={[tilt, 0, 0]}>
       <Line
         points={points}
-        color={color}
-        opacity={opacity}
+        color={tones.haze}
+        opacity={opacity * 0.18}
         transparent
         lineWidth={1}
+        position={[0, 0, 0]}
+        scale={[radii.outer / radius, 1, radii.outer / radius]}
+      />
+      <Line
+        points={points}
+        color={tones.base}
+        opacity={opacity * 0.82}
+        transparent
+        lineWidth={1}
+      />
+      <Line
+        points={points}
+        color={tones.core}
+        opacity={opacity * 0.42}
+        transparent
+        lineWidth={1}
+        position={[0, 0, 0]}
+        scale={[radii.inner / radius, 1, radii.inner / radius]}
       />
     </group>
   );

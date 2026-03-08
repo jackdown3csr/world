@@ -9,10 +9,11 @@ import * as THREE from "three";
 import type { MoonData } from "@/lib/layout";
 import { createMoonMaterial } from "@/lib/shaders/moonShader";
 import { MOON_GEOS } from "@/lib/geometryPool";
-import WalletTooltip from "./WalletTooltip";
+import WalletTooltip, { type WalletTooltipVariant } from "./WalletTooltip";
 
 interface MoonBodyProps {
   data:        MoonData;
+  starWorldPosition: [number, number, number];
   planetOrbit: number;   // parent planet orbit radius from sun
   hostRadius:  number;   // parent planet body radius (for shadow)
   selected:    boolean;
@@ -21,14 +22,20 @@ interface MoonBodyProps {
   onDeselect:  () => void;
   showLabel?:  boolean;
   showRenamedOnly?: boolean;
-  vesting?: boolean;
+  detailVariant?: WalletTooltipVariant;
+  paused?: boolean;
 }
 
-export default function MoonBody({ data, planetOrbit, hostRadius, selected, panelOpen, onSelect, onDeselect, showLabel, showRenamedOnly, vesting }: MoonBodyProps) {
+export default function MoonBody({ data, starWorldPosition, planetOrbit, hostRadius, selected, panelOpen, onSelect, onDeselect, showLabel, showRenamedOnly, detailVariant = "wallet", paused = false }: MoonBodyProps) {
   const hostGroupRef = useRef<THREE.Group>(null);
   const moonOrbitRef = useRef<THREE.Group>(null);
   const meshRef      = useRef<THREE.Mesh>(null);
+  const simTimeRef = useRef(0);
   const [hovered, setHovered] = useState(false);
+  const starWorldPos = useMemo(
+    () => new THREE.Vector3(starWorldPosition[0], starWorldPosition[1], starWorldPosition[2]),
+    [starWorldPosition],
+  );
 
   // Reusable vector for world-pos extraction
   const hostWorldPos = useMemo(() => new THREE.Vector3(), []);
@@ -43,13 +50,15 @@ export default function MoonBody({ data, planetOrbit, hostRadius, selected, pane
   const _lodPos = useMemo(() => new THREE.Vector3(), []);
   const lodRef = useRef(0);
 
-  useFrame((state) => {
-    const t = state.clock.elapsedTime;
+  useFrame((state, delta) => {
+    if (!paused) simTimeRef.current += delta;
+    const t = simTimeRef.current;
     if (moonOrbitRef.current)
       moonOrbitRef.current.rotation.y = data.initialAngle + data.orbitSpeed * t;
     if (meshRef.current)
       meshRef.current.rotation.y = data.seed * 6.28 + 0.06 * t;
     material.uniforms.uTime.value = t;
+    material.uniforms.uStarPos.value.copy(starWorldPos);
 
     // LOD: swap sphere tessellation based on camera distance
     if (meshRef.current) {
@@ -104,7 +113,7 @@ export default function MoonBody({ data, planetOrbit, hostRadius, selected, pane
             zIndexRange={[10000, 0]}
             style={{ pointerEvents: (selected && panelOpen) ? "auto" : "none" }}
           >
-            <WalletTooltip wallet={data.wallet} onClose={(selected && panelOpen) ? onDeselect : undefined} vesting={vesting} />
+            <WalletTooltip wallet={data.wallet} onClose={(selected && panelOpen) ? onDeselect : undefined} variant={detailVariant} />
           </Html>
         )}
 
@@ -112,8 +121,8 @@ export default function MoonBody({ data, planetOrbit, hostRadius, selected, pane
         {showLabel && (!showRenamedOnly || data.wallet.customName) && !hovered && !(selected && panelOpen) && (
           <SpriteLabel
             position={[data.orbitRadius, data.radius + 0.15, 0]}
-            text={`${vesting ? "◈ " : ""}${data.wallet.customName || `${data.wallet.address.slice(0, 6)}\u2026${data.wallet.address.slice(-4)}`}`}
-            color={vesting ? "#7ccedd" : "#80a8b8"}
+            text={`${detailVariant === "vesting" ? "◈ " : ""}${data.wallet.customName || `${data.wallet.address.slice(0, 6)}\u2026${data.wallet.address.slice(-4)}`}`}
+            color={detailVariant === "vesting" ? "#7ccedd" : detailVariant === "pool" ? "#ffe08a" : "#80a8b8"}
             fontSize={0.3}
             opacity={0.8}
             onClick={onSelect}

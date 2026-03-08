@@ -7,6 +7,7 @@ interface DirectoryPanelProps {
   solarData: SolarSystemData;
   selectedAddress: string | null;
   onSelect: (address: string, customName?: string) => void;
+  attached?: boolean;
 }
 
 /* ── Shared styles ── */
@@ -46,6 +47,7 @@ export default function DirectoryPanel({
   solarData,
   selectedAddress,
   onSelect,
+  attached = false,
 }: DirectoryPanelProps) {
   const sel = selectedAddress?.toLowerCase() ?? "";
 
@@ -54,7 +56,9 @@ export default function DirectoryPanel({
       style={{
         background: "rgba(2, 6, 14, 0.92)",
         border: "1px solid rgba(0,229,255,0.12)",
+        borderTop: attached ? "none" : undefined,
         borderLeft: "2px solid rgba(0,229,255,0.25)",
+        borderRadius: attached ? "0 0 0 8px" : undefined,
         maxHeight: "60vh",
         overflowY: "auto",
         padding: 0,

@@ -1,21 +1,26 @@
 "use client";
 
 import React from "react";
-import type { WalletEntry, VestingWalletEntry } from "@/lib/types";
+import type { PoolTokenEntry, WalletEntry, VestingWalletEntry } from "@/lib/types";
+
+export type WalletTooltipVariant = "wallet" | "vesting" | "pool";
 
 interface WalletTooltipProps {
   wallet: WalletEntry;
   onClose?: () => void;
-  /** When true, show vesting fields instead of veGNET fields */
+  variant?: WalletTooltipVariant;
   vesting?: boolean;
 }
 
 /**
  * HUD-style tooltip rendered as a drei <Html> child.
- * Shows veGNET or vesting fields based on the `vesting` prop.
+ * Shows system-specific fields based on the tooltip variant.
  */
-export default function WalletTooltip({ wallet, onClose, vesting = false }: WalletTooltipProps) {
+export default function WalletTooltip({ wallet, onClose, variant = "wallet", vesting = false }: WalletTooltipProps) {
   const short = `${wallet.address.slice(0, 6)}\u2026${wallet.address.slice(-4)}`;
+  const resolvedVariant: WalletTooltipVariant = vesting ? "vesting" : variant;
+  const isVesting = resolvedVariant === "vesting";
+  const pool = resolvedVariant === "pool";
 
   const lockEndStr =
     !vesting && wallet.lockEnd > 0
@@ -90,7 +95,26 @@ export default function WalletTooltip({ wallet, onClose, vesting = false }: Wall
       }} />
 
       {/* Data rows */}
-      {vesting ? (
+      {pool ? (
+        <>
+          <div style={{ display: "flex", justifyContent: "space-between", gap: 16 }}>
+            <span style={{ color: "#5a7a90", fontSize: 9, letterSpacing: "0.1em", textTransform: "uppercase" }}>balance</span>
+            <span style={{ color: "#00e5ff", fontVariantNumeric: "tabular-nums" }}>{(wallet as PoolTokenEntry).balanceFormatted}</span>
+          </div>
+          <div style={{ display: "flex", justifyContent: "space-between", gap: 16 }}>
+            <span style={{ color: "#5a7a90", fontSize: 9, letterSpacing: "0.1em", textTransform: "uppercase" }}>price</span>
+            <span style={{ color: "#8ab0c0", fontVariantNumeric: "tabular-nums" }}>{(wallet as PoolTokenEntry).priceUSDFormatted}</span>
+          </div>
+          <div style={{ display: "flex", justifyContent: "space-between", gap: 16 }}>
+            <span style={{ color: "#5a7a90", fontSize: 9, letterSpacing: "0.1em", textTransform: "uppercase" }}>value</span>
+            <span style={{ color: "#c0a050", fontVariantNumeric: "tabular-nums" }}>{(wallet as PoolTokenEntry).valueUSDFormatted}</span>
+          </div>
+          <div style={{ display: "flex", justifyContent: "space-between", gap: 16 }}>
+            <span style={{ color: "#5a7a90", fontSize: 9, letterSpacing: "0.1em", textTransform: "uppercase" }}>share</span>
+            <span style={{ color: "#7a9ab0", fontVariantNumeric: "tabular-nums" }}>{(wallet as PoolTokenEntry).shareOfPoolFormatted}</span>
+          </div>
+        </>
+      ) : isVesting ? (
         <>
           <div style={{ display: "flex", justifyContent: "space-between", gap: 16 }}>
             <span style={{ color: "#5a7a90", fontSize: 9, letterSpacing: "0.1em", textTransform: "uppercase" }}>allocated</span>

@@ -1,28 +1,87 @@
 "use client";
 
-import { useState, useCallback } from "react";
+import { useState, useCallback, useEffect } from "react";
 import { BrowserProvider } from "ethers";
 import type { WalletEntry } from "@/lib/types";
 
+const GALACTICA_MAINNET_CHAIN_ID = 613419;
+const GALACTICA_MAINNET_CHAIN_ID_HEX = `0x${GALACTICA_MAINNET_CHAIN_ID.toString(16)}`;
+
+interface EthereumProvider {
+  isMetaMask?: boolean;
+  providers?: EthereumProvider[];
+  providerMap?: Map<string, unknown>;
+  request: (args: { method: string; params?: unknown[] }) => Promise<unknown>;
+  on?: (event: string, listener: (...args: unknown[]) => void) => void;
+  removeListener?: (event: string, listener: (...args: unknown[]) => void) => void;
+}
+
+function parseChainId(chainId: unknown): number | null {
+  if (typeof chainId === "number") return chainId;
+  if (typeof chainId === "string") {
+    const trimmed = chainId.trim();
+    if (!trimmed) return null;
+    return trimmed.startsWith("0x")
+      ? Number.parseInt(trimmed, 16)
+      : Number.parseInt(trimmed, 10);
+  }
+  return null;
+}
+
+async function getCurrentChainId(provider: EthereumProvider): Promise<number | null> {
+  const raw = await provider.request({ method: "eth_chainId" });
+  return parseChainId(raw);
+}
+
+async function ensureGalacticaMainnet(provider: EthereumProvider): Promise<number> {
+  const currentChainId = await getCurrentChainId(provider);
+  if (currentChainId === GALACTICA_MAINNET_CHAIN_ID) return currentChainId;
+
+  try {
+    await provider.request({
+      method: "wallet_switchEthereumChain",
+      params: [{ chainId: GALACTICA_MAINNET_CHAIN_ID_HEX }],
+    });
+  } catch (err) {
+    const code = typeof err === "object" && err && "code" in err ? Number((err as { code?: unknown }).code) : undefined;
+    if (code === 4001) {
+      throw new Error("Galactica mainnet switch was rejected.");
+    }
+    if (code === 4902) {
+      throw new Error("Galactica mainnet is not added in your wallet yet.");
+    }
+    throw new Error("Failed to switch wallet to Galactica mainnet.");
+  }
+
+  const switchedChainId = await getCurrentChainId(provider);
+  if (switchedChainId !== GALACTICA_MAINNET_CHAIN_ID) {
+    throw new Error("Wallet is not connected to Galactica mainnet.");
+  }
+
+  return switchedChainId;
+}
+
 /* ── Prefer MetaMask when several wallet extensions coexist ──── */
-function getPreferredProvider(): Record<string, unknown> | null {
-  const win = window as Window & { ethereum?: Record<string, unknown> };
+function getPreferredProvider(): EthereumProvider | null {
+  const win = window as Window & { ethereum?: EthereumProvider };
   let eth = win.ethereum;
   if (!eth) return null;
 
   // EIP-5749: providers array (Coinbase + MetaMask etc.)
-  const providers = eth.providers as Record<string, unknown>[] | undefined;
+  const providers = eth.providers as EthereumProvider[] | undefined;
   if (Array.isArray(providers)) {
     eth = providers.find((p) => p.isMetaMask) ?? eth;
   } else if (!eth.isMetaMask && eth.providerMap) {
     const map = eth.providerMap as Map<string, unknown>;
-    if (map instanceof Map) eth = (map.get("MetaMask") as Record<string, unknown>) ?? eth;
+    if (map instanceof Map) eth = (map.get("MetaMask") as EthereumProvider) ?? eth;
   }
   return eth;
 }
 
 export interface WalletConnectionState {
   connectedAddress: string | null;
+  connectedChainId: number | null;
+  isGalacticaMainnet: boolean;
   nameInput: string;
   isSaving: boolean;
   status: string | null;
@@ -45,6 +104,7 @@ export function useWalletConnection(
   onConnected?: (addr: string) => void,
 ): WalletConnectionState & WalletConnectionActions {
   const [connectedAddress, setConnectedAddress] = useState<string | null>(null);
+  const [connectedChainId, setConnectedChainId] = useState<number | null>(null);
   const [nameInput, setNameInput] = useState("");
   const [isSaving, setIsSaving] = useState(false);
   const [status, setStatus] = useState<string | null>(null);
@@ -57,6 +117,7 @@ export function useWalletConnection(
       : null;
 
   const canRename = !!connectedAddress && !!myWallet;
+  const isGalacticaMainnet = connectedChainId === GALACTICA_MAINNET_CHAIN_ID;
 
   const lockExpiry = myWallet?.lockEnd
     ? new Date(myWallet.lockEnd * 1000).toLocaleDateString("cs-CZ", {
@@ -66,6 +127,38 @@ export function useWalletConnection(
       })
     : null;
 
+  useEffect(() => {
+    const eth = getPreferredProvider();
+    if (!eth?.on) return;
+
+    const handleChainChanged = (chainId: unknown) => {
+      const nextChainId = parseChainId(chainId);
+      setConnectedChainId(nextChainId);
+      if (nextChainId !== GALACTICA_MAINNET_CHAIN_ID) {
+        setConnectedAddress(null);
+        setStatus("Switch wallet to Galactica mainnet.");
+      }
+    };
+
+    const handleAccountsChanged = (accounts: unknown) => {
+      const next = Array.isArray(accounts) ? accounts[0] : null;
+      if (typeof next === "string" && next) {
+        setConnectedAddress(next);
+      } else {
+        setConnectedAddress(null);
+        setStatus(null);
+      }
+    };
+
+    eth.on("chainChanged", handleChainChanged);
+    eth.on("accountsChanged", handleAccountsChanged);
+
+    return () => {
+      eth.removeListener?.("chainChanged", handleChainChanged);
+      eth.removeListener?.("accountsChanged", handleAccountsChanged);
+    };
+  }, []);
+
   const connectWallet = useCallback(async () => {
     try {
       const eth = getPreferredProvider();
@@ -73,6 +166,9 @@ export function useWalletConnection(
         setStatus("No wallet found — install MetaMask.");
         return;
       }
+      const chainId = await ensureGalacticaMainnet(eth);
+      setConnectedChainId(chainId);
+
       const provider = new BrowserProvider(eth as never);
       const signer = await provider.getSigner();
       const addr = await signer.getAddress();
@@ -90,6 +186,7 @@ export function useWalletConnection(
 
   const disconnect = useCallback(() => {
     setConnectedAddress(null);
+    setConnectedChainId(null);
     setStatus(null);
   }, []);
 
@@ -121,11 +218,13 @@ export function useWalletConnection(
 
       const eth = getPreferredProvider();
       if (!eth) throw new Error("Wallet provider missing");
+      const chainId = await ensureGalacticaMainnet(eth);
+      setConnectedChainId(chainId);
       const provider = new BrowserProvider(eth as never);
       const signer = await provider.getSigner();
 
       const message = [
-        "Vescrow System Alpha - Rename Planet",
+        "Sector Galactica - Rename Planet",
         `Address: ${connectedAddress}`,
         `Name: ${trimmed}`,
         `Nonce: ${nonceData.nonce}`,
@@ -159,6 +258,8 @@ export function useWalletConnection(
 
   return {
     connectedAddress,
+    connectedChainId,
+    isGalacticaMainnet,
     nameInput,
     isSaving,
     status,

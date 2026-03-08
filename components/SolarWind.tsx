@@ -40,9 +40,10 @@ const FRAG = /* glsl */ `
   }
 `;
 
-export default function SolarWind({ origin = [0, 0, 0], color = "warm" }: {
+export default function SolarWind({ origin = [0, 0, 0], color = "warm", paused = false }: {
   origin?: [number, number, number];
   color?:  "warm" | "cool";
+  paused?: boolean;
 }) {
   /* Per-particle state (NOT reactive — mutated in useFrame) */
   const vels = useRef<Float32Array>(null as unknown as Float32Array);
@@ -89,6 +90,7 @@ export default function SolarWind({ origin = [0, 0, 0], color = "warm" }: {
   }, [windColor.lo, windColor.hi]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useFrame((_, delta) => {
+    if (paused) return;
     const pos = geo.attributes.position as THREE.BufferAttribute;
     const vel = vels.current;
     const dt  = Math.min(delta, 0.05); // cap for tab-switch spikes

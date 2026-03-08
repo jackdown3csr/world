@@ -38,6 +38,21 @@ body {
   font-family: "Inter", system-ui, sans-serif;
 }
 
+@keyframes appStatePulse {
+  0% {
+    transform: scale(0.9);
+    opacity: 0.72;
+  }
+  50% {
+    transform: scale(1.08);
+    opacity: 1;
+  }
+  100% {
+    transform: scale(0.9);
+    opacity: 0.72;
+  }
+}
+
 /* Next.js root */
 #__next {
   width: 100%;

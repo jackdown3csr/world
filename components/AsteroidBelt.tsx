@@ -74,6 +74,10 @@ interface AsteroidBeltProps {
   showAllNames?: boolean;
   showRenamedOnly?: boolean;
   showOrbits?: boolean;
+  paused?: boolean;
+  interactive?: boolean;
+  showLabels?: boolean;
+  beltTone?: "default" | "ash";
 }
 
 export default function AsteroidBelt({
@@ -87,9 +91,26 @@ export default function AsteroidBelt({
   showAllNames,
   showRenamedOnly,
   showOrbits = true,
+  paused = false,
+  interactive = true,
+  showLabels = true,
+  beltTone = "default",
 }: AsteroidBeltProps) {
   const groupRef = useRef<THREE.Group>(null);
+  const simTimeRef = useRef(0);
   const count    = asteroids.length;
+  const orbitColor = beltTone === "ash" ? "#7a2d18" : "#443322";
+  const dustColor = beltTone === "ash" ? "#a13d1d" : "#443322";
+  const labelColor = beltTone === "ash" ? "#a97b69" : "#7098a8";
+  const beltMaterial = useMemo(() => {
+    const material = POTATO_MAT.clone();
+    if (beltTone === "ash") {
+      material.emissive = new THREE.Color("#180603");
+      material.emissiveIntensity = 0.14;
+      material.roughness = 0.92;
+    }
+    return material;
+  }, [beltTone]);
 
   // Global index into `asteroids` of the currently hovered item
   const [hoveredGlobalIdx, setHoveredGlobalIdx] = useState<number>(-1);
@@ -137,9 +158,15 @@ export default function AsteroidBelt({
         mesh.setMatrixAt(localId, mat4);
 
         // Muted brownish-grey tones typical for C/S/M type asteroids
-        const lightness = 0.30 + a.seed * 0.22;
-        const sat       = 0.12 + a.hue  * 0.18;
-        const hueAngle  = 0.07 + a.hue  * 0.06;  // narrow warm brown range
+        const lightness = beltTone === "ash"
+          ? 0.16 + a.seed * 0.18
+          : 0.30 + a.seed * 0.22;
+        const sat = beltTone === "ash"
+          ? 0.18 + a.hue * 0.24
+          : 0.12 + a.hue * 0.18;
+        const hueAngle = beltTone === "ash"
+          ? 0.01 + a.hue * 0.035
+          : 0.07 + a.hue * 0.06;
         color.setHSL(hueAngle, sat, lightness);
         mesh.setColorAt(localId, color);
       });
@@ -147,11 +174,12 @@ export default function AsteroidBelt({
       mesh.instanceMatrix.needsUpdate = true;
       if (mesh.instanceColor) mesh.instanceColor.needsUpdate = true;
     });
-  }, [asteroids, variantGroups]);
+  }, [asteroids, beltTone, variantGroups]);
 
   /* ── Slow belt rotation ─────────────────────────────────── */
-  useFrame((state) => {
-    if (groupRef.current) groupRef.current.rotation.y = 0.002 * state.clock.elapsedTime;
+  useFrame((_, delta) => {
+    if (!paused) simTimeRef.current += delta;
+    if (groupRef.current) groupRef.current.rotation.y = 0.002 * simTimeRef.current;
   });
 
   /* ── Event handlers (per variant) ───────────────────────── */
@@ -183,7 +211,7 @@ export default function AsteroidBelt({
     [variantGroups, asteroids, onSelectAddress],
   );
 
-  const selectedIndex = selectedAddress
+  const selectedIndex = interactive && selectedAddress
     ? asteroids.findIndex(
         (a) => a.wallet.address.toLowerCase() === selectedAddress.toLowerCase(),
       )
@@ -199,8 +227,8 @@ export default function AsteroidBelt({
       {/* Belt boundary orbit rings */}
       {showOrbits && beltInnerRadius > 0 && (
         <>
-          <OrbitRing radius={beltInnerRadius} tilt={0} color="#443322" opacity={0.12} />
-          <OrbitRing radius={beltOuterRadius} tilt={0} color="#443322" opacity={0.12} />
+          <OrbitRing radius={beltInnerRadius} tilt={0} color={orbitColor} opacity={beltTone === "ash" ? 0.16 : 0.12} />
+          <OrbitRing radius={beltOuterRadius} tilt={0} color={orbitColor} opacity={beltTone === "ash" ? 0.16 : 0.12} />
         </>
       )}
 
@@ -209,11 +237,25 @@ export default function AsteroidBelt({
         <mesh rotation={[Math.PI / 2, 0, 0]}>
           <ringGeometry args={[beltInnerRadius, beltOuterRadius, 128]} />
           <meshBasicMaterial
-            color="#443322"
-            opacity={0.06}
+            color={dustColor}
+            opacity={beltTone === "ash" ? 0.11 : 0.06}
             transparent
             side={THREE.DoubleSide}
             depthWrite={false}
+          />
+        </mesh>
+      )}
+
+      {beltTone === "ash" && beltInnerRadius > 0 && (
+        <mesh rotation={[Math.PI / 2, 0, 0]}>
+          <ringGeometry args={[beltInnerRadius * 1.08, beltOuterRadius * 0.96, 128]} />
+          <meshBasicMaterial
+            color="#ff6a2c"
+            opacity={0.045}
+            transparent
+            side={THREE.DoubleSide}
+            depthWrite={false}
+            blending={THREE.AdditiveBlending}
           />
         </mesh>
       )}
@@ -226,25 +268,29 @@ export default function AsteroidBelt({
           <instancedMesh
             key={v}
             ref={el => { meshRefs.current[v] = el; }}
-            args={[geo, POTATO_MAT, vCount]}
+            args={[geo, beltMaterial, vCount]}
             userData={{
               bodyType: "asteroid",
-              walletAddresses: variantGroups[v].map(gi =>
-                asteroids[gi].wallet.address.toLowerCase()),
+              ...(interactive
+                ? {
+                    walletAddresses: variantGroups[v].map(gi =>
+                      asteroids[gi].wallet.address.toLowerCase()),
+                  }
+                : {}),
             }}
             frustumCulled={false}
-            onPointerMove={makePointerMove(v)}
-            onPointerLeave={onPointerLeave}
-            onClick={makeClick(v)}
+            onPointerMove={interactive ? makePointerMove(v) : undefined}
+            onPointerLeave={interactive ? onPointerLeave : undefined}
+            onClick={interactive ? makeClick(v) : undefined}
           >
             <primitive object={geo} attach="geometry" />
-            <primitive object={POTATO_MAT} attach="material" />
+            <primitive object={beltMaterial} attach="material" />
           </instancedMesh>
         );
       })}
 
       {/* Tooltip */}
-      {activeAsteroid && (selectedIndex < 0 || panelOpen) && (
+      {interactive && activeAsteroid && (selectedIndex < 0 || panelOpen) && (
         <Html
           position={activeAsteroid.position}
           center
@@ -259,7 +305,7 @@ export default function AsteroidBelt({
       )}
 
       {/* Persistent name labels */}
-      {showAllNames && asteroids.map((a, i) => {
+      {interactive && showLabels && showAllNames && asteroids.map((a, i) => {
         if (showRenamedOnly && !a.wallet.customName) return null;
         if (activeIndex === i) return null;
         const label = a.wallet.customName || `${a.wallet.address.slice(0, 6)}\u2026${a.wallet.address.slice(-4)}`;
@@ -268,7 +314,7 @@ export default function AsteroidBelt({
             key={a.wallet.address}
             position={a.position as [number, number, number]}
             text={label}
-            color="#7098a8"
+            color={labelColor}
             fontSize={0.3}
             opacity={0.7}
             onClick={() => onSelectAddress(a.wallet.address)}

@@ -30,5 +30,19 @@ export const KEY_PLANET_ORBITS = "planet:orbits";
 /** JSON wrapper: { updatedAt, wallets[] } for the vesting / RewardDistributor system */
 export const KEY_VESTING_PAYLOAD = "vesting:payload";
 
+/** JSON wrapper: Hyperlane bridge snapshot payload */
+export const KEY_HYPERLANE_BRIDGE_PAYLOAD = "bridge:hyperlane:payload";
+
+/** Stringified block number for incremental Hyperlane mailbox scans */
+export const KEY_HYPERLANE_LAST_PROCESSED_BLOCK =
+  "bridge:hyperlane:lastProcessedBlock";
+
+/** JSON wrapper: Canonical bridge snapshot payload */
+export const KEY_CANONICAL_BRIDGE_PAYLOAD = "bridge:canonical:payload";
+
+/** Stringified block number for incremental Canonical bridge scans */
+export const KEY_CANONICAL_LAST_PROCESSED_BLOCK =
+  "bridge:canonical:lastProcessedBlock";
+
 /** Prefix for temporary SIWE-like nonces: auth:nonce:<address> */
 export const KEY_AUTH_NONCE_PREFIX = "auth:nonce:";

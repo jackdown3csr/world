@@ -14,7 +14,7 @@ import { Html } from "@react-three/drei";
 import SpriteLabel from "./SpriteLabel";
 import * as THREE from "three";
 
-const EPOCH_ADDRESS = "__epoch__";
+export const EPOCH_ADDRESS = "__epoch__";
 const BODY_RADIUS   = 4;
 
 /* ── Shared materials ────────────────────────────────────── */
@@ -36,6 +36,7 @@ interface EpochSatelliteProps {
   orbitRadius: number;
   showLabel?: boolean;
   onSelect?: (addr: string) => void;
+  paused?: boolean;
 }
 
 export default function EpochSatellite({
@@ -43,12 +44,14 @@ export default function EpochSatellite({
   orbitRadius,
   showLabel = true,
   onSelect,
+  paused = false,
 }: EpochSatelliteProps) {
   const groupRef   = useRef<THREE.Group>(null);
   const probeRef   = useRef<THREE.Group>(null);
   const labelRef   = useRef<THREE.Group>(null);
   const scanRef    = useRef<THREE.Group>(null);
   const angleRef   = useRef(Math.PI * 1.3);
+  const scanTimeRef = useRef(0);
   const [hovered, setHovered] = useState(false);
 
   const orbitSpeed = 0.005;
@@ -75,7 +78,10 @@ export default function EpochSatellite({
   }, []);
 
   useFrame((state, delta) => {
-    angleRef.current += orbitSpeed * delta;
+    if (!paused) {
+      angleRef.current += orbitSpeed * delta;
+      scanTimeRef.current += delta;
+    }
     const a = angleRef.current;
     if (groupRef.current) {
       groupRef.current.position.set(
@@ -96,7 +102,7 @@ export default function EpochSatellite({
     }
     // Slow scan platform sweep
     if (scanRef.current) {
-      scanRef.current.rotation.y = Math.sin(state.clock.elapsedTime * 0.4) * 0.8;
+      scanRef.current.rotation.y = Math.sin(scanTimeRef.current * 0.4) * 0.8;
     }
     // Counter-rotate labels to stay screen-aligned
     if (labelRef.current && groupRef.current) {

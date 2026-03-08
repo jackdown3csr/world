@@ -119,19 +119,19 @@ export default function SplashScreen({ loading }: SplashScreenProps) {
         style={{
           display: "flex",
           gap: 2,
-          marginBottom: 8,
+          marginBottom: 4,
           animation: "splashFadeUp 1s ease forwards",
           animationDelay: "0.3s",
           opacity: 0,
         }}
       >
-        {"VESCROW".split("").map((ch, i) => (
+        {"SECTOR".split("").map((ch, i) => (
           <span
             key={`a${i}`}
             style={{
-              color: "#00e5ff",
+              color: "#ffd3a1",
               fontSize: 20,
-              fontWeight: 600,
+              fontWeight: 700,
               letterSpacing: "0.22em",
               opacity: 0,
               animation: "splashLetter 0.5s ease forwards",
@@ -147,19 +147,19 @@ export default function SplashScreen({ loading }: SplashScreenProps) {
         style={{
           display: "flex",
           gap: 2,
-          marginBottom: 28,
+          marginBottom: 22,
           animation: "splashFadeUp 1s ease forwards",
           animationDelay: "0.8s",
           opacity: 0,
         }}
       >
-        {"SYSTEM ALPHA".split("").map((ch, i) => (
+        {"GALACTICA".split("").map((ch, i) => (
           <span
             key={`b${i}`}
             style={{
-              color: "#2a5a78",
+              color: "#E8832A",
               fontSize: 13,
-              fontWeight: 400,
+              fontWeight: 600,
               letterSpacing: "0.35em",
               opacity: 0,
               animation: "splashLetter 0.5s ease forwards",
@@ -176,8 +176,9 @@ export default function SplashScreen({ loading }: SplashScreenProps) {
       {/* Tagline */}
       <div
         style={{
-          color: "#2a4058",
+          color: "#E8832A",
           fontSize: 10,
+          fontWeight: 600,
           letterSpacing: "0.18em",
           textTransform: "uppercase",
           animation: "splashFadeUp 0.8s ease forwards",
@@ -186,7 +187,7 @@ export default function SplashScreen({ loading }: SplashScreenProps) {
           marginBottom: 20,
         }}
       >
-        your voting power, visualized
+        Contracts and capital flows. Visualized.
       </div>
 
       {/* Loading indicator */}
@@ -194,7 +195,7 @@ export default function SplashScreen({ loading }: SplashScreenProps) {
         style={{
           width: 120,
           height: 1,
-          background: "rgba(0,229,255,0.06)",
+          background: "rgba(232,131,42,0.14)",
           overflow: "hidden",
           animation: "splashFadeUp 0.6s ease forwards",
           animationDelay: "1.6s",
@@ -206,7 +207,7 @@ export default function SplashScreen({ loading }: SplashScreenProps) {
             width: "30%",
             height: "100%",
             background:
-              "linear-gradient(90deg, transparent, rgba(0,229,255,0.5), transparent)",
+              "linear-gradient(90deg, transparent, rgba(232,131,42,0.65), transparent)",
             animation: "splashBar 1.8s ease-in-out infinite",
           }}
         />

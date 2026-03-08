@@ -64,3 +64,125 @@ export interface VestingPayload {
   updatedAt: number; // unix ms
   wallets: VestingWalletEntry[];
 }
+
+/* ── gUBI pool types ─────────────────────────────────────── */
+
+export interface PoolTokenEntry extends WalletEntry {
+  symbol: string;
+  balance: string;
+  balanceFormatted: string;
+  priceUSD: number;
+  priceUSDFormatted: string;
+  valueUSD: number;
+  valueUSDFormatted: string;
+  shareOfPool: number;
+  shareOfPoolFormatted: string;
+}
+
+export interface PoolPayload {
+  updatedAt: number;
+  totalWorthUSD: number;
+  totalWorthFormatted: string;
+  gubiPriceUSD: number;
+  gubiPriceFormatted: string;
+  supply: string;
+  supplyFormatted: string;
+  tokens: PoolTokenEntry[];
+}
+
+/* ── Bridge telemetry types ─────────────────────────────── */
+
+export type BridgeTransferDirection = "outbound" | "inbound";
+
+export interface BridgeTransferEntry {
+  txHash: string;
+  blockNumber: number;
+  timestamp: number;
+  direction: BridgeTransferDirection;
+  sender: string;
+  recipient: string;
+  amountRaw: string | null;
+  amountFormatted: string | null;
+}
+
+/* ── Hyperlane bridge types ─────────────────────────────── */
+
+export type HyperlaneTransferDirection = BridgeTransferDirection;
+
+export interface HyperlaneTransferEntry extends BridgeTransferEntry {
+  messageId: string;
+  originDomain: number;
+  destinationDomain: number;
+}
+
+export interface CanonicalBridgeTransferEntry extends BridgeTransferEntry {
+  settlementLayer: "ethereum";
+  relayLayer: "arbitrum-one";
+  mechanism: "withdrawEth";
+}
+
+export interface HyperlaneBridgePayload {
+  updatedAt: number;
+  scannedThroughBlock: number;
+  routeLabel: string;
+  recentTransfers: number;
+  lastTransferAt: number | null;
+  outboundRecentTransfers: number;
+  inboundRecentTransfers: number;
+  historicalOutboundTransfers: number;
+  historicalInboundTransfers: number;
+  historicalOutboundAmountRaw: string;
+  historicalInboundAmountRaw: string;
+  lastOutboundAt: number | null;
+  lastInboundAt: number | null;
+  status: "standby" | "active" | "quiet";
+  statusLabel: string;
+  throughputLabel: string;
+  transfers: HyperlaneTransferEntry[];
+  outboundTransfers: HyperlaneTransferEntry[];
+  inboundTransfers: HyperlaneTransferEntry[];
+}
+
+export interface CanonicalBridgePayload {
+  updatedAt: number;
+  scannedThroughBlock: number;
+  routeLabel: string;
+  recentTransfers: number;
+  lastTransferAt: number | null;
+  outboundRecentTransfers: number;
+  inboundRecentTransfers: number;
+  historicalOutboundTransfers: number;
+  historicalInboundTransfers: number;
+  historicalOutboundAmountRaw: string;
+  historicalInboundAmountRaw: string;
+  lastOutboundAt: number | null;
+  lastInboundAt: number | null;
+  status: "standby" | "active" | "quiet";
+  statusLabel: string;
+  throughputLabel: string;
+  transfers: CanonicalBridgeTransferEntry[];
+  outboundTransfers: CanonicalBridgeTransferEntry[];
+  inboundTransfers: CanonicalBridgeTransferEntry[];
+}
+
+/* ── Staking remnant types ─────────────────────────────── */
+
+export interface StakingRemnantPayload {
+  updatedAt: number;
+  proxyAddress: string;
+  implementationAddress: string;
+  ownerAddress: string;
+  stakingTokenAddress: string;
+  nativeBalanceRaw: string;
+  nativeBalanceFormatted: string;
+  totalStakedRaw: string;
+  totalStakedFormatted: string;
+  rewardPerTokenStoredRaw: string;
+  lastUpdateTime: number;
+  lastUpdateLabel: string;
+  frozenSeconds: number;
+  frozenLabel: string;
+  status: "active" | "inactive" | "draining";
+  statusLabel: string;
+  rewardStateLabel: string;
+}

@@ -8,7 +8,7 @@ import {
 
 function buildRenameMessage(address: string, name: string, nonce: string) {
   return [
-    "Vescrow System Alpha - Rename Planet",
+    "Sector Galactica - Rename Planet",
     `Address: ${address}`,
     `Name: ${name}`,
     `Nonce: ${nonce}`,

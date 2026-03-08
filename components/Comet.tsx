@@ -27,10 +27,6 @@ const ARG_PERI = 0.3;                    // argument of perihelion (rad)
 const LAN      = 0.15;                   // longitude of ascending node — aphelion tilted toward +X
 const PERIOD   = 7200;                    // orbital period (seconds, full loop — rare event)
 
-// Stars for anti-solar computation
-const STAR_VESCROW: [number, number, number] = [0, 0, 0];
-const STAR_VESTING: [number, number, number] = [16000, 3000, 0];
-
 // Pre-compute rotation matrix constants
 const cosO = Math.cos(LAN), sinO = Math.sin(LAN);
 const cosI = Math.cos(INC), sinI = Math.sin(INC);
@@ -262,7 +258,7 @@ function sr(s: number): number { const x = Math.sin(s * 127.1 + 311.7) * 43758.5
 
 export const COMET_ADDRESS = "cascopea";
 
-export default function Comet({ onSelect, showLabel = true }: { onSelect?: (addr: string) => void; showLabel?: boolean }) {
+export default function Comet({ starPositions, onSelect, showLabel = true, paused = false }: { starPositions: [number, number, number][]; onSelect?: (addr: string) => void; showLabel?: boolean; paused?: boolean }) {
   const groupRef    = useRef<THREE.Group>(null);
   const comaRef     = useRef<THREE.Mesh>(null);
   const nucMatRef   = useRef<THREE.ShaderMaterial | null>(null);
@@ -377,6 +373,10 @@ export default function Comet({ onSelect, showLabel = true }: { onSelect?: (addr
   const _up   = useMemo(() => new THREE.Vector3(), []);   // perpendicular up
   const _tmp  = useMemo(() => new THREE.Vector3(), []);
   const _star = useMemo(() => new THREE.Vector3(), []);   // nearest star position
+  const sceneStars = useMemo(
+    () => starPositions.map(([x, y, z]) => new THREE.Vector3(x, y, z)),
+    [starPositions],
+  );
   const initialPos = useMemo(() => {
     const pos = new THREE.Vector3();
     const vel = new THREE.Vector3();
@@ -386,7 +386,7 @@ export default function Comet({ onSelect, showLabel = true }: { onSelect?: (addr
 
   useFrame((state, delta) => {
     const simDelta = Math.min(delta, MAX_SIM_DELTA);
-    simTimeRef.current = (simTimeRef.current + simDelta) % PERIOD;
+    if (!paused) simTimeRef.current = (simTimeRef.current + simDelta) % PERIOD;
     const t = simTimeRef.current;
     const camera = state.camera;
     getOrbitalState(t, _pos, _vel);
@@ -394,11 +394,16 @@ export default function Comet({ onSelect, showLabel = true }: { onSelect?: (addr
     // Move group to comet world position
     groupRef.current?.position.copy(_pos);
 
-    // Find nearest star for anti-solar computation
-    const dVescrow = _pos.distanceToSquared(_star.set(...STAR_VESCROW));
-    const dVesting = _pos.distanceToSquared(_star.set(...STAR_VESTING));
-    if (dVescrow <= dVesting) _star.set(...STAR_VESCROW); // else _star already has STAR_VESTING
-    const dist = Math.sqrt(Math.min(dVescrow, dVesting));
+    // Find nearest scene star for anti-solar computation
+    let minDistSq = Number.POSITIVE_INFINITY;
+    for (const starPos of sceneStars) {
+      const distSq = _pos.distanceToSquared(starPos);
+      if (distSq < minDistSq) {
+        minDistSq = distSq;
+        _star.copy(starPos);
+      }
+    }
+    const dist = Math.sqrt(minDistSq);
 
     // Billboard coma — always face camera
     if (comaRef.current) comaRef.current.quaternion.copy(camera.quaternion);

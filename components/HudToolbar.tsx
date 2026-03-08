@@ -1,6 +1,8 @@
 "use client";
 
 import React, { useState } from "react";
+import { toolbarShortcutMeta, toolbarShortcuts } from "@/lib/shortcuts";
+import FloatingTooltip from "./FloatingTooltip";
 
 /* ────────────────────────── SVG micro-icons (12×12) ────────────────── */
 const I = ({ d, size = 12 }: { d: string; size?: number }) => (
@@ -21,85 +23,185 @@ const icons = {
   ranked: (s?: number) => <I d="M3 4h18M3 8h14M3 12h10M3 16h6" size={s} />,
   gnet:   (s?: number) => <I d="M12 2v4M12 18v4M4.93 4.93l2.83 2.83M16.24 16.24l2.83 2.83M2 12h4M18 12h4M4.93 19.07l2.83-2.83M16.24 7.76l2.83-2.83" size={s} />,
   photo:  (s?: number) => <I d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2zM12 17a4 4 0 1 0 0-8 4 4 0 0 0 0 8z" size={s} />,
+  hud:    (s?: number) => <I d="M2 12s4-6 10-6 10 6 10 6-4 6-10 6S2 12 2 12M12 15a3 3 0 1 0 0-6 3 3 0 0 0 0 6" size={s} />,
 };
 
 /* ────────────────────────── Button component ───────────────────────── */
 function HudBtn({
-  active, onClick, icon, label, shortcut, disabled, mobile,
+  active, onClick, icon, label, shortcut, title, disabled, mobile, compact, iconOnly = false, strip = false,
 }: {
   active: boolean; onClick: () => void;
   icon: (s?: number) => React.ReactNode; label: string;
-  shortcut?: string; disabled?: boolean; mobile?: boolean;
+  shortcut?: string; title?: string; disabled?: boolean; mobile?: boolean; compact?: boolean; iconOnly?: boolean; strip?: boolean;
 }) {
   const [hovered, setHovered] = useState(false);
-  const iSize = mobile ? 14 : 12;
+  const anchorRef = React.useRef<HTMLSpanElement>(null);
+  const isStrip = strip && compact && !mobile;
+  const iSize = mobile ? 14 : isStrip ? 10 : compact ? 11 : 12;
+  const tooltipText = title ?? (shortcut ? `${label} (${shortcut})` : label);
 
   return (
-    <button
-      onClick={onClick}
-      disabled={disabled}
+    <span
+      ref={anchorRef}
       onMouseEnter={() => setHovered(true)}
       onMouseLeave={() => setHovered(false)}
-      title={shortcut ? `${label} (${shortcut})` : label}
       style={{
-        display: "flex",
-        alignItems: "center",
-        gap: mobile ? 6 : 4,
-        padding: mobile ? "8px 12px" : "4px 6px",
-        minHeight: mobile ? 40 : 26,
-        cursor: disabled ? "not-allowed" : "pointer",
-        background: active
-          ? "rgba(0,229,255,0.10)"
-          : hovered
-            ? "rgba(255,255,255,0.05)"
-            : "transparent",
-        color: active ? "#00e5ff" : disabled ? "#2a3a48" : hovered ? "#7eb8cc" : "#4a6278",
-        border: "none",
-        borderBottom: active ? "2px solid rgba(0,229,255,0.6)" : "2px solid transparent",
-        fontFamily: "'JetBrains Mono','SF Mono',monospace",
-        fontWeight: 500,
-        fontSize: mobile ? 11 : 9,
-        letterSpacing: "0.10em",
-        textTransform: "uppercase" as const,
-        transition: "all 0.18s ease",
-        opacity: disabled ? 0.3 : 1,
-        borderRadius: "3px 3px 0 0",
-        position: "relative" as const,
-        whiteSpace: "nowrap" as const,
+        position: "relative",
+        display: "inline-flex",
+        flexShrink: 0,
       }}
     >
-      <span style={{ display: "flex", alignItems: "center", flexShrink: 0 }}>
-        {icon(iSize)}
-      </span>
-      <span>{label}</span>
+      <button
+        onClick={onClick}
+        disabled={disabled}
+        aria-label={tooltipText}
+        style={{
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          gap: iconOnly ? 0 : mobile ? 6 : isStrip ? 4 : compact ? 3 : 4,
+          padding: iconOnly
+            ? (mobile ? "8px" : isStrip ? "3px 6px" : compact ? "4px" : "4px")
+            : mobile
+              ? "8px 12px"
+              : isStrip
+                ? "3px 8px"
+                : compact
+                  ? "4px 7px"
+                  : "4px 6px",
+          minWidth: iconOnly ? (mobile ? 40 : isStrip ? 22 : compact ? 24 : 26) : undefined,
+          minHeight: mobile ? 40 : isStrip ? 22 : compact ? 24 : 26,
+          cursor: disabled ? "not-allowed" : "pointer",
+          background: active
+            ? compact ? "rgba(255,255,255,0.12)" : "rgba(0,229,255,0.10)"
+            : hovered
+              ? compact ? "rgba(255,255,255,0.07)" : "rgba(255,255,255,0.05)"
+              : "transparent",
+          color: active ? (compact ? "#ffffff" : "#00e5ff") : disabled ? "#2a3a48" : hovered ? "#7eb8cc" : "#4a6278",
+          border: compact ? "1px solid rgba(255,255,255,0.08)" : "none",
+          borderBottom: compact ? undefined : active ? "2px solid rgba(0,229,255,0.6)" : "2px solid transparent",
+          fontFamily: "'JetBrains Mono','SF Mono',monospace",
+          fontWeight: 500,
+          fontSize: mobile ? 11 : isStrip ? 9 : compact ? 8 : 9,
+          letterSpacing: compact ? (isStrip ? "0.10em" : "0.08em") : "0.10em",
+          textTransform: "uppercase" as const,
+          transition: "all 0.18s ease",
+          opacity: disabled ? 0.3 : 1,
+          borderRadius: compact ? 4 : "3px 3px 0 0",
+          position: "relative" as const,
+          whiteSpace: "nowrap" as const,
+          lineHeight: 1.1,
+        }}
+      >
+        <span style={{ display: "flex", alignItems: "center", flexShrink: 0 }}>
+          {icon(iSize)}
+        </span>
+        {!iconOnly && <span>{label}</span>}
 
-      {/* Active glow dot */}
-      {active && (
-        <span style={{
-          position: "absolute",
-          bottom: -1,
-          left: "50%",
-          transform: "translateX(-50%)",
-          width: 3,
-          height: 3,
-          borderRadius: "50%",
-          background: "#00e5ff",
-          boxShadow: "0 0 6px 1px rgba(0,229,255,0.5)",
-        }} />
+        {active && (
+          <span style={{
+            position: "absolute",
+            bottom: compact ? "50%" : -1,
+            left: "50%",
+            transform: compact ? "translate(-50%, 50%)" : "translateX(-50%)",
+            width: compact ? 2 : 3,
+            height: compact ? 2 : 3,
+            borderRadius: "50%",
+            background: compact ? "#ffffff" : "#00e5ff",
+            boxShadow: compact ? "0 0 5px 1px rgba(255,255,255,0.25)" : "0 0 6px 1px rgba(0,229,255,0.5)",
+          }} />
+        )}
+      </button>
+
+      {!mobile && hovered && (
+        <FloatingTooltip
+          anchorRef={anchorRef}
+          open={hovered}
+          text={tooltipText}
+          placement={compact ? "bottom" : "top"}
+          compact={compact}
+        />
       )}
-    </button>
+    </span>
+  );
+}
+
+function HudMiniBtn({
+  active, onClick, icon, label, disabled, mobile, compact, strip = false,
+}: {
+  active: boolean; onClick: () => void;
+  icon: (s?: number) => React.ReactNode; label: string;
+  disabled?: boolean; mobile?: boolean; compact?: boolean; strip?: boolean;
+}) {
+  const [hovered, setHovered] = useState(false);
+  const anchorRef = React.useRef<HTMLSpanElement>(null);
+  const isStrip = strip && compact && !mobile;
+  const iSize = mobile ? 14 : isStrip ? 10 : compact ? 10 : 11;
+
+  return (
+    <span
+      ref={anchorRef}
+      onMouseEnter={() => setHovered(true)}
+      onMouseLeave={() => setHovered(false)}
+      style={{
+        position: "relative",
+        display: "inline-flex",
+        flexShrink: 0,
+      }}
+    >
+      <button
+        onClick={onClick}
+        disabled={disabled}
+        aria-label={label}
+        style={{
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          width: mobile ? 34 : 22,
+          minWidth: mobile ? 34 : 22,
+          minHeight: mobile ? 40 : isStrip ? 22 : compact ? 24 : 26,
+          cursor: disabled ? "not-allowed" : "pointer",
+          background: active
+            ? compact ? "rgba(255,255,255,0.12)" : "rgba(0,229,255,0.10)"
+            : hovered
+              ? compact ? "rgba(255,255,255,0.07)" : "rgba(255,255,255,0.05)"
+              : "transparent",
+          color: active ? (compact ? "#ffffff" : "#00e5ff") : disabled ? "#2a3a48" : hovered ? "#7eb8cc" : "#4a6278",
+          border: compact ? "1px solid rgba(255,255,255,0.08)" : "none",
+          borderBottom: compact ? undefined : active ? "2px solid rgba(0,229,255,0.6)" : "2px solid transparent",
+          borderLeft: compact ? undefined : "1px solid rgba(0,229,255,0.10)",
+          transition: "all 0.18s ease",
+          opacity: disabled ? 0.3 : 1,
+          borderRadius: compact ? 4 : 0,
+          padding: 0,
+        }}
+      >
+        {icon(iSize)}
+      </button>
+
+      {!mobile && hovered && (
+        <FloatingTooltip
+          anchorRef={anchorRef}
+          open={hovered}
+          text={label}
+          placement={compact ? "bottom" : "top"}
+          compact={compact}
+        />
+      )}
+    </span>
   );
 }
 
 /* ────────────────────────── Group panel ─────────────────────────────── */
-function Group({ label, children, mobile }: { label: string; children: React.ReactNode; mobile?: boolean }) {
+function Group({ label, children, mobile, compact }: { label: string; children: React.ReactNode; mobile?: boolean; compact?: boolean }) {
   return (
     <div style={{
       display: "flex",
       flexDirection: "column",
-      gap: 0,
+      gap: compact ? 1 : 0,
+      flexShrink: 0,
     }}>
-      {!mobile && (
+      {!mobile && !compact && (
         <span style={{
           fontSize: 7,
           fontWeight: 600,
@@ -117,10 +219,11 @@ function Group({ label, children, mobile }: { label: string; children: React.Rea
       <div style={{
         display: "flex",
         alignItems: "stretch",
-        gap: 1,
-        background: "rgba(255,255,255,0.02)",
-        borderRadius: 4,
-        padding: "1px 2px",
+        gap: compact ? 4 : 1,
+        background: compact ? "transparent" : "rgba(255,255,255,0.02)",
+        borderRadius: compact ? 4 : 4,
+        padding: compact ? 0 : "1px 2px",
+        flexWrap: "nowrap",
       }}>
         {children}
       </div>
@@ -134,14 +237,12 @@ interface HudToolbarProps {
   onToggleLabels: () => void;
   showRenamedOnly: boolean;
   onToggleRenamed: () => void;
-  showDirectory: boolean;
-  onToggleDirectory: () => void;
   showHelp: boolean;
   onToggleHelp: () => void;
   showOrbits: boolean;
   onToggleOrbits: () => void;
-  showTrails: boolean;
-  onToggleTrails: () => void;
+  showFlightHud?: boolean;
+  onToggleFlightHud?: () => void;
   onReset: () => void;
   flyModeEnabled?: boolean;
   onToggleFlyMode?: () => void;
@@ -150,10 +251,13 @@ interface HudToolbarProps {
   onToggleLayout?: () => void;
   gnetRanked?: boolean;
   onToggleGnet?: () => void;
-  nearVesting?: boolean;
+  layoutVariant?: "vescrow" | "vesting" | "none";
   vestingClaimed?: boolean;
   onToggleVestingClaimed?: () => void;
   mobile?: boolean;
+  compact?: boolean;
+  embedded?: boolean;
+  showHelpButton?: boolean;
 }
 
 export default function HudToolbar({
@@ -161,14 +265,12 @@ export default function HudToolbar({
   onToggleLabels,
   showRenamedOnly,
   onToggleRenamed,
-  showDirectory,
-  onToggleDirectory,
   showHelp,
   onToggleHelp,
   showOrbits,
   onToggleOrbits,
-  showTrails,
-  onToggleTrails,
+  showFlightHud = true,
+  onToggleFlightHud,
   onReset,
   flyModeEnabled = false,
   onToggleFlyMode,
@@ -177,57 +279,80 @@ export default function HudToolbar({
   onToggleLayout,
   gnetRanked = false,
   onToggleGnet,
-  nearVesting = false,
+  layoutVariant = "vescrow",
   vestingClaimed = false,
   onToggleVestingClaimed,
   mobile = false,
+  compact = false,
+  embedded = false,
+  showHelpButton = true,
 }: HudToolbarProps) {
+  const showLayoutGroup =
+    (layoutVariant === "vescrow" && (Boolean(onToggleLayout) || Boolean(onToggleGnet))) ||
+    (layoutVariant === "vesting" && Boolean(onToggleVestingClaimed));
+  const strip = embedded && compact && !mobile;
+
   return (
     <div
       style={{
-        background: "rgba(2, 6, 14, 0.92)",
-        border: "1px solid rgba(0,229,255,0.08)",
+        background: embedded ? "transparent" : compact ? "rgba(2, 6, 14, 0.24)" : "rgba(2, 6, 14, 0.92)",
+        border: embedded ? "none" : compact ? "1px solid rgba(255,255,255,0.08)" : "1px solid rgba(0,229,255,0.08)",
         borderLeft: mobile ? "none" : undefined,
         borderTop: mobile ? "1px solid rgba(0,229,255,0.15)" : undefined,
-        padding: mobile ? "6px 8px" : "6px 10px 4px",
+        padding: mobile ? "6px 8px" : strip ? 0 : compact ? "5px 7px" : "6px 10px 4px",
         display: "flex",
-        alignItems: "flex-end",
-        flexWrap: "wrap",
-        gap: mobile ? 6 : 10,
+        alignItems: compact ? "center" : "flex-end",
+        flexWrap: embedded ? "nowrap" : "wrap",
+        gap: mobile ? 6 : strip ? 6 : compact ? 8 : 10,
         justifyContent: mobile ? "space-evenly" : undefined,
-        borderRadius: mobile ? 0 : 4,
-        boxShadow: "0 2px 16px rgba(0,0,0,0.4)",
-        backdropFilter: "blur(8px)",
+        borderRadius: mobile ? 0 : strip ? 0 : compact ? 8 : 4,
+        boxShadow: embedded ? "none" : compact ? "0 6px 18px rgba(0,0,0,0.18)" : "0 2px 16px rgba(0,0,0,0.4)",
+        backdropFilter: embedded ? undefined : "blur(8px)",
+        maxWidth: compact ? "min(calc(100vw - 360px), 860px)" : undefined,
+        overflowX: embedded ? "visible" : undefined,
       }}
     >
-      <Group label="view" mobile={mobile}>
-        <HudBtn active={showOrbits} onClick={onToggleOrbits} icon={icons.orbit} label="orbits" shortcut="O" mobile={mobile} />
-        <HudBtn active={showTrails} onClick={onToggleTrails} icon={icons.trail} label="trails" shortcut="T" mobile={mobile} />
-        <HudBtn active={showAllNames} onClick={onToggleLabels} icon={icons.label} label="labels" shortcut="L" mobile={mobile} />
-        <HudBtn active={showRenamedOnly && showAllNames} onClick={onToggleRenamed} icon={icons.named} label="named" shortcut="N" disabled={!showAllNames} mobile={mobile} />
+      <Group label="browse" mobile={mobile} compact={compact}>
+        <HudBtn active={showAllNames} onClick={onToggleLabels} icon={icons.label} label="labels" shortcut={toolbarShortcuts.labels} title={`${toolbarShortcutMeta.labels.description} (${toolbarShortcutMeta.labels.keys})`} mobile={mobile} compact={compact} strip={strip} />
+        <HudBtn active={showRenamedOnly && showAllNames} onClick={onToggleRenamed} icon={icons.named} label="named" shortcut={toolbarShortcuts.named} title={`${toolbarShortcutMeta.named.description} (${toolbarShortcutMeta.named.keys})`} disabled={!showAllNames} mobile={mobile} compact={compact} strip={strip} />
       </Group>
 
-      <Group label="layout" mobile={mobile}>
-        {!nearVesting && onToggleLayout && (
-          <HudBtn active={rankedLayout} onClick={onToggleLayout} icon={icons.ranked} label="ranked" shortcut="K" mobile={mobile} />
-        )}
-        {!nearVesting && onToggleGnet && (
-          <HudBtn active={gnetRanked} onClick={onToggleGnet} icon={icons.gnet} label="gnet" shortcut="J" disabled={!rankedLayout} mobile={mobile} />
-        )}
-        {nearVesting && onToggleVestingClaimed && (
-          <HudBtn active={vestingClaimed} onClick={onToggleVestingClaimed} icon={icons.gnet} label="claimed" shortcut="K" mobile={mobile} />
-        )}
+      <Group label="scene" mobile={mobile} compact={compact}>
+        <HudBtn active={showOrbits} onClick={onToggleOrbits} icon={icons.orbit} label="orbits" shortcut={toolbarShortcuts.orbits} title={`${toolbarShortcutMeta.orbits.description} (${toolbarShortcutMeta.orbits.keys})`} mobile={mobile} compact={compact} strip={strip} />
       </Group>
 
-      <Group label="tools" mobile={mobile}>
-        <HudBtn active={showDirectory} onClick={onToggleDirectory} icon={icons.search} label="search" shortcut="F" mobile={mobile} />
-        <HudBtn active={showHelp} onClick={onToggleHelp} icon={icons.help} label="help" shortcut="H" mobile={mobile} />
-        <HudBtn active={false} onClick={onReset} icon={icons.reset} label="reset" shortcut="R" mobile={mobile} />
+      {showLayoutGroup && (
+        <Group label="layout" mobile={mobile} compact={compact}>
+          {layoutVariant === "vescrow" && onToggleLayout && (
+            <HudBtn active={rankedLayout} onClick={onToggleLayout} icon={icons.ranked} label="ranked" shortcut={toolbarShortcuts.ranked} title={`${toolbarShortcutMeta.ranked.description} (${toolbarShortcutMeta.ranked.keys})`} mobile={mobile} compact={compact} strip={strip} />
+          )}
+          {layoutVariant === "vescrow" && onToggleGnet && (
+            <HudBtn active={gnetRanked} onClick={onToggleGnet} icon={icons.gnet} label="gnet" shortcut={toolbarShortcuts.gnet} title={`${toolbarShortcutMeta.gnet.description} (${toolbarShortcutMeta.gnet.keys})`} disabled={!rankedLayout} mobile={mobile} compact={compact} strip={strip} />
+          )}
+          {layoutVariant === "vesting" && onToggleVestingClaimed && (
+            <HudBtn active={vestingClaimed} onClick={onToggleVestingClaimed} icon={icons.gnet} label="claimed" shortcut={toolbarShortcuts.claimed} title={`${toolbarShortcutMeta.claimed.description} (${toolbarShortcutMeta.claimed.keys})`} mobile={mobile} compact={compact} strip={strip} />
+          )}
+        </Group>
+      )}
+
+      <Group label="modes" mobile={mobile} compact={compact}>
         {onToggleFlyMode && !mobile && (
-          <HudBtn active={flyModeEnabled} onClick={onToggleFlyMode} icon={icons.fly} label="fly" shortcut="G" mobile={mobile} />
+          <div style={{ display: "flex", alignItems: "stretch", background: compact ? "transparent" : "rgba(255,255,255,0.02)", borderRadius: compact ? 4 : 999, overflow: "hidden", gap: compact ? 4 : 0 }}>
+            <HudBtn active={flyModeEnabled} onClick={onToggleFlyMode} icon={icons.fly} label="fly" shortcut={toolbarShortcuts.fly} title={`${toolbarShortcutMeta.fly.description} (${toolbarShortcutMeta.fly.keys})`} mobile={mobile} compact={compact} strip={strip} />
+            {onToggleFlightHud && (
+              <HudMiniBtn active={showFlightHud} onClick={onToggleFlightHud} icon={icons.hud} label="Toggle flight HUD" disabled={!flyModeEnabled} mobile={mobile} compact={compact} strip={strip} />
+            )}
+          </div>
         )}
         {onPhotoMode && (
-          <HudBtn active={false} onClick={onPhotoMode} icon={icons.photo} label="photo" shortcut="P" mobile={mobile} />
+          <HudBtn active={false} onClick={onPhotoMode} icon={icons.photo} label="photo" shortcut={toolbarShortcuts.photo} title={`${toolbarShortcutMeta.photo.description} (${toolbarShortcutMeta.photo.keys})`} mobile={mobile} compact={compact} iconOnly={compact} strip={strip} />
+        )}
+      </Group>
+
+      <Group label="utility" mobile={mobile} compact={compact}>
+        <HudBtn active={false} onClick={onReset} icon={icons.reset} label="reset" shortcut={toolbarShortcuts.reset} title={`${toolbarShortcutMeta.reset.description} (${toolbarShortcutMeta.reset.keys})`} mobile={mobile} compact={compact} strip={strip} />
+        {showHelpButton && (
+          <HudBtn active={showHelp} onClick={onToggleHelp} icon={icons.help} label="help" shortcut={toolbarShortcuts.help} title={`${toolbarShortcutMeta.help.description} (${toolbarShortcutMeta.help.keys})`} mobile={mobile} compact={compact} iconOnly={compact} strip={strip} />
         )}
       </Group>
     </div>

@@ -19,10 +19,23 @@ import type { FreeLookHandle } from "./FreeLookControls";
 
 export type CameraMode = "fly" | "orbit";
 
+type FocusBodyType =
+  | "star"
+  | "planet"
+  | "moon"
+  | "ring"
+  | "comet"
+  | "bridge"
+  | "rogue"
+  | "satellite"
+  | "asteroid"
+  | "unknown";
+
 interface CameraControllerProps {
   selectedAddress: string | null;
   selectionVersion: number;
   cameraMode: CameraMode;
+  frameInsetRight?: number;
   controlsRef: React.RefObject<OrbitControlsImpl | null>;
   freelookRef: React.RefObject<FreeLookHandle | null>;
   onModeChange?: (mode: CameraMode) => void;
@@ -48,6 +61,9 @@ const _scale = new THREE.Vector3();
 const _quat  = new THREE.Quaternion();
 const _v3    = new THREE.Vector3();
 const _up    = new THREE.Vector3(0, 1, 0);
+const _snapCam = new THREE.Vector3();
+const _snapTarget = new THREE.Vector3();
+const _goalQuat = new THREE.Quaternion();
 
 /** Compute lookAt quaternion */
 function lookAtQuat(eye: THREE.Vector3, target: THREE.Vector3): THREE.Quaternion {
@@ -55,19 +71,70 @@ function lookAtQuat(eye: THREE.Vector3, target: THREE.Vector3): THREE.Quaternion
   return new THREE.Quaternion().setFromRotationMatrix(_mat4);
 }
 
+function smootherStep(t: number) {
+  const x = THREE.MathUtils.clamp(t, 0, 1);
+  return x * x * x * (x * (x * 6 - 15) + 10);
+}
+
+function getSnapProfile(bodyType: FocusBodyType, travelDistance: number) {
+  const normalizedDistance = THREE.MathUtils.clamp(travelDistance / 1800, 0, 1);
+
+  let baseDuration = 1.02;
+  let distanceFactor = 0.38;
+  let arcStrength = 0.08;
+
+  switch (bodyType) {
+    case "star":
+      baseDuration = 1.45;
+      distanceFactor = 0.55;
+      arcStrength = 0.14;
+      break;
+    case "planet":
+      baseDuration = 1.0;
+      distanceFactor = 0.34;
+      arcStrength = 0.08;
+      break;
+    case "moon":
+    case "satellite":
+      baseDuration = 0.88;
+      distanceFactor = 0.24;
+      arcStrength = 0.05;
+      break;
+    case "comet":
+    case "bridge":
+    case "rogue":
+      baseDuration = 1.14;
+      distanceFactor = 0.42;
+      arcStrength = 0.1;
+      break;
+    case "ring":
+      baseDuration = 1.08;
+      distanceFactor = 0.32;
+      arcStrength = 0.07;
+      break;
+    default:
+      break;
+  }
+
+  return {
+    duration: THREE.MathUtils.clamp(baseDuration + normalizedDistance * distanceFactor, 0.72, 1.95),
+    arcHeight: travelDistance * arcStrength,
+  };
+}
+
 function findBody(
   scene: THREE.Scene,
   addr: string,
   camera?: THREE.Camera,
-): { position: THREE.Vector3; bodyRadius: number; bodyType: string } | null {
-  const matches: { position: THREE.Vector3; bodyRadius: number; bodyType: string }[] = [];
+): { position: THREE.Vector3; bodyRadius: number; focusRadius?: number; bodyType: string } | null {
+  const matches: { position: THREE.Vector3; bodyRadius: number; focusRadius?: number; bodyType: string }[] = [];
   scene.traverse((obj) => {
     const ud = obj.userData;
     if (!ud) return;
     if (ud.walletAddress === addr) {
       const wp = new THREE.Vector3();
       obj.getWorldPosition(wp);
-      matches.push({ position: wp, bodyRadius: ud.bodyRadius ?? 1, bodyType: ud.bodyType ?? "planet" });
+      matches.push({ position: wp, bodyRadius: ud.bodyRadius ?? 1, focusRadius: ud.focusRadius, bodyType: ud.bodyType ?? "planet" });
       return;
     }
     if (ud.walletAddresses && Array.isArray(ud.walletAddresses) && obj instanceof THREE.InstancedMesh) {
@@ -77,7 +144,7 @@ function findBody(
         _pos.setFromMatrixPosition(_mat4);
         obj.localToWorld(_pos);
         _mat4.decompose(_v3, _quat, _scale);
-        matches.push({ position: _pos.clone(), bodyRadius: _scale.x, bodyType: ud.bodyType ?? "asteroid" });
+        matches.push({ position: _pos.clone(), bodyRadius: _scale.x, focusRadius: ud.focusRadius, bodyType: ud.bodyType ?? "asteroid" });
       }
     }
   });
@@ -97,6 +164,7 @@ export default function CameraController({
   selectedAddress,
   selectionVersion,
   cameraMode: externalMode,
+  frameInsetRight = 0,
   controlsRef,
   freelookRef,
   onModeChange,
@@ -118,9 +186,14 @@ export default function CameraController({
   const lastBodyPos  = useRef(new THREE.Vector3());
 
   /* Snap state (works for both modes) */
+  const snapStartCam   = useRef(new THREE.Vector3());
+  const snapStartTarget = useRef(new THREE.Vector3());
   const snapGoalCam    = useRef(new THREE.Vector3());
   const snapGoalTarget = useRef(new THREE.Vector3());
   const isSnapping     = useRef(false);
+  const snapElapsed    = useRef(0);
+  const snapDuration   = useRef(1);
+  const snapArcHeight  = useRef(0);
   const snapToMode     = useRef<CameraMode>("orbit"); // which mode after snap completes
 
   /* Remember if user was in fly mode before clicking a body */
@@ -182,11 +255,25 @@ export default function CameraController({
   useFrame((_state, delta) => {
     const ctrl = controlsRef.current;
 
+    const captureCurrentTarget = () => {
+      if (ctrl) return ctrl.target.clone();
+      const dir = camera.getWorldDirection(new THREE.Vector3());
+      return camera.position.clone().addScaledVector(dir, 400);
+    };
+
     /* ── Handle reset → snap to overview, switch to orbit ── */
     if (resetRequested && !prevReset.current) {
+      snapStartCam.current.copy(camera.position);
+      snapStartTarget.current.copy(captureCurrentTarget());
       snapGoalCam.current.copy(DEFAULT_POS);
       snapGoalTarget.current.copy(DEFAULT_TARGET);
       isSnapping.current   = true;
+      snapElapsed.current  = 0;
+      {
+        const resetProfile = getSnapProfile("star", snapStartCam.current.distanceTo(DEFAULT_POS));
+        snapDuration.current = resetProfile.duration;
+        snapArcHeight.current = Math.min(resetProfile.arcHeight, 260);
+      }
       snapToMode.current   = "orbit";
       trackingAddr.current = null;
       prevReset.current    = true;
@@ -239,30 +326,62 @@ export default function CameraController({
       const addr = selectedAddress.toLowerCase();
       const body = findBody(scene, addr, camera);
       if (!body) return;
+      const bodyType = (body.bodyType ?? "unknown") as FocusBodyType;
 
       /* Zoom distance by body type */
       let dist: number;
-      switch (body.bodyType) {
-        case "star":   dist = body.bodyRadius * 5; break;          // overview of whole star
+      switch (bodyType) {
+        case "star":   dist = Math.max(body.bodyRadius * 12, 900); break;  // system overview, not a surface close-up
         case "planet": dist = Math.max(body.bodyRadius * 4, 12); break;
         case "moon":   dist = Math.max(body.bodyRadius * 8, 4);  break;
         case "ring":   dist = Math.max(body.bodyRadius * 12, 8); break;
         case "comet":  dist = 55; break;
+        case "bridge": dist = Math.max(body.bodyRadius * 3.4, 120); break;
+        case "rogue": dist = Math.max(body.bodyRadius * 14, 110); break;
         case "satellite": dist = 30; break;
         default:       dist = Math.max(body.bodyRadius * 12, 8); break;
       }
 
-      const radDir = body.position.clone();
-      const len    = radDir.length();
-      if (len > 1) radDir.divideScalar(len); else radDir.set(0, 0, 1);
+      let camPos: THREE.Vector3;
+      if (bodyType === "star") {
+        const overviewRadius = body.focusRadius ?? body.bodyRadius * 8;
+        dist = Math.max(overviewRadius * 1.55, 1200);
+        const starViewDir = new THREE.Vector3(0.78, 0.34, 1.0).normalize();
+        camPos = body.position.clone().addScaledVector(starViewDir, dist);
+      } else {
+        const radDir = body.position.clone();
+        const len    = radDir.length();
+        if (len > 1) radDir.divideScalar(len); else radDir.set(0, 0, 1);
 
-      const camPos = body.position.clone()
-        .add(radDir.clone().multiplyScalar(dist * 0.7))
-        .add(new THREE.Vector3(0, dist * 0.4, 0));
+        camPos = body.position.clone()
+          .add(radDir.clone().multiplyScalar(dist * 0.7))
+          .add(new THREE.Vector3(0, dist * 0.4, 0));
+      }
 
+      const framedTarget = body.position.clone();
+      if (bodyType !== "star" && frameInsetRight > 0 && camera instanceof THREE.PerspectiveCamera) {
+        const viewportWidth = Math.max(gl.domElement.clientWidth, 1);
+        const screenOffsetX = -Math.min((frameInsetRight / viewportWidth) * 0.25, 0.085);
+        if (Math.abs(screenOffsetX) > 0.001) {
+          const forward = body.position.clone().sub(camPos).normalize();
+          const right = new THREE.Vector3().crossVectors(forward, _up).normalize();
+          const focusDistance = camPos.distanceTo(body.position);
+          const halfWidth = Math.tan(THREE.MathUtils.degToRad(camera.fov * 0.5)) * focusDistance * camera.aspect;
+          framedTarget.addScaledVector(right, -screenOffsetX * halfWidth);
+        }
+      }
+
+      snapStartCam.current.copy(camera.position);
+      snapStartTarget.current.copy(captureCurrentTarget());
       snapGoalCam.current.copy(camPos);
-      snapGoalTarget.current.copy(body.position);
+      snapGoalTarget.current.copy(framedTarget);
       isSnapping.current = true;
+      snapElapsed.current = 0;
+      {
+        const snapProfile = getSnapProfile(bodyType, snapStartCam.current.distanceTo(camPos));
+        snapDuration.current = snapProfile.duration;
+        snapArcHeight.current = Math.min(snapProfile.arcHeight, 320);
+      }
       snapToMode.current = "orbit";
 
       /* Remember if we came from fly mode */
@@ -275,18 +394,27 @@ export default function CameraController({
 
     /* ── Smooth snap interpolation ── */
     if (isSnapping.current) {
-      const alpha = 1 - Math.exp(-9 * delta);
+      snapElapsed.current += delta;
+      const rawT = snapDuration.current <= 0 ? 1 : snapElapsed.current / snapDuration.current;
+      const easedT = smootherStep(rawT);
+      const arcLift = Math.sin(Math.PI * easedT) * snapArcHeight.current;
+
+      _snapCam.copy(snapStartCam.current).lerp(snapGoalCam.current, easedT);
+      _snapTarget.copy(snapStartTarget.current).lerp(snapGoalTarget.current, easedT);
+
+      if (arcLift > 0.001) {
+        _snapCam.y += arcLift;
+        _snapTarget.y += arcLift * 0.18;
+      }
 
       if (snapToMode.current === "orbit" && ctrl) {
-        // Lerp both camera position and orbit target
-        camera.position.lerp(snapGoalCam.current, alpha);
-        ctrl.target.lerp(snapGoalTarget.current, alpha);
+        camera.position.copy(_snapCam);
+        ctrl.target.copy(_snapTarget);
         ctrl.update();
       } else {
-        // Fly-mode snap: lerp position, slerp quaternion toward lookAt
-        camera.position.lerp(snapGoalCam.current, alpha);
-        const goalQ = lookAtQuat(snapGoalCam.current, snapGoalTarget.current);
-        camera.quaternion.slerp(goalQ, alpha);
+        camera.position.copy(_snapCam);
+        _goalQuat.copy(lookAtQuat(_snapCam, _snapTarget));
+        camera.quaternion.slerp(_goalQuat, THREE.MathUtils.clamp(1 - Math.exp(-10 * delta), 0, 1));
       }
 
       // Keep lastBodyPos synced during snap
@@ -300,7 +428,12 @@ export default function CameraController({
         ? ctrl.target.distanceTo(snapGoalTarget.current)
         : 0;
 
-      if (camDist < 0.5 && tgtDist < 0.5) {
+      if (rawT >= 1 || (camDist < 0.5 && tgtDist < 0.5)) {
+        camera.position.copy(snapGoalCam.current);
+        if (ctrl && snapToMode.current === "orbit") {
+          ctrl.target.copy(snapGoalTarget.current);
+          ctrl.update();
+        }
         isSnapping.current = false;
         setMode(snapToMode.current);
         if (snapToMode.current === "fly") {

@@ -14,6 +14,8 @@ interface WalletPanelProps {
   onDisconnect: () => void;
   onSaveName: () => void;
   onNameChange: (v: string) => void;
+  showConnectAction?: boolean;
+  hideWhenDisconnected?: boolean;
 }
 
 export default function WalletPanel({
@@ -27,11 +29,15 @@ export default function WalletPanel({
   onDisconnect,
   onSaveName,
   onNameChange,
+  showConnectAction = true,
+  hideWhenDisconnected = false,
 }: WalletPanelProps) {
   const canSave = !isSaving && !!nameInput.trim();
 
   /* ── Not connected ── */
   if (!connectedAddress) {
+    if (hideWhenDisconnected && !status) return null;
+
     return (
       <>
         <div
@@ -42,7 +48,7 @@ export default function WalletPanel({
             padding: "10px 12px",
             display: "flex",
             alignItems: "center",
-            justifyContent: "space-between",
+            justifyContent: showConnectAction ? "space-between" : "flex-start",
           }}
         >
           <span
@@ -55,24 +61,26 @@ export default function WalletPanel({
           >
             offline
           </span>
-          <button
-            onClick={onConnect}
-            style={{
-              background: "rgba(0,229,255,0.08)",
-              color: "#00e5ff",
-              border: "1px solid rgba(0,229,255,0.3)",
-              padding: "5px 12px",
-              cursor: "pointer",
-              fontFamily: "inherit",
-              fontWeight: 600,
-              fontSize: 10,
-              letterSpacing: "0.1em",
-              textTransform: "uppercase",
-              transition: "all 0.15s",
-            }}
-          >
-            connect
-          </button>
+          {showConnectAction && (
+            <button
+              onClick={onConnect}
+              style={{
+                background: "rgba(0,229,255,0.08)",
+                color: "#00e5ff",
+                border: "1px solid rgba(0,229,255,0.3)",
+                padding: "5px 12px",
+                cursor: "pointer",
+                fontFamily: "inherit",
+                fontWeight: 600,
+                fontSize: 10,
+                letterSpacing: "0.1em",
+                textTransform: "uppercase",
+                transition: "all 0.15s",
+              }}
+            >
+              connect
+            </button>
+          )}
         </div>
         {status && (
           <div

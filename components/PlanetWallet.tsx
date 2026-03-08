@@ -9,7 +9,7 @@ import * as THREE from "three";
 import type { PlanetData } from "@/lib/layout";
 import { createPlanetMaterial, createMarsMaterial } from "@/lib/shaders/planetMaterial";
 import { PLANET_GEOS, ATMOS_HAZE_GEO, ATMOS_RIM_GEO, ATMOS_EXPIRY_GEO } from "@/lib/geometryPool";
-import WalletTooltip from "./WalletTooltip";
+import WalletTooltip, { type WalletTooltipVariant } from "./WalletTooltip";
 import MoonBody from "./MoonBody";
 import SaturnSystem from "./SaturnSystem";
 
@@ -137,6 +137,7 @@ function cloneExpiryGlowMat(color: THREE.Color, intensity: number): THREE.Shader
 
 interface PlanetWalletProps {
   data:     PlanetData;
+  starWorldPosition: [number, number, number];
   selected: boolean;
   panelOpen?: boolean;
   onSelect: () => void;
@@ -147,18 +148,20 @@ interface PlanetWalletProps {
   showMoonLabels?: boolean;
   showRingLabels?: boolean;
   showRenamedOnly?: boolean;
-  showTrails?: boolean;
   onShiftSelect?: (addr: string) => void;
-  vesting?: boolean;
+  detailVariant?: WalletTooltipVariant;
+  paused?: boolean;
 }
 
-const TRAIL_N   = 60;
-const TRAIL_SEC = 30;
-
-export default function PlanetWallet({ data, selected, panelOpen, onSelect, onDeselect, selectedAddress, onSelectAddress, showLabel, showMoonLabels, showRingLabels, showRenamedOnly, showTrails, onShiftSelect, vesting }: PlanetWalletProps) {
+export default function PlanetWallet({ data, starWorldPosition, selected, panelOpen, onSelect, onDeselect, selectedAddress, onSelectAddress, showLabel, showMoonLabels, showRingLabels, showRenamedOnly, onShiftSelect, detailVariant = "wallet", paused = false }: PlanetWalletProps) {
   const orbitRef = useRef<THREE.Group>(null);
   const meshRef  = useRef<THREE.Mesh>(null);
+  const simTimeRef = useRef(0);
   const [hovered, setHovered] = useState(false);
+  const starWorldPos = useMemo(
+    () => new THREE.Vector3(starWorldPosition[0], starWorldPosition[1], starWorldPosition[2]),
+    [starWorldPosition],
+  );
 
   // One ShaderMaterial per planet — unique uniforms (hue, seed, type, time)
   const material = useMemo(
@@ -220,37 +223,16 @@ export default function PlanetWallet({ data, selected, panelOpen, onSelect, onDe
   const _lodPos = useMemo(() => new THREE.Vector3(), []);
   const lodRef = useRef(0);
 
-  // ── Orbit trail geometry ──
-  const trailPositions = useMemo(() => new Float32Array(TRAIL_N * 3), []);
-  const trailColors    = useMemo(() => new Float32Array(TRAIL_N * 3), []);
-  const trailGeo = useMemo(() => {
-    const g = new THREE.BufferGeometry();
-    g.setAttribute("position", new THREE.BufferAttribute(trailPositions, 3).setUsage(THREE.DynamicDrawUsage));
-    g.setAttribute("color",    new THREE.BufferAttribute(trailColors,    3).setUsage(THREE.DynamicDrawUsage));
-    return g;
-  }, [trailPositions, trailColors]);
-  const trailMat = useMemo(
-    () => new THREE.LineBasicMaterial({
-      vertexColors: true,
-      transparent:  true,
-      opacity:      0.40,
-      depthWrite:   false,
-      blending:     THREE.AdditiveBlending,
-    }),
-    [],
-  );
-  const trailLine = useMemo(() => {
-    const line = new THREE.Line(trailGeo, trailMat);
-    line.frustumCulled = false;   // bounding sphere never updates; skip culling
-    return line;
-  }, [trailGeo, trailMat]);
-
-  useFrame((state) => {
-    const t = state.clock.elapsedTime;
+  useFrame((state, delta) => {
+    if (!paused) simTimeRef.current += delta;
+    const t = simTimeRef.current;
     if (orbitRef.current) orbitRef.current.rotation.y = data.initialAngle + data.orbitSpeed * t;
     if (meshRef.current)  meshRef.current.rotation.y  = 0.04 * t;
     material.uniforms.uTime.value = t;
+    material.uniforms.uStarPos.value.copy(starWorldPos);
     if (expiryGlowMat) expiryGlowMat.uniforms.uTime.value = t;
+    if (atmosRimMat) atmosRimMat.uniforms.uStarPos.value.copy(starWorldPos);
+    if (atmosHazeMat) atmosHazeMat.uniforms.uStarPos.value.copy(starWorldPos);
 
     // LOD: swap sphere tessellation based on camera distance
     if (meshRef.current) {
@@ -265,20 +247,6 @@ export default function PlanetWallet({ data, selected, panelOpen, onSelect, onDe
 
     // Analytically compute moon world positions for transit shadow uniforms.
     // Transform chain: Rx(planet.tilt) → Ry(planetAngle) → T(orbitR) → Rx(moon.tilt) → Ry(moonAngle) → T(moon.orbitR)
-    // ── Update trail ──
-    if (showTrails) {
-      const pos = trailGeo.attributes.position as THREE.BufferAttribute;
-      const col = trailGeo.attributes.color    as THREE.BufferAttribute;
-      for (let i = 0; i < TRAIL_N; i++) {
-        const frac  = i / (TRAIL_N - 1);           // 0 = oldest tail, 1 = current head
-        const ti    = t - TRAIL_SEC * (1 - frac);
-        const angle = data.initialAngle + data.orbitSpeed * ti;
-        pos.setXYZ(i, data.orbitRadius * Math.cos(angle), 0, data.orbitRadius * Math.sin(angle));
-        col.setXYZ(i, 0.0, frac * 0.45, frac * 0.75);  // fade from black → dim cyan
-      }
-      pos.needsUpdate = true;
-      col.needsUpdate = true;
-    }
 
     if (data.moons.length > 0) {
       const planetAngle = data.initialAngle + data.orbitSpeed * t;
@@ -330,9 +298,6 @@ export default function PlanetWallet({ data, selected, panelOpen, onSelect, onDe
 
   return (
     <group rotation={[data.tilt, 0, 0]}>
-      {/* Orbit trail — lives in tilted-group local space so tilt is inherited */}
-      {showTrails && <primitive object={trailLine} />}
-
       <group ref={orbitRef}>
 
         {/* Planet sphere */}
@@ -378,6 +343,7 @@ export default function PlanetWallet({ data, selected, panelOpen, onSelect, onDe
           <group position={[data.orbitRadius, 0, 0]}>
             <SaturnSystem
               data={data}
+              starWorldPosition={starWorldPosition}
               selectedAddress={selectedAddress}
               onSelectAddress={onSelectAddress}
               onDeselect={onDeselect}
@@ -385,6 +351,7 @@ export default function PlanetWallet({ data, selected, panelOpen, onSelect, onDe
               showMoonLabels={showMoonLabels}
               showRingLabels={showRingLabels}
               showRenamedOnly={showRenamedOnly}
+              paused={paused}
             />
           </group>
         )}
@@ -397,7 +364,7 @@ export default function PlanetWallet({ data, selected, panelOpen, onSelect, onDe
             zIndexRange={[10000, 0]}
             style={{ pointerEvents: (selected && panelOpen) ? "auto" : "none" }}
           >
-            <WalletTooltip wallet={data.wallet} onClose={(selected && panelOpen) ? onDeselect : undefined} vesting={vesting} />
+            <WalletTooltip wallet={data.wallet} onClose={(selected && panelOpen) ? onDeselect : undefined} variant={detailVariant} />
           </Html>
         )}
 
@@ -406,8 +373,8 @@ export default function PlanetWallet({ data, selected, panelOpen, onSelect, onDe
           (!showRenamedOnly || data.wallet.customName) ? (
           <SpriteLabel
             position={[data.orbitRadius, data.radius + 0.4, 0]}
-            text={`${vesting ? "◈ " : `#${data.vpRank} `}${data.wallet.customName || `${data.wallet.address.slice(0, 6)}\u2026${data.wallet.address.slice(-4)}`}`}
-            color={vesting ? "#7ccedd" : "#90b8d0"}
+            text={`${detailVariant === "vesting" ? "◈ " : detailVariant === "pool" ? "" : `#${data.vpRank} `}${data.wallet.customName || `${data.wallet.address.slice(0, 6)}\u2026${data.wallet.address.slice(-4)}`}`}
+            color={detailVariant === "vesting" ? "#7ccedd" : detailVariant === "pool" ? "#ffe08a" : "#90b8d0"}
             fontSize={0.4}
             opacity={0.85}
             onClick={onSelect}
@@ -420,6 +387,7 @@ export default function PlanetWallet({ data, selected, panelOpen, onSelect, onDe
           <MoonBody
             key={moon.wallet.address + i}
             data={moon}
+            starWorldPosition={starWorldPosition}
             planetOrbit={data.orbitRadius}
             hostRadius={data.radius}
             selected={selectedAddress?.toLowerCase() === moon.wallet.address.toLowerCase()}
@@ -428,7 +396,8 @@ export default function PlanetWallet({ data, selected, panelOpen, onSelect, onDe
             onDeselect={onDeselect}
             showLabel={showMoonLabels}
             showRenamedOnly={showRenamedOnly}
-            vesting={vesting}
+            detailVariant={detailVariant}
+            paused={paused}
           />
         ))}
       </group>

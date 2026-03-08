@@ -71,6 +71,7 @@ interface ProtoplanetaryDiskProps {
   showAllNames?: boolean;
   showRenamedOnly?: boolean;
   vesting?: boolean;
+  paused?: boolean;
 }
 
 export default function ProtoplanetaryDisk({
@@ -84,8 +85,10 @@ export default function ProtoplanetaryDisk({
   showAllNames,
   showRenamedOnly,
   vesting,
+  paused = false,
 }: ProtoplanetaryDiskProps) {
   const groupRef = useRef<THREE.Group>(null);
+  const simTimeRef = useRef(0);
   const count    = asteroids.length;
 
   const [hoveredGlobalIdx, setHoveredGlobalIdx] = useState<number>(-1);
@@ -161,10 +164,11 @@ export default function ProtoplanetaryDisk({
   }, [asteroids, variantGroups, beltInnerRadius, beltOuterRadius, count]);
 
   /* ── Slow disk rotation ─────────────────────────────────── */
-  useFrame((state) => {
+  useFrame((_, delta) => {
+    if (!paused) simTimeRef.current += delta;
     if (groupRef.current)
       // Slightly faster than asteroid belt (more "active" accretion)
-      groupRef.current.rotation.y = 0.004 * state.clock.elapsedTime;
+      groupRef.current.rotation.y = 0.004 * simTimeRef.current;
   });
 
   /* ── Event handlers ─────────────────────────────────────── */

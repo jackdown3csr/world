@@ -11,6 +11,7 @@ const PERIOD   = 950;          // seconds per full orbit
 const OMEGA    = (2 * Math.PI) / PERIOD;
 const PHASE    = 2.17;         // arbitrary starting phase
 const ROGUE_R  = 4.2;          // body radius
+export const ROGUE_ADDRESS = "__rogue__";
 
 /* The single cryptic identifying hash shown on click */
 export const ROGUE_HASH =
@@ -107,12 +108,21 @@ const FRAG = /* glsl */ `
 `;
 
 interface RoguePlanetProps {
-  onRogueClick: () => void;
+  starPositions: [number, number, number][];
+  onSelect?: (addr: string) => void;
+  paused?: boolean;
 }
 
-export default function RoguePlanet({ onRogueClick }: RoguePlanetProps) {
+export default function RoguePlanet({ starPositions, onSelect, paused = false }: RoguePlanetProps) {
   const groupRef = useRef<THREE.Group>(null);
   const meshRef  = useRef<THREE.Mesh>(null);
+  const simTimeRef = useRef(0);
+  const worldPos = useMemo(() => new THREE.Vector3(), []);
+  const nearestStar = useMemo(() => new THREE.Vector3(), []);
+  const sceneStars = useMemo(
+    () => starPositions.map(([x, y, z]) => new THREE.Vector3(x, y, z)),
+    [starPositions],
+  );
 
   const material = useMemo(
     () =>
@@ -128,8 +138,9 @@ export default function RoguePlanet({ onRogueClick }: RoguePlanetProps) {
     [],
   );
 
-  useFrame(({ clock }) => {
-    const t     = clock.elapsedTime;
+  useFrame((_, delta) => {
+    if (!paused) simTimeRef.current += delta;
+    const t     = simTimeRef.current;
     const angle = PHASE + OMEGA * t;
     if (groupRef.current) {
       groupRef.current.position.set(
@@ -137,6 +148,16 @@ export default function RoguePlanet({ onRogueClick }: RoguePlanetProps) {
         ORBIT_R * Math.sin(INCL) * Math.sin(angle),   // inclined orbit
         ORBIT_R * Math.cos(INCL) * Math.sin(angle),
       );
+      groupRef.current.getWorldPosition(worldPos);
+      let minDistSq = Number.POSITIVE_INFINITY;
+      for (const starPos of sceneStars) {
+        const distSq = worldPos.distanceToSquared(starPos);
+        if (distSq < minDistSq) {
+          minDistSq = distSq;
+          nearestStar.copy(starPos);
+        }
+      }
+      material.uniforms.uStarPos.value.copy(nearestStar);
     }
     if (meshRef.current) meshRef.current.rotation.y = 0.012 * t;
     material.uniforms.uTime.value = t;
@@ -146,9 +167,10 @@ export default function RoguePlanet({ onRogueClick }: RoguePlanetProps) {
     <group ref={groupRef}>
       <mesh
         ref={meshRef}
+        userData={{ walletAddress: ROGUE_ADDRESS, bodyRadius: ROGUE_R, bodyType: "rogue" }}
         onPointerEnter={(e) => { e.stopPropagation(); document.body.style.cursor = "pointer"; }}
         onPointerLeave={() => { document.body.style.cursor = "auto"; }}
-        onClick={(e) => { e.stopPropagation(); onRogueClick(); }}
+        onClick={(e) => { e.stopPropagation(); onSelect?.(ROGUE_ADDRESS); }}
       >
         <sphereGeometry args={[ROGUE_R, 64, 48]} />
         <primitive object={material} attach="material" />

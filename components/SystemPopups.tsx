@@ -8,6 +8,7 @@
 
 import React from "react";
 import type { WalletEntry } from "@/lib/types";
+import type { BridgeSceneObject } from "@/lib/bridges";
 import { ROGUE_HASH } from "./RoguePlanet";
 
 /* ── Storage Slot Popup ── */
@@ -164,6 +165,139 @@ export function RoguePopup({ onClose }: RoguePopupProps) {
         <div style={{ marginTop:10, textAlign:"right", color:"#2e1414", fontSize:9, letterSpacing:"0.10em" }}>
           click to dismiss
         </div>
+      </div>
+    </div>
+  );
+}
+
+interface BridgePopupProps {
+  bridge: BridgeSceneObject;
+  onClose: () => void;
+}
+
+export function BridgePopup({ bridge, onClose }: BridgePopupProps) {
+  const lastPulseLabel = bridge.stats.lastTransferAt
+    ? new Date(bridge.stats.lastTransferAt).toLocaleString()
+    : "waiting";
+  const lastTransfer = bridge.stats.latestTransfers[0] ?? null;
+
+  return (
+    <div
+      style={{
+        position: "fixed",
+        right: 14,
+        top: 92,
+        zIndex: 12000,
+        width: "min(340px, calc(100vw - 28px))",
+        pointerEvents: "none",
+      }}
+    >
+      <div
+        onClick={(e) => e.stopPropagation()}
+        style={{
+          pointerEvents: "auto",
+          background: "rgba(1, 8, 16, 0.96)",
+          border: "1px solid rgba(92,245,255,0.22)",
+          borderLeft: "2px solid rgba(92,245,255,0.68)",
+          borderRadius: 4,
+          padding: "14px 16px",
+          fontFamily: "'JetBrains Mono','SF Mono','Fira Code',Menlo,monospace",
+          fontSize: 11,
+          color: "#96b4c4",
+          lineHeight: 1.7,
+          boxShadow: "0 6px 30px rgba(0,0,0,0.5), inset 0 0 40px rgba(30,120,140,0.05)",
+        }}
+      >
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", marginBottom: 10 }}>
+          <span style={{ color: "#7ef1ff", fontSize: 10, letterSpacing: "0.18em", textTransform: "uppercase" }}>
+            {bridge.label} / {bridge.kind}
+          </span>
+          <button
+            onClick={onClose}
+            style={{ background: "none", border: "none", color: "#4f8695", cursor: "pointer", fontSize: 14, padding: 0, fontFamily: "inherit" }}
+          >
+            x
+          </button>
+        </div>
+
+        <div style={{ color: "#6e8b98", marginBottom: 10 }}>
+          {bridge.routeHint}
+        </div>
+
+        <div style={{
+          display: "grid",
+          gridTemplateColumns: "repeat(3, minmax(0, 1fr))",
+          gap: 10,
+          marginBottom: 10,
+        }}>
+          {bridge.stats.cardMetrics.slice(0, 3).map((metric) => (
+            <CompactStat
+              key={metric.label}
+              label={metric.label}
+              value={metric.value}
+              accent={metric.accent ?? "#d6ecf8"}
+            />
+          ))}
+        </div>
+
+        <div style={{ borderTop: "1px solid rgba(92,245,255,0.08)", paddingTop: 8, display: "grid", gap: 6 }}>
+          <div style={{ display: "flex", justifyContent: "space-between", gap: 10, color: "#6b8b99" }}>
+            <span>status</span>
+            <span style={{ color: "#a7dbe0", textAlign: "right" }}>{bridge.stats.statusLabel}</span>
+          </div>
+          <div style={{ display: "flex", justifyContent: "space-between", gap: 10, color: "#6b8b99" }}>
+            <span>tracked tx</span>
+            <span style={{ color: "#a7dbe0", textAlign: "right" }}>{bridge.stats.historySummary}</span>
+          </div>
+          <div style={{ display: "flex", justifyContent: "space-between", gap: 10, color: "#6b8b99" }}>
+            <span>throughput</span>
+            <span style={{ color: "#a7dbe0", textAlign: "right" }}>{bridge.stats.throughputLabel}</span>
+          </div>
+          <div style={{ display: "flex", justifyContent: "space-between", gap: 10, color: "#6b8b99" }}>
+            <span>last</span>
+            <span style={{ color: "#a7dbe0", textAlign: "right" }}>{lastPulseLabel}</span>
+          </div>
+          {bridge.stats.scannedThroughBlock ? (
+            <div style={{ color: "#4f7482", fontSize: 10 }}>
+              synced through block {bridge.stats.scannedThroughBlock.toLocaleString()}
+            </div>
+          ) : null}
+          {lastTransfer ? (
+            <div style={{
+              marginTop: 4,
+              borderTop: "1px solid rgba(255,255,255,0.04)",
+              paddingTop: 8,
+              display: "grid",
+              gap: 2,
+              color: "#7fa4b2",
+            }}>
+              <div style={{ color: lastTransfer.direction === "outbound" ? "#8ff7ff" : "#ffcb93", fontSize: 9, letterSpacing: "0.12em", textTransform: "uppercase" }}>
+                latest {lastTransfer.direction}
+              </div>
+              <div style={{ color: "#d2edf8" }}>{lastTransfer.amountFormatted ?? "unparsed payload"}</div>
+              <div>{lastTransfer.sender} {"->"} {lastTransfer.recipient}</div>
+            </div>
+          ) : null}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function CompactStat({ label, value, accent }: { label: string; value: string; accent: string }) {
+  return (
+    <div style={{
+      minWidth: 0,
+      border: "1px solid rgba(255,255,255,0.06)",
+      background: "rgba(255,255,255,0.025)",
+      borderRadius: 4,
+      padding: "8px 9px",
+    }}>
+      <div style={{ color: "#5d7a88", fontSize: 8, letterSpacing: "0.14em", textTransform: "uppercase", marginBottom: 5 }}>
+        {label}
+      </div>
+      <div style={{ color: accent, fontSize: 15, fontWeight: 700, lineHeight: 1.15, wordBreak: "break-word" }}>
+        {value}
       </div>
     </div>
   );
