@@ -96,6 +96,7 @@ interface TopStripChipProps {
   label: string;
   active?: boolean;
   onClick?: () => void;
+  disabled?: boolean;
   accent?: string;
   title?: string;
   noTooltip?: boolean;
@@ -106,6 +107,7 @@ export function TopStripChip({
   label,
   active = false,
   onClick,
+  disabled = false,
   accent,
   title,
   noTooltip = false,
@@ -122,7 +124,8 @@ export function TopStripChip({
       <button
         ref={anchorRef}
         type="button"
-        onClick={onClick}
+        onClick={disabled ? undefined : onClick}
+        disabled={disabled}
         aria-label={tooltipText}
         onMouseEnter={() => setHovered(true)}
         onMouseLeave={() => setHovered(false)}
@@ -145,7 +148,9 @@ export function TopStripChip({
                 : "rgba(255,255,255,0.05)"
               : active
                 ? "rgba(255,255,255,0.12)"
-                : "rgba(255,255,255,0.04)",
+                : disabled
+                  ? "rgba(255,255,255,0.025)"
+                  : "rgba(255,255,255,0.04)",
           color: isHint
             ? "rgba(255,255,255,0.42)"
             : isStatus
@@ -154,7 +159,9 @@ export function TopStripChip({
                 : "rgba(255,255,255,0.58)"
               : active
                 ? "#ffffff"
-                : accent ?? "rgba(255,255,255,0.72)",
+                : disabled
+                  ? "rgba(255,255,255,0.28)"
+                  : accent ?? "rgba(255,255,255,0.72)",
           borderRadius: 4,
           padding: variant === "hint" ? "2px 6px" : "3px 8px",
           minHeight: 22,
@@ -162,11 +169,12 @@ export function TopStripChip({
           letterSpacing: variant === "hint" ? "0.12em" : "0.10em",
           textTransform: "uppercase",
           fontFamily: "'JetBrains Mono', 'SF Mono', monospace",
-          cursor: onClick ? "pointer" : "default",
+          cursor: disabled ? "not-allowed" : onClick ? "pointer" : "default",
           lineHeight: 1.1,
           transition: "all 0.18s ease",
           flexShrink: 0,
           position: "relative",
+          opacity: disabled ? 0.55 : 1,
         }}
       >
         {label}

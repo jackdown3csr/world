@@ -936,8 +936,10 @@ export default function SystemHud({
                   key={system.id}
                   label={system.navLabel}
                   active={system.id === toolbarActiveSystemId}
-                  onClick={selectedSystemStarId === system.starId ? undefined : () => onJumpToStar(system.starId)}
+                  onClick={selectedSystemStarId === system.starId || flyModeEnabled ? undefined : () => onJumpToStar(system.starId)}
+                  disabled={flyModeEnabled}
                   accent={system.accent}
+                  title={flyModeEnabled ? "System switching is disabled in fly mode" : undefined}
                   noTooltip
                 />
               ))}
