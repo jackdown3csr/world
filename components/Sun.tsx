@@ -31,6 +31,7 @@ import { createCmeMaterial, createSurfaceMaterial } from "./sun/starMaterials";
 export type { StarPalette } from "./sun/config";
 
 interface SunProps {
+  showSystemLabel?: boolean;
   totalVotingPower?: string;
   totalLocked?: string;
   blockNumber?: number;
@@ -45,6 +46,7 @@ interface SunProps {
 }
 
 export default function Sun({
+  showSystemLabel = true,
   totalVotingPower,
   totalLocked,
   blockNumber,
@@ -143,16 +145,18 @@ export default function Sun({
         />
       </group>
 
-      {(totalVotingPower || totalLocked) && (
+      {(showSystemLabel || totalVotingPower || totalLocked) && (
         <group position={[0, labelYOffset, 0]}>
-          <SpriteLabel
-            text={label ?? "VESCROW"}
-            color={pal.label.name}
-            fontSize={0.55}
-            opacity={1}
-            onClick={onSelect}
-            alwaysVisible
-          />
+          {showSystemLabel && (
+            <SpriteLabel
+              text={label ?? "VESCROW"}
+              color={pal.label.name}
+              fontSize={0.55}
+              opacity={1}
+              onClick={onSelect}
+              alwaysVisible
+            />
+          )}
           {totalVotingPower && (
             <SpriteLabel
               localOffset={[0, -0.8, 0]}

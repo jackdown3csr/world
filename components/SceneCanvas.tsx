@@ -508,7 +508,8 @@ export default function SceneCanvas({
           totalLocked={system.starSecondaryMetric}
           blockNumber={system.id === "vescrow" ? getBlockPulseTick(system.id) : undefined}
           showOrbits={showOrbits}
-          showAllNames={showAllNames}
+          showAllNames={showAllNames && activeSystem === system.id}
+          showSystemLabel={showAllNames}
           showRenamedOnly={showRenamedOnly || activeSystem !== system.id}
           photoMode={photoMode}
           paused={simulationPaused}
@@ -523,7 +524,7 @@ export default function SceneCanvas({
           starScale={system.starScale}
           detailVariant={system.detailVariant}
           interactiveBelt={system.id !== "staking-remnant"}
-          showBeltLabels={system.id !== "staking-remnant"}
+          showBeltLabels={showAllNames && activeSystem === system.id && system.id !== "staking-remnant"}
           beltTone={"default"}
           showSolarWind={system.id !== "gubi-pool"}
         />

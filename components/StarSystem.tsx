@@ -53,6 +53,7 @@ export interface StarSystemProps {
   showOrbits?: boolean;
   /** Show body name labels */
   showAllNames?: boolean;
+  showSystemLabel?: boolean;
   showRenamedOnly?: boolean;
   photoMode?: boolean;
   paused?: boolean;
@@ -86,6 +87,7 @@ export default function StarSystem({
   blockNumber,
   showOrbits = true,
   showAllNames = true,
+  showSystemLabel = true,
   showRenamedOnly = false,
   photoMode = false,
   paused = false,
@@ -124,6 +126,7 @@ export default function StarSystem({
       {/* All 3D bodies in world-space offset group */}
       <group position={position}>
         <Sun
+          showSystemLabel={showSystemLabel && !photoMode}
           totalVotingPower={showAllNames && !photoMode ? totalVotingPower : undefined}
           totalLocked={showAllNames && !photoMode ? totalLocked : undefined}
           blockNumber={blockNumber}
