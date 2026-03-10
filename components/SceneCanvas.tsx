@@ -435,7 +435,7 @@ export default function SceneCanvas({
   const [activeSystem, setActiveSystem] = useState<SceneSystemId>(systems[0]?.id ?? "vescrow");
   const activeFlyMode = cinematicFlyEnabled ? "cinematic" : flyModeEnabled ? "flight" : null;
   const interactionEnabled = !flyModeEnabled && cameraMode !== "fly";
-  const visualFocusAddress = selectedAddress;
+  const visualFocusAddress = cameraFocusAddress ?? selectedAddress;
   const starPositions = useMemo(() => systems.map((system) => system.position), [systems]);
 
   const getBlockPulseTick = (systemId: SceneSystemId) => {

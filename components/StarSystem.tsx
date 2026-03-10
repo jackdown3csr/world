@@ -127,6 +127,20 @@ export default function StarSystem({
     [systemId],
   );
 
+  // Interpret scoped IDs ("systemId:0x...") so only the matching system
+  // treats the address as selected. This prevents cross-system highlight bleed.
+  const systemSelectedAddress = React.useMemo(() => {
+    if (!selectedAddress) return null;
+    const colonIdx = selectedAddress.indexOf(":");
+    const isScoped = colonIdx > 0 && !selectedAddress.startsWith("__");
+    if (!isScoped) return selectedAddress;
+    if (!systemId) return null;
+
+    const scopedSystemId = selectedAddress.slice(0, colonIdx);
+    if (scopedSystemId !== systemId) return null;
+    return selectedAddress.slice(colonIdx + 1);
+  }, [selectedAddress, systemId]);
+
   return (
     <>
       {/* SolarWind at scene root (not inside the offset group) */}
@@ -159,12 +173,12 @@ export default function StarSystem({
               data={p}
               starWorldPosition={position}
               selected={
-                selectedAddress?.toLowerCase() === p.wallet.address.toLowerCase()
+                systemSelectedAddress?.toLowerCase() === p.wallet.address.toLowerCase()
               }
               onSelect={() => onSelect?.(scopeAddr(p.wallet.address))}
               onDeselect={() => onDeselect?.()}
               panelOpen={panelOpen}
-              selectedAddress={selectedAddress}
+              selectedAddress={systemSelectedAddress}
               onSelectAddress={(addr) => onSelect?.(scopeAddr(addr))}
               showLabel={showAllNames && !photoMode}
               showMoonLabels={showAllNames && !photoMode}
@@ -184,7 +198,7 @@ export default function StarSystem({
             asteroids={solarData.asteroids}
             beltInnerRadius={solarData.beltInnerRadius}
             beltOuterRadius={solarData.beltOuterRadius}
-            selectedAddress={selectedAddress}
+            selectedAddress={systemSelectedAddress}
             onSelectAddress={(addr) => onSelect?.(scopeAddr(addr))}
             onDeselect={() => onDeselect?.()}
             panelOpen={panelOpen}
@@ -200,8 +214,8 @@ export default function StarSystem({
             asteroids={solarData.asteroids}
             beltInnerRadius={solarData.beltInnerRadius}
             beltOuterRadius={solarData.beltOuterRadius}
-            selectedAddress={selectedAddress}
-            onSelectAddress={(addr) => onSelect?.(addr)}
+            selectedAddress={systemSelectedAddress}
+            onSelectAddress={(addr) => onSelect?.(scopeAddr(addr))}
             onDeselect={() => onDeselect?.()}
             panelOpen={panelOpen}
             showAllNames={showAllNames && !photoMode}

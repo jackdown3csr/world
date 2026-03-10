@@ -80,6 +80,29 @@ export interface PoolTokenEntry extends WalletEntry {
   shareOfPoolFormatted: string;
 }
 
+export interface PoolStats {
+  totalUsers: number;
+  dailyDistribution: string;
+  totalMonthlyEmission: string;
+  emissionPerRepPoint: string;
+}
+
+export interface VaultBalances {
+  wgnet: string;
+  wgnetFormatted: string;
+  archai: string;
+  archaiFormatted: string;
+}
+
+export interface PoolRedeemBasket {
+  userGubiBalance: string;
+  userGubiFormatted: string;
+  redeemWgnet: string;
+  redeemWgnetFormatted: string;
+  redeemArchai: string;
+  redeemArchaiFormatted: string;
+}
+
 export interface PoolPayload {
   updatedAt: number;
   totalWorthUSD: number;
@@ -89,6 +112,8 @@ export interface PoolPayload {
   supply: string;
   supplyFormatted: string;
   tokens: PoolTokenEntry[];
+  stats: PoolStats | null;
+  vault: VaultBalances | null;
 }
 
 /* ── Bridge telemetry types ─────────────────────────────── */

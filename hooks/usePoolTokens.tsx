@@ -8,7 +8,7 @@ import {
   useCallback,
   type ReactNode,
 } from "react";
-import type { PoolPayload, PoolTokenEntry } from "@/lib/types";
+import type { PoolPayload, PoolTokenEntry, PoolStats, VaultBalances } from "@/lib/types";
 
 interface PoolState {
   tokens: PoolTokenEntry[];
@@ -19,6 +19,8 @@ interface PoolState {
   gubiPriceFormatted: string;
   supply: string;
   supplyFormatted: string;
+  stats: PoolStats | null;
+  vault: VaultBalances | null;
   loading: boolean;
   error: string | null;
   refetch: () => Promise<void>;
@@ -38,6 +40,8 @@ const initialState: PoolState = {
   gubiPriceFormatted: "$0.00",
   supply: "0",
   supplyFormatted: "0 gUBI",
+  stats: null,
+  vault: null,
   loading: true,
   error: null,
   refetch: () => Promise.resolve(),
@@ -58,6 +62,8 @@ function reducer(state: PoolState, action: Action): PoolState {
         gubiPriceFormatted: action.payload.gubiPriceFormatted,
         supply: action.payload.supply,
         supplyFormatted: action.payload.supplyFormatted,
+        stats: action.payload.stats ?? null,
+        vault: action.payload.vault ?? null,
         loading: false,
         error: null,
       };

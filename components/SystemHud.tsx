@@ -349,6 +349,7 @@ export default function SystemHud({
     beltOuterRadius: 0,
   };
   const toolbarActiveSystemId = hasDetachedFocus ? null : displaySystem?.id ?? null;
+  const isDirectoryDisabled = (toolbarActiveSystemId ?? activeSystemId) === "staking-remnant";
   const photoFovPresets = [35, 55, 70];
   const overviewTargetId = hasDetachedFocus ? null : (displaySystem?.id ?? activeSystemId);
   const selectedBridgeId = selectedBridge?.id ?? null;
@@ -815,13 +816,18 @@ export default function SystemHud({
   }, [infoChipActive, onToggleDirectory, onToggleHelp, overviewTargetId, selectedBridgeId, selectedTransitBeaconId, showBugReport, showHelp, showNamesList]);
 
   const handleListToggle = React.useCallback(() => {
+    if (isDirectoryDisabled) return;
     if (!showNamesList) {
       if (showSceneInfo) setShowSceneInfo(false);
       if (showHelp) onToggleHelp();
       if (showBugReport) setShowBugReport(false);
     }
     onToggleDirectory();
-  }, [onToggleDirectory, onToggleHelp, showBugReport, showHelp, showNamesList, showSceneInfo]);
+  }, [isDirectoryDisabled, onToggleDirectory, onToggleHelp, showBugReport, showHelp, showNamesList, showSceneInfo]);
+
+  React.useEffect(() => {
+    if (isDirectoryDisabled && showNamesList) onToggleDirectory();
+  }, [isDirectoryDisabled, onToggleDirectory, showNamesList]);
 
   const handleHelpToggle = React.useCallback(() => {
     if (!showHelp) {
@@ -1233,7 +1239,15 @@ export default function SystemHud({
               ))}
               <TopStripDivider />
               <TopStripChip label="info" active={showSceneInfo} onClick={handleInfoToggle} accent="#9cc9d8" noTooltip />
-              <TopStripChip label="list" active={showNamesList} onClick={handleListToggle} accent="#9cc9d8" noTooltip />
+              <TopStripChip
+                label="list"
+                active={showNamesList}
+                onClick={handleListToggle}
+                disabled={isDirectoryDisabled}
+                accent="#9cc9d8"
+                title={isDirectoryDisabled ? "Directory unavailable in staking system" : "Open directory"}
+                noTooltip
+              />
             </div>
           </div>
 
@@ -1390,7 +1404,14 @@ export default function SystemHud({
                 ))}
                 <TopStripDivider />
                 <TopStripChip label="info" active={infoChipActive} onClick={handleInfoToggle} accent="#9cc9d8" title="Open system panel" />
-                <TopStripChip label="list" active={showNamesList} onClick={handleListToggle} accent="#9cc9d8" title="Open directory" />
+                <TopStripChip
+                  label="list"
+                  active={showNamesList}
+                  onClick={handleListToggle}
+                  disabled={isDirectoryDisabled}
+                  accent="#9cc9d8"
+                  title={isDirectoryDisabled ? "Directory unavailable in staking system" : "Open directory"}
+                />
               </TopStripGroup>
 
               <HudToolbar {...toolbarProps} compact embedded />

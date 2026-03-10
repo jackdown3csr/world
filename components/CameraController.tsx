@@ -308,6 +308,11 @@ export default function CameraController({
         default:       dist = Math.max(body.bodyRadius * 12, 8); break;
       }
 
+      // Slightly tighter framing helps orbit tracking feel more "locked" to the object.
+      if (bodyType !== "star") {
+        dist *= 0.92;
+      }
+
       let camPos: THREE.Vector3;
       if (bodyType === "star") {
         const overviewRadius = body.focusRadius ?? body.bodyRadius * 8;

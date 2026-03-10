@@ -90,7 +90,7 @@ export default function SystemInfoCard({
           gap: "10px 14px",
           marginBottom: 10,
         }}>
-          {system?.summaryRows.slice(0, 4).map((row, index) => (
+          {system?.summaryRows.map((row, index) => (
             <div key={row.label} style={{ gridColumn: index === 0 && (system.summaryRows.length % 2 === 1) ? "1 / -1" : undefined }}>
               <div style={{ color: "#5f7788", fontSize: 8, letterSpacing: "0.14em", textTransform: "uppercase", marginBottom: 3 }}>
                 {row.label}

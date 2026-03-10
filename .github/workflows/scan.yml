@@ -21,9 +21,16 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      - name: Run scanner
+      - name: Run veGNET scanner
         env:
           UPSTASH_REDIS_REST_URL:   ${{ secrets.UPSTASH_REDIS_REST_URL }}
           UPSTASH_REDIS_REST_TOKEN: ${{ secrets.UPSTASH_REDIS_REST_TOKEN }}
           RPC_URL:                  ${{ secrets.RPC_URL }}
         run: npx tsx scripts/scan-and-update.ts
+
+      - name: Run vesting scanner
+        env:
+          UPSTASH_REDIS_REST_URL:   ${{ secrets.UPSTASH_REDIS_REST_URL }}
+          UPSTASH_REDIS_REST_TOKEN: ${{ secrets.UPSTASH_REDIS_REST_TOKEN }}
+          RPC_URL:                  ${{ secrets.RPC_URL }}
+        run: npx tsx scripts/scan-vesting.ts

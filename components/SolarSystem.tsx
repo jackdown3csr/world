@@ -15,6 +15,7 @@ import { useWalletConnection } from "@/hooks/useWalletConnection";
 import { useIsMobile } from "@/hooks/useIsMobile";
 import { useBlock } from "@/hooks/useBlock";
 import { useFaucet } from "@/hooks/useFaucet";
+import { useRedeemBasket } from "@/hooks/useRedeemBasket";
 import { buildPoolSystem, buildSolarSystem, buildStakingRemnantSystem, buildVestingSystem } from "@/lib/layout";
 import type { LayoutMode, VestingLayoutMode } from "@/lib/layout";
 import { formatBalance } from "@/lib/formatBalance";
@@ -79,7 +80,10 @@ export default function SolarSystem() {
     updatedAt: poolUpdatedAt,
     totalWorthFormatted,
     gubiPriceFormatted,
+    supply: poolSupplyRaw,
     supplyFormatted,
+    stats: poolStats,
+    vault: poolVault,
   } = usePoolTokens();
   const hyperlaneBridge = useHyperlaneBridge();
   const canonicalBridge = useCanonicalBridge();
@@ -162,6 +166,14 @@ export default function SolarSystem() {
 
   /* ── Wallet connection ── */
   const wc = useWalletConnection(wallets, refetch);
+
+  /* ── Redeem basket for connected user ── */
+  const redeemBasket = useRedeemBasket(
+    wc.connectedAddress,
+    poolSupplyRaw,
+    poolVault,
+    poolUpdatedAt,
+  );
 
   const handleFocusMyInstance = useCallback((systemId: SceneSystemId) => {
     if (!wc.connectedAddress) return;
@@ -317,6 +329,20 @@ export default function SolarSystem() {
           { label: "worth", value: totalWorthFormatted, accent: "#ffe08a" },
           { label: "1 gUBI", value: gubiPriceFormatted, accent: "#ffd27a" },
           { label: "supply", value: supplyFormatted, accent: "#8ab0c0" },
+          ...(poolStats ? [
+            { label: "users", value: poolStats.totalUsers.toLocaleString(), accent: "#c8e0a8" },
+            { label: "daily", value: poolStats.dailyDistribution, accent: "#b8d8e0" },
+            { label: "monthly", value: poolStats.totalMonthlyEmission, accent: "#a0c8d8" },
+          ] : []),
+          ...(poolVault ? [
+            { label: "WGNET", value: poolVault.wgnetFormatted, accent: "#ffc860" },
+            { label: "Archai", value: poolVault.archaiFormatted, accent: "#d8a0f0" },
+          ] : []),
+          ...(redeemBasket ? [
+            { label: "your gUBI", value: redeemBasket.userGubiFormatted, accent: "#e0e0e0" },
+            { label: "\u2192 WGNET", value: redeemBasket.redeemWgnetFormatted, accent: "#ffc860" },
+            { label: "\u2192 Archai", value: redeemBasket.redeemArchaiFormatted, accent: "#d8a0f0" },
+          ] : []),
         ],
         descriptionLines: [
           "read from the gUBI pool API",
@@ -371,8 +397,12 @@ export default function SolarSystem() {
     poolData,
     poolTokens,
     poolUpdatedAt,
+    poolStats,
+    poolVault,
+    redeemBasket,
     solarData,
     supplyFormatted,
+    poolSupplyRaw,
     totalLocked,
     totalVotingPower,
     totalWorthFormatted,
