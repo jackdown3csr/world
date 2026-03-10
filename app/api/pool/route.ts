@@ -101,8 +101,7 @@ export async function GET() {
       status: 200,
       headers: { "Cache-Control": "no-store" },
     });
-  } catch (err) {
-    console.error("[/api/pool] Upstream fetch failed:", err);
+  } catch {
     return NextResponse.json(
       { error: "Failed to load gUBI pool data." },
       { status: 500 },

@@ -63,8 +63,7 @@ export async function GET() {
       totalDistributed: (Number(distributedRaw) / 1e18).toFixed(2),
       balance: (Number(balanceRaw) / 1e18).toFixed(4),
     });
-  } catch (err) {
-    console.error("[/api/faucet]", err);
+  } catch {
     return NextResponse.json({ error: "Failed to fetch faucet stats" }, { status: 500 });
   }
 }

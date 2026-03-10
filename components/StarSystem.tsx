@@ -72,9 +72,12 @@ export interface StarSystemProps {
   starId?: string;
   starScale?: number;
   detailVariant?: WalletTooltipVariant;
+  interactionEnabled?: boolean;
   interactiveBelt?: boolean;
   showBeltLabels?: boolean;
   beltTone?: "default" | "ash";
+  /** System ID used to scope scene registry keys, e.g. "vescrow". */
+  systemId?: string;
 }
 
 export default function StarSystem({
@@ -102,9 +105,11 @@ export default function StarSystem({
   starId,
   starScale = 1,
   detailVariant = diskMode ? "vesting" : "wallet",
+  interactionEnabled = true,
   interactiveBelt = true,
   showBeltLabels = true,
   beltTone = "default",
+  systemId,
 }: StarSystemProps) {
   const visibleCount = useProgressiveMount(solarData.planets.length);
   const overviewRadius = React.useMemo(() => {
@@ -115,6 +120,12 @@ export default function StarSystem({
 
     return Math.max(solarData.beltOuterRadius + 120, farPlanetOrbit + 140, 520);
   }, [solarData]);
+
+  // Scope a wallet address into "systemId:0xaddr" format when systemId is set.
+  const scopeAddr = React.useCallback(
+    (addr: string) => systemId ? `${systemId}:${addr.toLowerCase()}` : addr,
+    [systemId],
+  );
 
   return (
     <>
@@ -135,7 +146,7 @@ export default function StarSystem({
           starId={starId ?? `__star_${palette}__`}
           scale={starScale}
           overviewRadius={overviewRadius}
-          onSelect={onStarSelect}
+          onSelect={interactionEnabled ? onStarSelect : undefined}
           paused={paused}
         />
 
@@ -150,18 +161,20 @@ export default function StarSystem({
               selected={
                 selectedAddress?.toLowerCase() === p.wallet.address.toLowerCase()
               }
-              onSelect={() => onSelect?.(p.wallet.address)}
+              onSelect={() => onSelect?.(scopeAddr(p.wallet.address))}
               onDeselect={() => onDeselect?.()}
               panelOpen={panelOpen}
               selectedAddress={selectedAddress}
-              onSelectAddress={(addr) => onSelect?.(addr)}
+              onSelectAddress={(addr) => onSelect?.(scopeAddr(addr))}
               showLabel={showAllNames && !photoMode}
               showMoonLabels={showAllNames && !photoMode}
               showRingLabels={showAllNames && !photoMode}
               showRenamedOnly={showRenamedOnly}
               onShiftSelect={(addr) => onShiftSelect?.(addr)}
               detailVariant={detailVariant}
+              interactionEnabled={interactionEnabled}
               paused={paused}
+              sceneIdPrefix={systemId}
             />
           </React.Fragment>
         ))}
@@ -172,13 +185,15 @@ export default function StarSystem({
             beltInnerRadius={solarData.beltInnerRadius}
             beltOuterRadius={solarData.beltOuterRadius}
             selectedAddress={selectedAddress}
-            onSelectAddress={(addr) => onSelect?.(addr)}
+            onSelectAddress={(addr) => onSelect?.(scopeAddr(addr))}
             onDeselect={() => onDeselect?.()}
             panelOpen={panelOpen}
             showAllNames={showAllNames && !photoMode}
             showRenamedOnly={showRenamedOnly}
             vesting
+            interactive={interactionEnabled}
             paused={paused}
+            sceneIdPrefix={systemId}
           />
         ) : (
           <AsteroidBelt
@@ -193,9 +208,10 @@ export default function StarSystem({
             showRenamedOnly={showRenamedOnly}
             showOrbits={showOrbits && !photoMode}
             paused={paused}
-            interactive={interactiveBelt}
+            interactive={interactiveBelt && interactionEnabled}
             showLabels={showBeltLabels}
             beltTone={beltTone}
+            sceneIdPrefix={systemId}
           />
         )}
       </group>

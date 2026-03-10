@@ -19,6 +19,7 @@ import type { PlanetData, MoonData, RingParticleData } from "@/lib/layout";
 import { createSaturnRingMaterial } from "@/lib/shaders/saturnRingShader";
 import { createMoonMaterial } from "@/lib/shaders/moonShader";
 import WalletTooltip from "./WalletTooltip";
+import { registerSceneObject, unregisterSceneObject, registerInstancedSceneObject, unregisterInstancedSceneObject } from "@/lib/sceneRegistry";
 
 /* ── Constants ────────────────────────────────────────────── */
 
@@ -98,7 +99,10 @@ interface SaturnSystemProps {
   showMoonLabels?:  boolean;
   showRingLabels?:  boolean;
   showRenamedOnly?: boolean;
+  interactionEnabled?: boolean;
   paused?:          boolean;
+  /** System prefix for scene registry keys, e.g. "vescrow". When set, registers as "prefix:0x...". */
+  sceneIdPrefix?: string;
 }
 
 /* ── Component ────────────────────────────────────────────── */
@@ -113,7 +117,9 @@ export default function SaturnSystem({
   showMoonLabels,
   showRingLabels,
   showRenamedOnly,
+  interactionEnabled = true,
   paused = false,
+  sceneIdPrefix,
 }: SaturnSystemProps) {
 
   const hostR  = data.radius;
@@ -206,13 +212,44 @@ export default function SaturnSystem({
     });
   }, [ringWallets, positions, variantGroups]);
 
+  // Register ring particles in the scene registry for camera targeting
+  useEffect(() => {
+    const ids: string[] = [];
+    variantGroups.forEach((globalIndices, v) => {
+      const mesh = rockMeshRefs.current[v];
+      if (!mesh) return;
+      globalIndices.forEach((gi, localIdx) => {
+        const rawAddr = ringWallets[gi].wallet.address.toLowerCase();
+        const id = sceneIdPrefix ? `${sceneIdPrefix}:${rawAddr}` : rawAddr;
+        registerInstancedSceneObject(id, mesh, localIdx, "ring");
+        ids.push(id);
+      });
+    });
+    return () => { ids.forEach(unregisterInstancedSceneObject); };
+  }, [ringWallets, variantGroups, sceneIdPrefix]);
+
+  // Register moons in the scene registry for camera targeting
+  useEffect(() => {
+    const ids: string[] = [];
+    moons.forEach((moon, i) => {
+      const mesh = moonMeshRefs.current[i];
+      if (!mesh) return;
+      const rawAddr = moon.wallet.address.toLowerCase();
+      const id = sceneIdPrefix ? `${sceneIdPrefix}:${rawAddr}` : rawAddr;
+      registerSceneObject(id, mesh, moon.radius, "moon");
+      ids.push(id);
+    });
+    return () => { ids.forEach(unregisterSceneObject); };
+  }, [moons, sceneIdPrefix]);
+
   /* ── Label proximity tracking ── */
   const { camera } = useThree();
   const [nearIndices, setNearIndices] = useState<Set<number>>(new Set());
   const LABEL_DIST = 35;
 
   /* ── Animation frame ── */
-  useFrame((state, delta) => {
+  useFrame((state, rawDelta) => {
+    const delta = Math.min(rawDelta, 1 / 30);
     if (!paused) simTimeRef.current += delta;
     const t = simTimeRef.current;
     // Ring disc + particles: slow rotation
@@ -350,9 +387,9 @@ export default function SaturnSystem({
                   ringWallets[gi].wallet.address.toLowerCase()),
               }}
               frustumCulled={false}
-              onPointerMove={makeRockPointerMove(v)}
-              onPointerOut={onRockPointerOut}
-              onClick={makeRockClick(v)}
+              onPointerMove={interactionEnabled ? makeRockPointerMove(v) : undefined}
+              onPointerOut={interactionEnabled ? onRockPointerOut : undefined}
+              onClick={interactionEnabled ? makeRockClick(v) : undefined}
             >
               <primitive object={geo} attach="geometry" />
               <primitive object={ROCK_MAT} attach="material" />
@@ -361,7 +398,7 @@ export default function SaturnSystem({
         })}
 
         {/* Ring-particle tooltip */}
-        {hoveredRingIdx >= 0 && hoveredRingIdx < count && (
+        {interactionEnabled && hoveredRingIdx >= 0 && hoveredRingIdx < count && (
           <Html
             position={[
               positions[hoveredRingIdx].x,
@@ -394,7 +431,7 @@ export default function SaturnSystem({
               color={isSelected ? "#b0e0ff" : "#80a8b8"}
               fontSize={isSelected ? 0.35 : 0.25}
               opacity={isSelected ? 1.0 : 0.65}
-              onClick={() => onSelectAddress(rp.wallet.address)}
+              onClick={interactionEnabled ? () => onSelectAddress(rp.wallet.address) : undefined}
             />
           );
         })}
@@ -419,16 +456,16 @@ export default function SaturnSystem({
                 bodyRadius: moon.radius,
                 bodyType: "moon",
               }}
-              onPointerEnter={onMoonEnter(i)}
-              onPointerLeave={onMoonLeave}
-              onClick={onMoonClick(i)}
+              onPointerEnter={interactionEnabled ? onMoonEnter(i) : undefined}
+              onPointerLeave={interactionEnabled ? onMoonLeave : undefined}
+              onClick={interactionEnabled ? onMoonClick(i) : undefined}
             >
               <primitive object={MOON_GEOS[0]} attach="geometry" />
               <primitive object={moonMaterials[i]} attach="material" />
             </mesh>
 
             {/* Moon tooltip */}
-            {(isMoonHovered || (isMoonSelected && panelOpen)) && (
+            {((interactionEnabled && isMoonHovered) || (isMoonSelected && panelOpen)) && (
               <Html
                 position={[moon.orbitRadius, moon.radius + 0.18, 0]}
                 center
@@ -450,7 +487,7 @@ export default function SaturnSystem({
                 color="#80a8b8"
                 fontSize={0.3}
                 opacity={0.8}
-                onClick={() => onSelectAddress(moon.wallet.address)}
+                onClick={interactionEnabled ? () => onSelectAddress(moon.wallet.address) : undefined}
               />
             )}
           </group>

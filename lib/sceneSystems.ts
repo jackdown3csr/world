@@ -2,6 +2,8 @@ import type { SolarSystemData } from "./layout";
 import type { WalletEntry, VestingWalletEntry, PoolTokenEntry } from "./types";
 import type { FaucetStats } from "@/hooks/useFaucet";
 import type { BridgeSceneObject } from "./bridges";
+import type { TransactionFlowEffect } from "./blockExplorer/types";
+export type { TransactionFlowEffect } from "./blockExplorer/types";
 
 export type SceneSystemId = "vescrow" | "vesting" | "gubi-pool" | "staking-remnant";
 export type SceneSystemDetailVariant = "wallet" | "vesting" | "pool";
@@ -20,6 +22,11 @@ export type SceneSystemDecorator =
       kind: "faucet-satellite";
       orbitRadius: number;
       stats: FaucetStats | null;
+    }
+  | {
+      id: string;
+      kind: "sputnik-probe";
+      orbitRadius: number;
     };
 
 export type SceneGlobalObject =
@@ -35,14 +42,24 @@ export type SceneGlobalObject =
       id: string;
       kind: "bridge";
       bridge: BridgeSceneObject;
+    }
+  | {
+      id: string;
+      kind: "transit-beacon";
+      label: string;
+      hint?: string;
+      position: [number, number, number];
+      bodyRadius: number;
     };
 
-export type SceneEffectDefinition = {
-  id: string;
-  kind: "block-pulse";
-  systemId: SceneSystemId;
-  tick: number;
-};
+export type SceneEffectDefinition =
+  | {
+      id: string;
+      kind: "block-pulse";
+      systemId: SceneSystemId;
+      tick: number;
+    }
+  | TransactionFlowEffect;
 
 export interface SceneSystemSummaryRow {
   label: string;

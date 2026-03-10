@@ -175,6 +175,7 @@ export function TopStripChip({
           flexShrink: 0,
           position: "relative",
           opacity: disabled ? 0.55 : 1,
+          outline: "none",
         }}
       >
         {label}

@@ -128,43 +128,6 @@ const s = {
 
 const sections: HelpSectionDef[] = [
   {
-    id: "shortcuts",
-    title: "Shortcuts",
-    hint: "hotkeys",
-    summary: "All keyboard shortcuts in one place, grouped by context.",
-    render: () => (
-      <>
-        <div style={s.h}>Toolbar</div>
-        <div style={s.list}>
-          {toolbarActionShortcuts.map((item) => (
-            <div key={`${item.context}-${item.keys}`} style={s.item}>
-              <span style={s.key}>{item.keys}</span>
-              <span>{item.description}</span>
-            </div>
-          ))}
-        </div>
-        <div style={s.h}>Navigation</div>
-        <div style={s.list}>
-          {navigationShortcuts.map((item) => (
-            <div key={`${item.context}-${item.keys}`} style={s.item}>
-              <span style={s.key}>{item.keys}</span>
-              <span>{item.description}</span>
-            </div>
-          ))}
-        </div>
-        <div style={s.h}>Photo Mode</div>
-        <div style={s.list}>
-          {photoModeShortcuts.map((item) => (
-            <div key={`${item.context}-${item.keys}`} style={s.item}>
-              <span style={s.key}>{item.keys}</span>
-              <span>{item.description}</span>
-            </div>
-          ))}
-        </div>
-      </>
-    ),
-  },
-  {
     id: "scene",
     title: "Scene Model",
     hint: "what you see",
@@ -189,7 +152,12 @@ const sections: HelpSectionDef[] = [
         <p style={s.block}>
           The main system represents wallets locking <span style={s.cyan}>GNET</span> on
           <span style={s.cyan}> Galactica mainnet</span>. Rank, scale, and body type are driven by
-          voting power.
+          <span style={s.cyan}> veGNET voting power</span>, not by locked GNET alone.
+        </p>
+        <p style={s.block}>
+          veGNET decays linearly toward expiry, the max lock is <span style={s.cyan}>730 days</span>,
+          and <span style={s.cyan}>adding tokens does not extend</span> the unlock date unless the user
+          explicitly relocks or extends.
         </p>
         <div style={s.h}>Vesting</div>
         <p style={s.block}>
@@ -206,6 +174,11 @@ const sections: HelpSectionDef[] = [
         <p style={s.block}>
           Bridge markers such as <span style={s.cyan}>Hyperlane Nexus</span> act as scene-level portals
           and navigation points layered on top of the Galactica-centered view.
+        </p>
+        <div style={s.h}>Staking Remnant</div>
+        <p style={s.block}>
+          A compact remnant system showing the deprecated staking contract. Its asteroid belt
+          visualises remaining staked wallets as an inert debris field.
         </p>
       </>
     ),
@@ -254,6 +227,7 @@ const sections: HelpSectionDef[] = [
         <div style={s.h}>Scene</div>
         <div style={s.list}>
           <div style={s.item}><span style={s.key}>orbits</span><span>Toggle orbit rings.</span></div>
+          <div style={s.item}><span style={s.key}>traffic</span><span>Toggle transaction trail visualisation.</span></div>
         </div>
         <div style={s.h}>Layout</div>
         <div style={s.list}>
@@ -270,6 +244,7 @@ const sections: HelpSectionDef[] = [
         <div style={s.list}>
           <div style={s.item}><span style={s.key}>reset</span><span>Return to overview.</span></div>
           <div style={s.item}><span style={s.key}>help</span><span>Open or close this guide.</span></div>
+          <div style={s.item}><span style={s.key}>bug</span><span>Open or close bug report.</span></div>
         </div>
       </>
     ),
@@ -282,7 +257,12 @@ const sections: HelpSectionDef[] = [
     render: () => (
       <>
         <p style={s.block}>
-          Higher voting power moves wallets upward through the vEscrow body ladder.
+          Higher veGNET voting power moves wallets upward through the vEscrow body ladder.
+        </p>
+        <p style={s.block}>
+          veGNET reaches full weight at <span style={s.cyan}>730 days</span>, decays linearly to zero,
+          and relocking before expiry avoids a zero-power gap. Adding more GNET and extending the lock
+          are separate actions.
         </p>
         <table style={s.table}>
           <tbody>
@@ -404,13 +384,53 @@ const sections: HelpSectionDef[] = [
       </>
     ),
   },
+  {
+    id: "shortcuts",
+    title: "Shortcuts",
+    hint: "hotkeys",
+    summary: "All keyboard shortcuts in one place, grouped by context.",
+    render: () => (
+      <>
+        <div style={s.h}>Toolbar</div>
+        <div style={s.list}>
+          {toolbarActionShortcuts.map((item) => (
+            <div key={`${item.context}-${item.keys}`} style={s.item}>
+              <span style={s.key}>{item.keys}</span>
+              <span>{item.description}</span>
+            </div>
+          ))}
+        </div>
+        <div style={s.h}>Navigation</div>
+        <div style={s.list}>
+          {navigationShortcuts.map((item) => (
+            <div key={`${item.context}-${item.keys}`} style={s.item}>
+              <span style={s.key}>{item.keys}</span>
+              <span>{item.description}</span>
+            </div>
+          ))}
+        </div>
+        <div style={s.h}>Photo Mode</div>
+        <div style={s.list}>
+          {photoModeShortcuts.map((item) => (
+            <div key={`${item.context}-${item.keys}`} style={s.item}>
+              <span style={s.key}>{item.keys}</span>
+              <span>{item.description}</span>
+            </div>
+          ))}
+        </div>
+      </>
+    ),
+  },
 ];
 
 export default function HelpPanel({ mobile = false }: { mobile?: boolean }) {
-  const [openSection, setOpenSection] = React.useState<SectionId>("shortcuts");
+  const [openSection, setOpenSection] = React.useState<SectionId>("scene");
 
   return (
-    <div style={s.box}>
+    <div style={{
+      ...s.box,
+      ...(mobile ? { maxHeight: "none", borderRadius: 0, borderLeft: "none" } : {}),
+    }}>
       <div style={s.accordion}>
         {sections.map((section) => {
           const open = openSection === section.id;

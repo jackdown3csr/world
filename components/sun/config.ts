@@ -49,9 +49,9 @@ export const DYING_PARAMS = {
   pulseSpeed: 0.35,
   pulseAmplitude: 0.06,
   heatBias: 0.55,
-  gasOpacity: 0.14,
-  gasScale: 1.72,
-  emberCount: 420,
+  gasOpacity: 0.09,
+  gasScale: 1.52,
+  emberCount: 160,
   emberSpeed: 0.065,
   emberEmissive: 2.5,
 } as const;
@@ -102,11 +102,11 @@ export function getHaloLayers(palette: StarPalette): HaloLayerConfig[] {
   switch (getStarVariant(palette)) {
     case "dying":
       return [
-        { scale: 1.08, color: pal.halo[0], alpha: 0.55, falloff: 5.0 },
-        { scale: 1.42, color: pal.halo[1], alpha: 0.35, falloff: 3.6 },
-        { scale: 2.1, color: pal.halo[2], alpha: 0.2, falloff: 2.4 },
-        { scale: 3.4, color: pal.halo[3], alpha: 0.1, falloff: 1.7 },
-        { scale: 5.6, color: pal.halo[4], alpha: 0.04, falloff: 1.1 },
+        { scale: 1.08, color: pal.halo[0], alpha: 0.40, falloff: 5.0 },
+        { scale: 1.42, color: pal.halo[1], alpha: 0.25, falloff: 3.6 },
+        { scale: 2.1,  color: pal.halo[2], alpha: 0.14, falloff: 2.4 },
+        { scale: 3.4,  color: pal.halo[3], alpha: 0.06, falloff: 1.7 },
+        { scale: 5.6,  color: pal.halo[4], alpha: 0.02, falloff: 1.1 },
       ];
     case "vesting":
       return [
@@ -146,7 +146,7 @@ export function getHaloLayers(palette: StarPalette): HaloLayerConfig[] {
 export function getLensFlareConfig(palette: StarPalette): { scaleMult: number; opacity: number } {
   switch (getStarVariant(palette)) {
     case "dying":
-      return { scaleMult: 5.5, opacity: 0.8 };
+      return { scaleMult: 4.5, opacity: 0.50 };
     case "dwarf":
       return { scaleMult: 2.8, opacity: 0.62 };
     case "vesting":

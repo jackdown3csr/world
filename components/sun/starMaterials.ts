@@ -817,7 +817,7 @@ const emberVert = /* glsl */ `
 
   void main() {
     float t = fract(uTime * aSpeed * uEmberSpeed + aLife);
-    float r = uSunRadius * (1.08 + t * 5.0);
+    float r = uSunRadius * (1.08 + t * 2.5);
 
     vec3 dir = normalize(position);
     vec3 tangent = normalize(cross(dir, vec3(0.0, 1.0, 0.001)));
@@ -830,7 +830,7 @@ const emberVert = /* glsl */ `
     vHeat = 1.0 - t;
 
     vec4 mvPos = modelViewMatrix * vec4(pos, 1.0);
-    gl_PointSize = aSize * vAlpha * (500.0 / -mvPos.z);
+    gl_PointSize = aSize * vAlpha * (260.0 / -mvPos.z);
     gl_Position = projectionMatrix * mvPos;
   }
 `;
@@ -848,9 +848,9 @@ const emberFrag = /* glsl */ `
     vec3 ashColor = vec3(0.6, 0.15, 0.05);
     vec3 col = mix(ashColor, coolColor, vHeat * 0.6);
     col = mix(col, hotColor, vHeat * vHeat);
-    col *= 3.0;
+    col *= 1.8;
 
-    gl_FragColor = vec4(col, circle * vAlpha * 0.9);
+    gl_FragColor = vec4(col, circle * vAlpha * 0.55);
   }
 `;
 

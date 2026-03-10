@@ -65,8 +65,7 @@ export async function PUT(req: Request) {
     await redis.del(nonceKey);
 
     return NextResponse.json({ ok: true, name: rawName }, { status: 200 });
-  } catch (err) {
-    console.error("[/api/planet-name] failed:", err);
+  } catch {
     return NextResponse.json(
       { error: "Failed to save planet name" },
       { status: 500 },

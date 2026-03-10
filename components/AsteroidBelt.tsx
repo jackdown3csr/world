@@ -79,6 +79,8 @@ interface AsteroidBeltProps {
   interactive?: boolean;
   showLabels?: boolean;
   beltTone?: "default" | "ash";
+  /** System prefix for scene registry keys, e.g. "vescrow". When set, registers as "prefix:0x...". */
+  sceneIdPrefix?: string;
 }
 
 export default function AsteroidBelt({
@@ -96,6 +98,7 @@ export default function AsteroidBelt({
   interactive = true,
   showLabels = true,
   beltTone = "default",
+  sceneIdPrefix,
 }: AsteroidBeltProps) {
   const groupRef = useRef<THREE.Group>(null);
   const simTimeRef = useRef(0);
@@ -185,7 +188,8 @@ export default function AsteroidBelt({
       const mesh = meshRefs.current[v];
       if (!mesh) return;
       globalIndices.forEach((gi, localIdx) => {
-        const id = asteroids[gi].wallet.address.toLowerCase();
+        const rawAddr = asteroids[gi].wallet.address.toLowerCase();
+        const id = sceneIdPrefix ? `${sceneIdPrefix}:${rawAddr}` : rawAddr;
         registerInstancedSceneObject(id, mesh, localIdx, "asteroid");
         ids.push(id);
       });
@@ -194,7 +198,8 @@ export default function AsteroidBelt({
   }, [asteroids, interactive, variantGroups]);
 
   /* ── Slow belt rotation ─────────────────────────────────── */
-  useFrame((_, delta) => {
+  useFrame((_, rawDelta) => {
+    const delta = Math.min(rawDelta, 1 / 30);
     if (!paused) simTimeRef.current += delta;
     if (groupRef.current) groupRef.current.rotation.y = 0.002 * simTimeRef.current;
   });
@@ -222,7 +227,9 @@ export default function AsteroidBelt({
       e.stopPropagation();
       const localId = e.instanceId ?? -1;
       if (localId >= 0 && localId < variantGroups[v].length) {
-        onSelectAddress(asteroids[variantGroups[v][localId]].wallet.address);
+        const rawAddr = asteroids[variantGroups[v][localId]].wallet.address;
+        const id = sceneIdPrefix ? `${sceneIdPrefix}:${rawAddr.toLowerCase()}` : rawAddr;
+        onSelectAddress(id);
       }
     },
     [variantGroups, asteroids, onSelectAddress],

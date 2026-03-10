@@ -14,20 +14,108 @@ import type { VestingLayoutMode } from "@/lib/layout";
 import type { BlockInfo } from "@/hooks/useBlock";
 import type { SceneSystemDefinition, SceneSystemId } from "@/lib/sceneSystems";
 import type { BridgeSceneObject } from "@/lib/bridges";
+import type { TransitBeaconSceneObject } from "@/lib/transitBeacon";
 import { usePanelSwap } from "@/hooks/usePanelSwap";
-import HudToolbar from "./HudToolbar";
+import HudToolbar, { HudBtn } from "./HudToolbar";
 import WalletPanel from "./WalletPanel";
+import BugReportPanel from "./BugReportPanel";
 import DirectoryPanel from "./DirectoryPanel";
 import HelpPanel from "./HelpPanel";
+import TrafficPanel, { type TrafficPanelItem } from "./TrafficPanel";
 import BridgeInfoCard from "./systemHud/BridgeInfoCard";
+import TransitBeaconInfoCard from "./systemHud/TransitBeaconInfoCard";
 import SystemInfoCard from "./systemHud/SystemInfoCard";
 import PhotoObjectPicker from "./systemHud/PhotoObjectPicker";
 import { TopStrip, TopStripChip, TopStripDivider, TopStripGroup } from "./TopStrip";
+import FloatingTooltip from "./FloatingTooltip";
 import type { WalletConnectionState, WalletConnectionActions } from "@/hooks/useWalletConnection";
 import type { PhotoTargetSection } from "@/lib/photoTargets";
 import { getShortcutByKey, photoModeShortcuts, toolbarShortcuts } from "@/lib/shortcuts";
 
-type PhotoOverlayMode = "clean" | "grid" | "scope";
+type PhotoOverlayMode = "clean" | "grid";
+
+function ShutterButton({ onClick, shortcut, saved, mobile }: {
+  onClick: () => void; shortcut: string; saved: boolean; mobile?: boolean;
+}) {
+  const [hovered, setHovered] = React.useState(false);
+  const ref = React.useRef<HTMLButtonElement>(null);
+  if (mobile) {
+    return (
+      <button
+        ref={ref}
+        onClick={onClick}
+        onMouseEnter={() => setHovered(true)}
+        onMouseLeave={() => setHovered(false)}
+        style={{
+          position: "fixed", bottom: 32, left: "50%", transform: "translateX(-50%)",
+          zIndex: 35, width: 64, height: 64, borderRadius: "50%",
+          border: saved ? "3px solid rgba(123,247,255,0.7)" : "3px solid rgba(255,255,255,0.25)",
+          background: saved ? "rgba(4,28,36,0.9)" : "rgba(255,255,255,0.10)",
+          backdropFilter: "blur(6px)",
+          cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center",
+          padding: 0, transition: "all 0.18s",
+        }}
+      >
+        <div style={{
+          width: 38, height: 38, borderRadius: "50%",
+          border: "2px solid rgba(255,255,255,0.5)",
+          display: "flex", alignItems: "center", justifyContent: "center",
+        }}>
+          <div style={{ width: 22, height: 22, borderRadius: "50%", background: saved ? "rgba(123,247,255,0.9)" : "rgba(255,255,255,0.75)" }} />
+        </div>
+      </button>
+    );
+  }
+  return (
+    <>
+      <button
+        ref={ref}
+        onClick={onClick}
+        onMouseEnter={() => setHovered(true)}
+        onMouseLeave={() => setHovered(false)}
+        style={{
+          position: "fixed",
+          bottom: 22,
+          left: "50%",
+          transform: "translateX(-50%)",
+          zIndex: 35,
+          display: "flex",
+          alignItems: "center",
+          gap: 8,
+          padding: "6px 12px",
+          borderRadius: 4,
+          border: saved ? "1px solid rgba(123,247,255,0.45)" : hovered ? "1px solid rgba(122,228,242,0.3)" : "1px solid rgba(255,255,255,0.12)",
+          background: saved ? "rgba(4,22,30,0.92)" : hovered ? "rgba(8,20,32,0.92)" : "rgba(4,10,18,0.82)",
+          boxShadow: saved ? "0 0 12px rgba(123,247,255,0.12)" : "0 8px 24px rgba(0,0,0,0.32)",
+          backdropFilter: "blur(10px)",
+          cursor: "pointer",
+          fontFamily: "'JetBrains Mono','SF Mono',monospace",
+          transition: "all 0.18s ease",
+          whiteSpace: "nowrap",
+        }}
+      >
+        <span style={{ fontSize: 9, letterSpacing: "0.14em", textTransform: "uppercase", color: saved ? "#7bf7ff" : "rgba(255,255,255,0.5)" }}>
+          {saved ? "saved" : "capture"}
+        </span>
+        {!saved && (
+          <span style={{
+            display: "inline-flex", alignItems: "center", justifyContent: "center",
+            padding: "2px 7px", borderRadius: 3,
+            border: "1px solid rgba(255,255,255,0.10)",
+            background: "rgba(255,255,255,0.04)",
+            color: "#c9fbff", fontSize: 9, letterSpacing: "0.12em",
+            textTransform: "uppercase", fontWeight: 700,
+          }}>
+            {shortcut}
+          </span>
+        )}
+      </button>
+      {hovered && !saved && (
+        <FloatingTooltip anchorRef={ref} open={hovered} text={`Capture screenshot`} placement="top" />
+      )}
+    </>
+  );
+}
 
 const photoGuideLine: React.CSSProperties = {
   position: "absolute",
@@ -49,8 +137,11 @@ export interface SystemHudProps {
   photoMode: boolean;
   photoHudVisible: boolean;
   photoPickerOpen: boolean;
+  flyPickerOpen: boolean;
   photoFocusMode: "focused" | "detached";
   photoTargetLabel: string | null;
+  flyTargetLabel: string | null;
+  flyAutopilotActive: boolean;
   photoTargetSections: PhotoTargetSection[];
   flashCapture: boolean;
   photoSavedToast: boolean;
@@ -62,6 +153,11 @@ export interface SystemHudProps {
   showNamesList: boolean;
   showHelp: boolean;
   showOrbits: boolean;
+  showTraffic: boolean;
+  trafficPanelOpen: boolean;
+  rxLed: boolean;
+  ecoLed: boolean;
+  trafficItems: TrafficPanelItem[];
   flyModeEnabled: boolean;
   showFlightHud: boolean;
   sceneReady: boolean;
@@ -70,7 +166,9 @@ export interface SystemHudProps {
   systems: SceneSystemDefinition[];
   activeSystemId: SceneSystemId;
   selectedBridge?: BridgeSceneObject | null;
+  selectedTransitBeacon?: TransitBeaconSceneObject | null;
   selectedAddress: string | null;
+  selectedSystemId?: SceneSystemId | null;
   camDebug: CamDebug | null;
   blockInfo: BlockInfo | null;
   wc: WalletConnectionState & WalletConnectionActions;
@@ -80,6 +178,7 @@ export interface SystemHudProps {
   onPhotoDetach: () => void;
   onPhotoRefocus: () => void;
   onTogglePhotoPicker: () => void;
+  onToggleFlyPicker: () => void;
   onSetPhotoSimulationMode: (mode: "frozen" | "live") => void;
   onSetPhotoFov: (fov: number) => void;
   onTogglePhotoHud: () => void;
@@ -88,10 +187,15 @@ export interface SystemHudProps {
   onToggleDirectory: () => void;
   onToggleHelp: () => void;
   onToggleOrbits: () => void;
+  onToggleTraffic: () => void;
+  onToggleTrafficPanel: () => void;
+  onTrafficSelect: (address: string) => void;
   onToggleFlightHud: () => void;
   onReset: () => void;
   onToggleFlyMode: () => void;
   onPhotoMode: () => void;
+  onFlyTargetSelect: (address: string) => void;
+  onFlyToTarget: () => void;
   onToggleLayout: () => void;
   onToggleGnet: () => void;
   onToggleVestingClaimed: () => void;
@@ -105,8 +209,11 @@ export default function SystemHud({
   photoMode,
   photoHudVisible,
   photoPickerOpen,
+  flyPickerOpen,
   photoFocusMode,
   photoTargetLabel,
+  flyTargetLabel,
+  flyAutopilotActive,
   photoTargetSections,
   flashCapture,
   photoSavedToast,
@@ -118,6 +225,11 @@ export default function SystemHud({
   showNamesList,
   showHelp,
   showOrbits,
+  showTraffic,
+  trafficPanelOpen,
+  rxLed,
+  ecoLed,
+  trafficItems,
   flyModeEnabled,
   showFlightHud,
   sceneReady,
@@ -126,7 +238,9 @@ export default function SystemHud({
   systems,
   activeSystemId,
   selectedBridge,
+  selectedTransitBeacon,
   selectedAddress,
+  selectedSystemId,
   camDebug,
   blockInfo,
   wc,
@@ -136,6 +250,7 @@ export default function SystemHud({
   onPhotoDetach,
   onPhotoRefocus,
   onTogglePhotoPicker,
+  onToggleFlyPicker,
   onSetPhotoSimulationMode,
   onSetPhotoFov,
   onTogglePhotoHud,
@@ -144,10 +259,15 @@ export default function SystemHud({
   onToggleDirectory,
   onToggleHelp,
   onToggleOrbits,
+  onToggleTraffic,
+  onToggleTrafficPanel,
+  onTrafficSelect,
   onToggleFlightHud,
   onReset,
   onToggleFlyMode,
   onPhotoMode,
+  onFlyTargetSelect,
+  onFlyToTarget,
   onToggleLayout,
   onToggleGnet,
   onToggleVestingClaimed,
@@ -161,7 +281,9 @@ export default function SystemHud({
   const attachedMenuTop = 33;
   const contextSystem = systems.find((system) => system.id === activeSystemId) ?? systems[0];
   const [photoOverlayMode, setPhotoOverlayMode] = React.useState<PhotoOverlayMode>("clean");
+  const [photoKeyHints, setPhotoKeyHints] = React.useState(false);
   const [showSceneInfo, setShowSceneInfo] = React.useState(false);
+  const [showBugReport, setShowBugReport] = React.useState(false);
   const [overviewVisible, setOverviewVisible] = React.useState(false);
   const [overviewMounted, setOverviewMounted] = React.useState(false);
   const [overviewPhase, setOverviewPhase] = React.useState<"hidden" | "entering" | "visible" | "leaving">("hidden");
@@ -176,6 +298,13 @@ export default function SystemHud({
   const lastBridgeOverviewTargetRef = React.useRef<string | null>(null);
   const bridgeOverviewHideTimerRef = React.useRef<number | null>(null);
   const bridgeOverviewUnmountTimerRef = React.useRef<number | null>(null);
+  const [transitBeaconOverviewVisible, setTransitBeaconOverviewVisible] = React.useState(false);
+  const [transitBeaconOverviewMounted, setTransitBeaconOverviewMounted] = React.useState(false);
+  const [transitBeaconOverviewPhase, setTransitBeaconOverviewPhase] = React.useState<"hidden" | "entering" | "visible" | "leaving">("hidden");
+  const transitBeaconOverviewDismissedForRef = React.useRef<string | null>(null);
+  const lastTransitBeaconOverviewTargetRef = React.useRef<string | null>(null);
+  const transitBeaconOverviewHideTimerRef = React.useRef<number | null>(null);
+  const transitBeaconOverviewUnmountTimerRef = React.useRef<number | null>(null);
   const photoShortcutMap = React.useMemo(() => ({
     hud: getShortcutByKey(photoModeShortcuts, "H")?.keys ?? "H",
     exit: getShortcutByKey(photoModeShortcuts, "Esc")?.keys ?? "Esc",
@@ -191,12 +320,17 @@ export default function SystemHud({
   const selectedSystem = React.useMemo(() => {
     if (!selectedAddress) return null;
 
+    // When the system origin is known, prefer it to avoid cross-system collisions.
+    if (selectedSystemId) {
+      return systems.find((s) => s.id === selectedSystemId) ?? null;
+    }
+
     const lowered = selectedAddress.toLowerCase();
     return systems.find((system) => (
       system.starId === selectedAddress
       || system.entries.some((entry) => entry.address.toLowerCase() === lowered)
     )) ?? null;
-  }, [selectedAddress, systems]);
+  }, [selectedAddress, selectedSystemId, systems]);
   const hasDetachedFocus = Boolean(selectedAddress) && !selectedSystem;
   const displaySystem = hasDetachedFocus ? contextSystem : (selectedSystem ?? contextSystem);
   const activeData = displaySystem?.data ?? {
@@ -209,7 +343,9 @@ export default function SystemHud({
   const photoFovPresets = [35, 55, 70];
   const overviewTargetId = hasDetachedFocus ? null : (displaySystem?.id ?? activeSystemId);
   const selectedBridgeId = selectedBridge?.id ?? null;
+  const selectedTransitBeaconId = selectedTransitBeacon?.id ?? null;
   const bridgePanelVisible = Boolean(selectedBridge) && !isMobile;
+  const transitBeaconPanelVisible = Boolean(selectedTransitBeacon) && !isMobile;
   const activeDesktopPanel = showHelp
     ? "help"
     : showNamesList
@@ -220,6 +356,12 @@ export default function SystemHud({
           : bridgeOverviewMounted
             ? "bridge-overview"
             : null
+        : selectedTransitBeacon
+          ? showSceneInfo
+            ? "transit-beacon-info"
+            : transitBeaconOverviewMounted
+              ? "transit-beacon-overview"
+              : null
         : showSceneInfo
           ? "info"
           : hasDetachedFocus
@@ -230,10 +372,13 @@ export default function SystemHud({
   const infoPanelVisible = activeDesktopPanel === "overview"
     || activeDesktopPanel === "info"
     || activeDesktopPanel === "bridge-overview"
-    || activeDesktopPanel === "bridge-info";
+    || activeDesktopPanel === "bridge-info"
+    || activeDesktopPanel === "transit-beacon-overview"
+    || activeDesktopPanel === "transit-beacon-info";
   const infoChipActive = showSceneInfo
     || (activeDesktopPanel === "overview" && overviewVisible)
-    || (activeDesktopPanel === "bridge-overview" && bridgeOverviewVisible);
+    || (activeDesktopPanel === "bridge-overview" && bridgeOverviewVisible)
+    || (activeDesktopPanel === "transit-beacon-overview" && transitBeaconOverviewVisible);
   const { displayItem: panelSystem, animationState: panelAnimationState } = usePanelSwap({
     item: displaySystem,
     itemKey: displaySystem.id,
@@ -246,24 +391,50 @@ export default function SystemHud({
     enabled: !isMobile && (activeDesktopPanel === "bridge-overview" || activeDesktopPanel === "bridge-info"),
     durationMs: PANEL_SWAP_MS,
   });
+  const { displayItem: panelTransitBeacon, animationState: transitBeaconPanelAnimationState } = usePanelSwap({
+    item: selectedTransitBeacon ?? null,
+    itemKey: selectedTransitBeaconId,
+    enabled: !isMobile && (activeDesktopPanel === "transit-beacon-overview" || activeDesktopPanel === "transit-beacon-info"),
+    durationMs: PANEL_SWAP_MS,
+  });
+
+  const handlePhotoPickerToggle = React.useCallback(() => {
+    if (showBugReport) setShowBugReport(false);
+    onTogglePhotoPicker();
+  }, [onTogglePhotoPicker, showBugReport]);
+
+  const handleFlyPickerToggle = React.useCallback(() => {
+    if (showBugReport) setShowBugReport(false);
+    onToggleFlyPicker();
+  }, [onToggleFlyPicker, showBugReport]);
+
+  const handleBugToggle = React.useCallback(() => {
+    if (!showBugReport) {
+      if (showSceneInfo) setShowSceneInfo(false);
+      if (showNamesList) onToggleDirectory();
+      if (showHelp) onToggleHelp();
+      if (photoMode && photoPickerOpen) onTogglePhotoPicker();
+      if (flyModeEnabled && flyPickerOpen) onToggleFlyPicker();
+    }
+    setShowBugReport((value) => !value);
+  }, [flyModeEnabled, flyPickerOpen, onToggleDirectory, onToggleFlyPicker, onToggleHelp, onTogglePhotoPicker, photoMode, photoPickerOpen, showBugReport, showHelp, showNamesList, showSceneInfo]);
+
+  React.useEffect(() => {
+    if (photoMode) setPhotoKeyHints(true);
+  }, [photoMode]);
 
   React.useEffect(() => {
     if (!photoMode) return;
 
     function onKeyDown(e: KeyboardEvent) {
+      if (e.repeat) return;
       const target = e.target as HTMLElement | null;
       const tag = target?.tagName;
       if (tag === "INPUT" || tag === "TEXTAREA" || target?.isContentEditable) return;
 
-      if (e.key.toLowerCase() === "m") {
+      if (e.key === "?") {
         e.preventDefault();
-        onSetPhotoSimulationMode(photoSimulationMode === "live" ? "frozen" : "live");
-        return;
-      }
-
-      if (e.key.toLowerCase() === "g") {
-        e.preventDefault();
-        setPhotoOverlayMode((mode) => mode === "clean" ? "grid" : mode === "grid" ? "scope" : "clean");
+        setPhotoKeyHints((v) => !v);
         return;
       }
 
@@ -273,9 +444,27 @@ export default function SystemHud({
         return;
       }
 
+      if (e.key.toLowerCase() === "p") {
+        e.preventDefault();
+        onExitPhotoMode();
+        return;
+      }
+
+      if (e.key.toLowerCase() === "m") {
+        e.preventDefault();
+        onSetPhotoSimulationMode(photoSimulationMode === "live" ? "frozen" : "live");
+        return;
+      }
+
+      if (e.key.toLowerCase() === "g") {
+        e.preventDefault();
+        setPhotoOverlayMode((mode) => mode === "clean" ? "grid" : "clean");
+        return;
+      }
+
       if (e.key.toLowerCase() === "t") {
         e.preventDefault();
-        onTogglePhotoPicker();
+        handlePhotoPickerToggle();
         return;
       }
 
@@ -301,18 +490,32 @@ export default function SystemHud({
         e.preventDefault();
         onExitPhotoMode();
       }
+
+      // + / = → zoom in (lower FOV), - → zoom out (higher FOV)
+      if (e.key === "+" || e.key === "=") {
+        e.preventDefault();
+        onSetPhotoFov(Math.max(10, photoFov - 2));
+        return;
+      }
+      if (e.key === "-") {
+        e.preventDefault();
+        onSetPhotoFov(Math.min(90, photoFov + 2));
+        return;
+      }
     }
 
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
   }, [
     onCapturePhoto,
+    handlePhotoPickerToggle,
     onExitPhotoMode,
     onPhotoDetach,
     onPhotoRefocus,
+    onSetPhotoFov,
     onSetPhotoSimulationMode,
     onTogglePhotoHud,
-    onTogglePhotoPicker,
+    photoFov,
     photoMode,
     photoSimulationMode,
   ]);
@@ -400,6 +603,10 @@ export default function SystemHud({
   }, [selectedBridgeId]);
 
   React.useEffect(() => {
+    transitBeaconOverviewDismissedForRef.current = null;
+  }, [selectedTransitBeaconId]);
+
+  React.useEffect(() => {
     if (bridgeOverviewHideTimerRef.current !== null) {
       window.clearTimeout(bridgeOverviewHideTimerRef.current);
       bridgeOverviewHideTimerRef.current = null;
@@ -472,11 +679,85 @@ export default function SystemHud({
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedBridgeId, isMobile, showHelp, showNamesList, showSceneInfo]);
 
+  React.useEffect(() => {
+    if (transitBeaconOverviewHideTimerRef.current !== null) {
+      window.clearTimeout(transitBeaconOverviewHideTimerRef.current);
+      transitBeaconOverviewHideTimerRef.current = null;
+    }
+    if (transitBeaconOverviewUnmountTimerRef.current !== null) {
+      window.clearTimeout(transitBeaconOverviewUnmountTimerRef.current);
+      transitBeaconOverviewUnmountTimerRef.current = null;
+    }
+
+    if (isMobile || !selectedTransitBeacon || showHelp || showNamesList || showSceneInfo
+        || transitBeaconOverviewDismissedForRef.current === selectedTransitBeaconId) {
+      lastTransitBeaconOverviewTargetRef.current = selectedTransitBeaconId;
+      setTransitBeaconOverviewVisible(false);
+      setTransitBeaconOverviewMounted(false);
+      setTransitBeaconOverviewPhase("hidden");
+      return;
+    }
+
+    const isRetargetingTransitBeaconOverview = Boolean(
+      selectedTransitBeaconId
+      && transitBeaconOverviewMounted
+      && transitBeaconOverviewVisible
+      && lastTransitBeaconOverviewTargetRef.current
+      && lastTransitBeaconOverviewTargetRef.current !== selectedTransitBeaconId,
+    );
+    lastTransitBeaconOverviewTargetRef.current = selectedTransitBeaconId;
+
+    setTransitBeaconOverviewMounted(true);
+    let rafId: number | null = null;
+    if (isRetargetingTransitBeaconOverview) {
+      setTransitBeaconOverviewPhase("visible");
+      setTransitBeaconOverviewVisible(true);
+    } else {
+      rafId = window.requestAnimationFrame(() => {
+        setTransitBeaconOverviewPhase("entering");
+        setTransitBeaconOverviewVisible(true);
+      });
+    }
+
+    const settleVisibleTimer = window.setTimeout(() => {
+      setTransitBeaconOverviewPhase("visible");
+    }, isRetargetingTransitBeaconOverview ? 0 : OVERVIEW_FADE_MS);
+
+    transitBeaconOverviewHideTimerRef.current = window.setTimeout(() => {
+      setTransitBeaconOverviewPhase("leaving");
+      setTransitBeaconOverviewVisible(false);
+      transitBeaconOverviewHideTimerRef.current = null;
+    }, 8000);
+
+    transitBeaconOverviewUnmountTimerRef.current = window.setTimeout(() => {
+      setTransitBeaconOverviewMounted(false);
+      setTransitBeaconOverviewPhase("hidden");
+      transitBeaconOverviewUnmountTimerRef.current = null;
+    }, 8000 + OVERVIEW_FADE_MS);
+
+    return () => {
+      if (rafId !== null) {
+        window.cancelAnimationFrame(rafId);
+      }
+      window.clearTimeout(settleVisibleTimer);
+      if (transitBeaconOverviewHideTimerRef.current !== null) {
+        window.clearTimeout(transitBeaconOverviewHideTimerRef.current);
+        transitBeaconOverviewHideTimerRef.current = null;
+      }
+      if (transitBeaconOverviewUnmountTimerRef.current !== null) {
+        window.clearTimeout(transitBeaconOverviewUnmountTimerRef.current);
+        transitBeaconOverviewUnmountTimerRef.current = null;
+      }
+    };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedTransitBeaconId, isMobile, showHelp, showNamesList, showSceneInfo]);
+
   const handleInfoToggle = React.useCallback(() => {
     if (infoChipActive) {
       // Mark current targets as dismissed so auto-overview won't reopen them.
       overviewDismissedForRef.current = overviewTargetId;
       bridgeOverviewDismissedForRef.current = selectedBridgeId;
+      transitBeaconOverviewDismissedForRef.current = selectedTransitBeaconId;
 
       setShowSceneInfo(false);
 
@@ -503,29 +784,53 @@ export default function SystemHud({
       setBridgeOverviewVisible(false);
       setBridgeOverviewMounted(false);
       setBridgeOverviewPhase("hidden");
+
+      if (transitBeaconOverviewHideTimerRef.current !== null) {
+        window.clearTimeout(transitBeaconOverviewHideTimerRef.current);
+        transitBeaconOverviewHideTimerRef.current = null;
+      }
+      if (transitBeaconOverviewUnmountTimerRef.current !== null) {
+        window.clearTimeout(transitBeaconOverviewUnmountTimerRef.current);
+        transitBeaconOverviewUnmountTimerRef.current = null;
+      }
+      setTransitBeaconOverviewVisible(false);
+      setTransitBeaconOverviewMounted(false);
+      setTransitBeaconOverviewPhase("hidden");
       return;
     }
 
     setShowSceneInfo(true);
     if (showNamesList) onToggleDirectory();
     if (showHelp) onToggleHelp();
-  }, [infoChipActive, onToggleDirectory, onToggleHelp, overviewTargetId, selectedBridgeId, showHelp, showNamesList]);
+    if (showBugReport) setShowBugReport(false);
+  }, [infoChipActive, onToggleDirectory, onToggleHelp, overviewTargetId, selectedBridgeId, selectedTransitBeaconId, showBugReport, showHelp, showNamesList]);
 
   const handleListToggle = React.useCallback(() => {
     if (!showNamesList) {
       if (showSceneInfo) setShowSceneInfo(false);
       if (showHelp) onToggleHelp();
+      if (showBugReport) setShowBugReport(false);
     }
     onToggleDirectory();
-  }, [onToggleDirectory, onToggleHelp, showHelp, showNamesList, showSceneInfo]);
+  }, [onToggleDirectory, onToggleHelp, showBugReport, showHelp, showNamesList, showSceneInfo]);
 
   const handleHelpToggle = React.useCallback(() => {
     if (!showHelp) {
       if (showSceneInfo) setShowSceneInfo(false);
       if (showNamesList) onToggleDirectory();
+      if (showBugReport) setShowBugReport(false);
     }
     onToggleHelp();
-  }, [onToggleDirectory, onToggleHelp, showHelp, showNamesList, showSceneInfo]);
+  }, [onToggleDirectory, onToggleHelp, showBugReport, showHelp, showNamesList, showSceneInfo]);
+
+  React.useEffect(() => {
+    if (!flyModeEnabled) return;
+
+    if (showSceneInfo) setShowSceneInfo(false);
+    if (showNamesList) onToggleDirectory();
+    if (showHelp) onToggleHelp();
+    if (showBugReport) setShowBugReport(false);
+  }, [flyModeEnabled, onToggleDirectory, onToggleHelp, showBugReport, showHelp, showNamesList, showSceneInfo]);
 
   React.useEffect(() => {
     if (photoMode) return;
@@ -553,6 +858,11 @@ export default function SystemHud({
       if (key === toolbarShortcuts.orbits.toLowerCase()) {
         e.preventDefault();
         onToggleOrbits();
+        return;
+      }
+      if (key === toolbarShortcuts.traffic.toLowerCase()) {
+        e.preventDefault();
+        onToggleTraffic();
         return;
       }
       if (key === toolbarShortcuts.ranked.toLowerCase()) {
@@ -602,6 +912,7 @@ export default function SystemHud({
     onToggleLabels,
     onToggleLayout,
     onToggleOrbits,
+    onToggleTraffic,
     onToggleRenamed,
     onToggleVestingClaimed,
     photoMode,
@@ -612,10 +923,16 @@ export default function SystemHud({
     onToggleLabels,
     showRenamedOnly,
     onToggleRenamed,
+    showBugReport,
+    onToggleBugReport: handleBugToggle,
     showHelp,
-    onToggleHelp,
+    onToggleHelp: handleHelpToggle,
     showOrbits,
     onToggleOrbits,
+    showTraffic,
+    onToggleTraffic,
+    rxLed,
+    ecoLed,
     showFlightHud,
     onToggleFlightHud,
     onReset,
@@ -629,7 +946,7 @@ export default function SystemHud({
     layoutVariant: displaySystem?.layoutVariant ?? "vescrow",
     vestingClaimed: vestingLayoutMode === "claimed",
     onToggleVestingClaimed,
-    showHelpButton: isMobile,
+    showHelpButton: true,
   };
 
   const walletPanelProps = {
@@ -682,52 +999,63 @@ export default function SystemHud({
                     <div style={{ ...photoGuideLine, top: "66.666%", left: 0, right: 0, height: 1 }} />
                   </>
                 )}
-                {photoOverlayMode === "scope" && (
-                  <>
-                    <div style={{ position: "absolute", left: 0, right: 0, top: 0, height: "10%", background: "rgba(0,0,0,0.58)" }} />
-                    <div style={{ position: "absolute", left: 0, right: 0, bottom: 0, height: "10%", background: "rgba(0,0,0,0.58)" }} />
-                    <div style={{ ...photoGuideLine, left: "10%", right: "10%", top: "50%", height: 1, opacity: 0.18 }} />
-                  </>
-                )}
+
               </div>
               <TopStrip left={0} right={0} top={0} zIndex={35} nowrap>
+                <TopStripGroup padding="0 2px 0 0">
+                  <TopStripChip label={photoTargetLabel ?? "no target"} active={Boolean(photoTargetLabel)} accent="#9cc9d8" title={photoTargetLabel ?? "No focused object"} />
+                  <TopStripChip label="targets" active={photoPickerOpen} onClick={handlePhotoPickerToggle} title={`Open object picker (${photoShortcutMap.targets})`} />
+                  <TopStripChip
+                    label={photoFocusMode === "detached" ? "free cam" : "locked"}
+                    active={photoFocusMode === "detached"}
+                    onClick={photoFocusMode === "detached" ? onPhotoRefocus : onPhotoDetach}
+                    title={photoFocusMode === "detached" ? "Lock camera back to target" : `Free cam — WASD/QE rotate · HJNLIK move · Shift/Ctrl zoom · drag to look (${photoShortcutMap.detach})`}
+                  />
+                </TopStripGroup>
+                <TopStripDivider />
                 <TopStripGroup>
                   <TopStripChip label="clean" active={photoOverlayMode === "clean"} onClick={() => setPhotoOverlayMode("clean")} />
                   <TopStripChip label="grid" active={photoOverlayMode === "grid"} onClick={() => setPhotoOverlayMode("grid")} />
-                  <TopStripChip label="scope" active={photoOverlayMode === "scope"} onClick={() => setPhotoOverlayMode("scope")} />
                 </TopStripGroup>
                 <TopStripDivider />
                 <TopStripGroup padding="0 2px">
                   {photoFovPresets.map((preset) => (
                     <TopStripChip
                       key={preset}
-                      label={`${preset}fov`}
+                      label={`${preset}°`}
                       active={photoFov === preset}
                       onClick={() => onSetPhotoFov(preset)}
-                      title={`Set photo lens to ${preset} degrees`}
+                      title={`Field of view: ${preset}°`}
                     />
                   ))}
                 </TopStripGroup>
                 <TopStripDivider />
                 <TopStripGroup padding="0 2px">
-                  <TopStripChip label={photoFocusMode === "focused" ? "focused" : "detached"} active variant="status" />
-                  <TopStripChip label={photoTargetLabel ?? "no target"} active={Boolean(photoTargetLabel)} accent="#9cc9d8" title={photoTargetLabel ?? "No focused object selected"} />
+                  <TopStripChip
+                    label={photoSimulationMode === "frozen" ? "frozen" : "freeze"}
+                    active={photoSimulationMode === "frozen"}
+                    onClick={() => onSetPhotoSimulationMode(photoSimulationMode === "live" ? "frozen" : "live")}
+                    title="Toggle scene simulation freeze"
+                  />
                 </TopStripGroup>
                 <TopStripDivider />
-                <TopStripGroup padding="0 2px">
-                  <TopStripChip label="targets" active={photoPickerOpen} onClick={onTogglePhotoPicker} title={`Open object picker (${photoShortcutMap.targets})`} />
-                  <TopStripChip label="detach" active={photoFocusMode === "detached"} onClick={onPhotoDetach} title={`Detach focus for cinematic fly (${photoShortcutMap.detach})`} />
-                  <TopStripChip label="refocus" active={photoFocusMode === "focused"} onClick={onPhotoRefocus} title={`Snap back to current target (${photoShortcutMap.refocus})`} />
+                <TopStripGroup>
+                  <TopStripChip
+                    label="labels"
+                    active={showAllNames}
+                    onClick={onToggleLabels}
+                    title="Toggle all labels"
+                  />
+                  <TopStripChip
+                    label="named"
+                    active={showRenamedOnly}
+                    onClick={onToggleRenamed}
+                    title="Toggle named-only labels"
+                  />
                 </TopStripGroup>
                 <TopStripDivider />
-                <TopStripGroup padding="0 2px">
-                  <TopStripChip label="frozen" active={photoSimulationMode === "frozen"} onClick={() => onSetPhotoSimulationMode("frozen")} title="Freeze scene simulation" />
-                  <TopStripChip label="live" active={photoSimulationMode === "live"} onClick={() => onSetPhotoSimulationMode("live")} title="Live scene simulation" />
-                  <TopStripChip label={simulationPaused ? "paused" : "live scene"} active={simulationPaused} variant="status" />
-                </TopStripGroup>
-                <TopStripDivider />
-                <TopStripGroup padding="0 2px 0 2px">
-                  <TopStripChip label="hud off" onClick={onTogglePhotoHud} accent="#9cc9d8" title={`Hide photo HUD (${photoShortcutMap.hud})`} />
+                <TopStripGroup padding="0 0 0 2px">
+                  <TopStripChip label="bug" active={showBugReport} onClick={handleBugToggle} accent="#ffbf8f" title="Open bug report" />
                 </TopStripGroup>
                 <TopStripDivider />
                 <TopStripGroup padding="0 0 0 2px">
@@ -735,104 +1063,79 @@ export default function SystemHud({
                 </TopStripGroup>
               </TopStrip>
               {isMobile ? (
-                <button
-                  onClick={onCapturePhoto}
-                  title={`Capture screenshot (${photoShortcutMap.capture})`}
-                  style={{
-                    position: "fixed", bottom: 32, left: "50%", transform: "translateX(-50%)",
-                    zIndex: 35, width: 64, height: 64, borderRadius: "50%",
-                    border: "3px solid rgba(255,255,255,0.25)",
-                    background: "rgba(255,255,255,0.10)",
-                    backdropFilter: "blur(6px)",
-                    cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center",
-                    padding: 0, transition: "all 0.15s",
-                  }}
-                  onMouseEnter={(e) => { e.currentTarget.style.background = "rgba(255,255,255,0.22)"; e.currentTarget.style.borderColor = "rgba(255,255,255,0.6)"; }}
-                  onMouseLeave={(e) => { e.currentTarget.style.background = "rgba(255,255,255,0.10)"; e.currentTarget.style.borderColor = "rgba(255,255,255,0.25)"; }}
-                >
-                  <div style={{
-                    width: 38, height: 38, borderRadius: "50%",
-                    border: "2px solid rgba(255,255,255,0.5)",
-                    display: "flex", alignItems: "center", justifyContent: "center",
-                  }}>
-                    <div style={{ width: 22, height: 22, borderRadius: "50%", background: "rgba(255,255,255,0.75)" }} />
-                  </div>
-                </button>
+                <ShutterButton onClick={onCapturePhoto} shortcut={photoShortcutMap.capture} saved={photoSavedToast} mobile />
               ) : (
-                <button
-                  onClick={onCapturePhoto}
-                  title={`Capture screenshot (${photoShortcutMap.capture})`}
-                  style={{
-                    position: "fixed",
-                    bottom: 26,
-                    left: "50%",
-                    transform: "translateX(-50%)",
-                    zIndex: 35,
-                    display: "flex",
-                    alignItems: "center",
-                    gap: 12,
-                    minWidth: 192,
-                    height: 46,
-                    padding: "0 10px 0 14px",
-                    borderRadius: 999,
-                    border: "1px solid rgba(255,255,255,0.1)",
-                    background: "rgba(4,10,18,0.78)",
-                    boxShadow: "0 12px 28px rgba(0,0,0,0.26)",
-                    backdropFilter: "blur(12px)",
-                    cursor: "pointer",
-                    transition: "all 0.15s ease",
-                  }}
-                  onMouseEnter={(e) => {
-                    e.currentTarget.style.background = "rgba(8,18,30,0.9)";
-                    e.currentTarget.style.borderColor = "rgba(122,228,242,0.28)";
-                  }}
-                  onMouseLeave={(e) => {
-                    e.currentTarget.style.background = "rgba(4,10,18,0.78)";
-                    e.currentTarget.style.borderColor = "rgba(255,255,255,0.1)";
-                  }}
-                >
-                  <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-start", gap: 2 }}>
-                    <span style={{
-                      color: "rgba(255,255,255,0.46)",
-                      fontSize: 8,
-                      letterSpacing: "0.16em",
-                      textTransform: "uppercase",
-                    }}>
-                      capture
-                    </span>
-                    <span style={{
-                      color: "#eaf7ff",
-                      fontSize: 11,
-                      letterSpacing: "0.1em",
-                      textTransform: "uppercase",
-                      fontWeight: 600,
-                    }}>
-                      save png
-                    </span>
+                <ShutterButton onClick={onCapturePhoto} shortcut={photoShortcutMap.capture} saved={photoSavedToast} />
+              )}
+
+              {/* Photo key hints (same pattern as FlyHud key hints) */}
+              {photoKeyHints && !isMobile && (
+                <div style={{
+                  position: "fixed",
+                  left: 24,
+                  bottom: 14,
+                  display: "flex",
+                  flexDirection: "column",
+                  gap: 3,
+                  padding: "9px 11px",
+                  width: 182,
+                  background: "linear-gradient(180deg, rgba(5,17,24,0.38), rgba(4,12,18,0.16))",
+                  border: "1px solid rgba(123,247,255,0.08)",
+                  clipPath: "polygon(0 0, 100% 0, calc(100% - 12px) 100%, 0 100%)",
+                  zIndex: 35,
+                  fontFamily: "'JetBrains Mono', 'SF Mono', monospace",
+                  letterSpacing: "0.08em",
+                  pointerEvents: "auto",
+                }}>
+                  <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 8 }}>
+                    <div style={{ fontSize: 8, fontWeight: 700, color: "rgba(217,251,255,0.72)", letterSpacing: "0.08em" }}>PHOTO</div>
+                    <button type="button" onClick={() => setPhotoKeyHints(false)} style={{ border: "none", background: "transparent", color: "rgba(123,247,255,0.47)", fontFamily: "inherit", fontSize: 11, lineHeight: 1, cursor: "pointer", padding: "1px 0 0" }} aria-label="Hide key hints">
+                      {"\u00d7"}
+                    </button>
                   </div>
-                  <div style={{
-                    marginLeft: "auto",
-                    display: "inline-flex",
-                    alignItems: "center",
-                    justifyContent: "center",
-                    minWidth: 56,
-                    height: 30,
-                    padding: "0 10px",
-                    borderRadius: 999,
-                    border: "1px solid rgba(255,255,255,0.12)",
-                    background: "rgba(255,255,255,0.05)",
-                    color: "#c9fbff",
-                    fontSize: 10,
-                    letterSpacing: "0.12em",
-                    textTransform: "uppercase",
-                    fontWeight: 700,
-                    flexShrink: 0,
-                  }}>
-                    {photoShortcutMap.capture}
-                  </div>
-                </button>
+                  {([
+                    ["SPACE", "Capture"],
+                    ["T", "Targets picker"],
+                    ["V", "Free cam"],
+                    ["F", "Refocus"],
+                    ["G", "Clean / grid"],
+                    ["H", "Hide HUD"],
+                    ["M", "Freeze"],
+                    ["ESC", "Exit"],
+                  ] as const).map(([key, action]) => (
+                    <div key={key} style={{ display: "flex", alignItems: "center", gap: 7 }}>
+                      <span style={{ fontSize: 8, fontWeight: 700, color: "#d9fbff", minWidth: 48, textAlign: "right", letterSpacing: "0.04em" }}>{key}</span>
+                      <span style={{ fontSize: 8, color: "rgba(123,247,255,0.4)", fontWeight: 500 }}>{action}</span>
+                    </div>
+                  ))}
+                </div>
               )}
             </>
+          )}
+
+          {!photoHudVisible && (
+            <button
+              onClick={onTogglePhotoHud}
+              title={`Show HUD (${photoShortcutMap.hud})`}
+              style={{
+                position: "fixed",
+                top: 8,
+                left: "50%",
+                transform: "translateX(-50%)",
+                zIndex: 35,
+                background: "rgba(20,28,36,0.55)",
+                border: "1px solid rgba(120,160,190,0.25)",
+                borderRadius: 4,
+                color: "rgba(140,170,200,0.6)",
+                fontFamily: "'JetBrains Mono', 'SF Mono', 'Fira Code', Menlo, monospace",
+                fontSize: 10,
+                padding: "3px 10px",
+                cursor: "pointer",
+                letterSpacing: "0.04em",
+              }}
+            >
+              show HUD ({photoShortcutMap.hud})
+            </button>
           )}
 
           {photoHudVisible && photoPickerOpen && !isMobile && (
@@ -855,133 +1158,265 @@ export default function SystemHud({
             </div>
           )}
 
-          {!photoHudVisible && (
-            <div style={{ position: "fixed", top: 16, right: 18, zIndex: 35, pointerEvents: "none" }}>
-              <div style={{
-                padding: "4px 8px",
-                borderRadius: 999,
-                background: "rgba(0,0,0,0.22)",
-                border: "1px solid rgba(255,255,255,0.08)",
-                color: "rgba(255,255,255,0.55)",
-                fontSize: 9,
-                letterSpacing: "0.12em",
-                textTransform: "uppercase",
-              }}>
-                {photoShortcutMap.hud} hud
-              </div>
+          {showBugReport && (
+            <div style={{
+              position: "fixed",
+              left: isMobile ? 0 : undefined,
+              right: isMobile ? 0 : 18,
+              top: isMobile ? 34 : 42,
+              bottom: isMobile ? 110 : undefined,
+              width: isMobile ? undefined : 360,
+              maxHeight: isMobile ? "calc(100vh - 144px)" : undefined,
+              overflowY: isMobile ? "auto" : undefined,
+              zIndex: 36,
+              fontFamily: "'JetBrains Mono', 'SF Mono', 'Fira Code', Menlo, monospace",
+              fontSize: 12,
+              color: "#8a9bb0",
+              boxShadow: isMobile ? undefined : "0 18px 42px rgba(0,0,0,0.28)",
+            }}>
+              <BugReportPanel
+                mobile={isMobile}
+                connectedAddress={wc.connectedAddress}
+                reporterDefault={wc.myWallet?.customName ?? (wc.connectedAddress ? `${wc.connectedAddress.slice(0, 6)}...${wc.connectedAddress.slice(-4)}` : "")}
+                selectedLabel={photoTargetLabel ?? selectedBridge?.label ?? selectedTransitBeacon?.label ?? displaySystem?.navLabel ?? null}
+                onSubmitted={() => setShowBugReport(false)}
+              />
             </div>
           )}
 
+
+
           {photoSavedToast && (
-            <div style={{
-              position: "fixed",
-              left: "50%",
-              bottom: photoHudVisible ? 112 : 28,
-              transform: "translateX(-50%)",
-              zIndex: 41,
-              pointerEvents: "none",
-              padding: "8px 14px",
-              borderRadius: 999,
-              background: "rgba(5, 18, 28, 0.84)",
-              border: "1px solid rgba(123,247,255,0.18)",
-              color: "#c9fbff",
-              fontSize: 10,
-              letterSpacing: "0.12em",
-              textTransform: "uppercase",
-              boxShadow: "0 10px 28px rgba(0,0,0,0.24)",
-            }}>
-              saved png
-            </div>
+            <div style={{ display: "none" }} />
           )}
         </>
       )}
 
       {/* ── HUD overlay (hidden in photo mode) ── */}
       {!photoMode && (isMobile ? (
-        /* ════ MOBILE: bottom sheet ════ */
-        <div style={{
-          position: "fixed", bottom: 0, left: 0, right: 0, zIndex: 20,
-          fontFamily: "'JetBrains Mono','SF Mono','Fira Code',Menlo,monospace",
-          fontSize: 12, color: "#8a9bb0",
-          display: "flex", flexDirection: "column",
-        }}>
-          {(showNamesList || showHelp) && (
-            <div style={{
-              maxHeight: "55vh", overflowY: "auto",
-              background: "rgba(2,6,14,0.96)",
-              borderTop: "1px solid rgba(0,229,255,0.15)",
-            }}>
-              {showHelp      && <HelpPanel mobile />}
-              {showNamesList && (
-                <DirectoryPanel
-                  solarData={activeData}
-                  selectedAddress={selectedAddress}
-                  onSelect={onDirectorySelect}
-                />
-              )}
-            </div>
-          )}
-          <div style={{ borderTop: "1px solid rgba(0,229,255,0.08)" }}>
-            <WalletPanel {...walletPanelProps} />
-          </div>
-          <HudToolbar mobile {...toolbarProps} />
-        </div>
-      ) : (
-        /* ════ DESKTOP: right-side column ════ */
+        /* ════ MOBILE ════ */
         <>
-          <TopStrip left={0} right={0} top={0} zIndex={21} nowrap>
-            <TopStripGroup gap={8}>
+          {/* ── Top navigation bar (system chips) ── */}
+          <div style={{
+            position: "fixed", top: 0, left: 0, right: 0, zIndex: 21,
+            background: "rgba(2,6,14,0.58)",
+            borderBottom: "1px solid rgba(255,255,255,0.08)",
+            backdropFilter: "blur(10px)",
+            padding: "3px 0",
+            WebkitOverflowScrolling: "touch",
+          }}>
+            <div style={{
+              display: "flex", alignItems: "center", gap: 6,
+              padding: "0 8px",
+              overflowX: "auto",
+              scrollbarWidth: "none",
+              WebkitOverflowScrolling: "touch",
+            }}>
               {systems.map((system) => (
                 <TopStripChip
                   key={system.id}
                   label={system.navLabel}
                   active={system.id === toolbarActiveSystemId}
-                  onClick={selectedSystemStarId === system.starId || flyModeEnabled ? undefined : () => onJumpToStar(system.starId)}
-                  disabled={flyModeEnabled}
+                  onClick={selectedSystemStarId === system.starId ? undefined : () => onJumpToStar(system.starId)}
                   accent={system.accent}
-                  title={flyModeEnabled ? "System switching is disabled in fly mode" : undefined}
                   noTooltip
                 />
               ))}
               <TopStripDivider />
-              <TopStripChip label="info" active={infoChipActive} onClick={handleInfoToggle} accent="#9cc9d8" title="Open system panel" />
-              <TopStripChip label="list" active={showNamesList} onClick={handleListToggle} accent="#9cc9d8" title="Open directory" />
-              <TopStripChip label="help" active={showHelp} onClick={handleHelpToggle} accent="#9cc9d8" title="Open guide" />
-            </TopStripGroup>
+              <TopStripChip label="info" active={showSceneInfo} onClick={handleInfoToggle} accent="#9cc9d8" noTooltip />
+              <TopStripChip label="list" active={showNamesList} onClick={handleListToggle} accent="#9cc9d8" noTooltip />
+            </div>
+          </div>
 
-            <HudToolbar {...toolbarProps} compact embedded showHelpButton={false} />
-
-            <TopStripDivider />
-
-            {!wc.connectedAddress ? (
-              <TopStripGroup padding="0 0 0 2px">
-                <TopStripChip label="connect wallet" onClick={wc.connectWallet} accent="#00e5ff" title="Connect wallet" />
-              </TopStripGroup>
-            ) : (
-              <TopStripGroup padding="0 0 0 2px">
-                <TopStripChip label="wallet" active accent="#6ef7a7" title="Connected wallet" />
-                {connectedLabel && <TopStripChip label={connectedLabel} active accent="#6ef7a7" title={wc.connectedAddress ?? undefined} />}
-                {wc.canRename && (
+          {/* ── Bottom sheet ── */}
+          <div style={{
+            position: "fixed", bottom: 0, left: 0, right: 0, zIndex: 20,
+            fontFamily: "'JetBrains Mono','SF Mono','Fira Code',Menlo,monospace",
+            fontSize: 12, color: "#8a9bb0",
+            display: "flex", flexDirection: "column",
+            maxHeight: "70vh",
+          }}>
+            {/* Expandable panels: traffic, help, directory */}
+            {(showTraffic || showNamesList || showHelp || showSceneInfo || showBugReport) && (
+              <div style={{
+                maxHeight: "40vh", overflowY: "auto",
+                background: "rgba(2,6,14,0.96)",
+                borderTop: "1px solid rgba(0,229,255,0.15)",
+              }}>
+                {showBugReport && (
+                  <BugReportPanel
+                    mobile
+                    connectedAddress={wc.connectedAddress}
+                    reporterDefault={wc.myWallet?.customName ?? (wc.connectedAddress ? `${wc.connectedAddress.slice(0, 6)}...${wc.connectedAddress.slice(-4)}` : "")}
+                    selectedLabel={selectedBridge?.label ?? selectedTransitBeacon?.label ?? displaySystem?.navLabel ?? null}
+                    onSubmitted={() => setShowBugReport(false)}
+                  />
+                )}
+                {showSceneInfo && selectedBridge && (
                   <div style={{
-                    display: "flex",
-                    alignItems: "center",
-                    gap: 4,
-                    padding: "0 0 0 2px",
-                    flexShrink: 0,
+                    padding: "8px 10px",
+                    borderBottom: "1px solid rgba(0,229,255,0.06)",
                   }}>
-                    <input
-                      value={wc.nameInput}
-                      onChange={(e) => wc.setNameInput(e.target.value)}
-                      onKeyDown={(e) => {
-                        if (e.key === "Enter" && !wc.isSaving && wc.nameInput.trim()) {
-                          wc.savePlanetName();
-                        }
-                      }}
-                      maxLength={32}
-                      placeholder={wc.myWallet?.customName || "designation"}
-                      disabled={wc.isSaving}
-                      title="Rename connected wallet"
-                      style={{
+                    <div style={{ fontSize: 8, letterSpacing: "0.16em", textTransform: "uppercase", color: "#5a7a8a", marginBottom: 4 }}>galactica</div>
+                    <div style={{ fontSize: 11, color: "#d0e8f2", fontWeight: 700, marginBottom: 6 }}>{selectedBridge.label}</div>
+                    <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "4px 12px", fontSize: 9 }}>
+                      <div><span style={{ color: "#5a7a8a" }}>status </span><span style={{ color: selectedBridge.status === "active" ? "#00e5ff" : "#8a9bb0" }}>{selectedBridge.status}</span></div>
+                      <div><span style={{ color: "#5a7a8a" }}>type </span><span style={{ color: "#8eb0c4" }}>{selectedBridge.kind}</span></div>
+                    </div>
+                  </div>
+                )}
+                {showSceneInfo && selectedTransitBeacon && !selectedBridge && (
+                  <div style={{
+                    padding: "8px 10px",
+                    borderBottom: "1px solid rgba(0,229,255,0.06)",
+                  }}>
+                    <div style={{ fontSize: 8, letterSpacing: "0.16em", textTransform: "uppercase", color: "#5a7a8a", marginBottom: 4 }}>galactica</div>
+                    <div style={{ fontSize: 11, color: "#d0e8f2", fontWeight: 700, marginBottom: 6 }}>{selectedTransitBeacon.label}</div>
+                    <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "4px 12px", fontSize: 9 }}>
+                      <div><span style={{ color: "#5a7a8a" }}>state </span><span style={{ color: "#00e5ff" }}>active</span></div>
+                      <div><span style={{ color: "#5a7a8a" }}>traffic </span><span style={{ color: "#8eb0c4" }}>{trafficItems.length}</span></div>
+                    </div>
+                  </div>
+                )}
+                {showSceneInfo && !selectedBridge && !selectedTransitBeacon && displaySystem && (
+                  <div style={{
+                    padding: "8px 10px",
+                    borderBottom: "1px solid rgba(0,229,255,0.06)",
+                  }}>
+                    <div style={{ fontSize: 8, letterSpacing: "0.16em", textTransform: "uppercase", color: "#5a7a8a", marginBottom: 4 }}>galactica</div>
+                    <div style={{ fontSize: 11, color: "#d0e8f2", fontWeight: 700, marginBottom: 6 }}>{displaySystem.navLabel}</div>
+                    <div style={{ display: "flex", flexDirection: "column", gap: 2, fontSize: 9 }}>
+                      {displaySystem.summaryRows.map((row) => (
+                        <div key={row.label}>
+                          <span style={{ color: "#5a7a8a" }}>{row.label} </span>
+                          <span style={{ color: row.accent ?? "#8ab0c0" }}>{row.value}</span>
+                        </div>
+                      ))}
+                    </div>
+                    {displaySystem.descriptionLines.length > 0 && (
+                      <div style={{ marginTop: 6, fontSize: 9, color: "#4a6575", lineHeight: 1.4 }}>
+                        {displaySystem.descriptionLines.map((line) => (
+                          <div key={line}>{line}</div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                )}
+                {showTraffic && (
+                  <TrafficPanel
+                    items={trafficItems}
+                    collapsed={!trafficPanelOpen}
+                    rxLed={rxLed}
+                    ecoLed={ecoLed}
+                    onSelect={onTrafficSelect}
+                    onToggleCollapsed={onToggleTrafficPanel}
+                  />
+                )}
+                {showHelp      && <HelpPanel mobile />}
+                {showNamesList && (
+                  <DirectoryPanel
+                    solarData={activeData}
+                    selectedAddress={selectedAddress}
+                    onSelect={onDirectorySelect}
+                  />
+                )}
+              </div>
+            )}
+            <div style={{ borderTop: "1px solid rgba(0,229,255,0.08)" }}>
+              <WalletPanel {...walletPanelProps} />
+            </div>
+            <HudToolbar mobile {...toolbarProps} />
+          </div>
+        </>
+      ) : (
+        /* ════ DESKTOP: right-side column ════ */
+        <>
+          {flyModeEnabled ? (
+            <TopStrip left={0} right={0} top={0} zIndex={21} nowrap>
+              <TopStripGroup gap={4}>
+                <HudBtn compact strip active={flyPickerOpen} onClick={handleFlyPickerToggle} label="list" title="Open flight target list" />
+              </TopStripGroup>
+
+              <TopStripDivider />
+
+              <TopStripGroup gap={4} padding="0 2px">
+                <HudBtn compact strip active={Boolean(flyTargetLabel)} disabled={!flyTargetLabel} label={flyTargetLabel ?? "no target"} title={flyTargetLabel ?? "No flight target selected"} />
+                <HudBtn compact strip active={Boolean(flyTargetLabel) || flyAutopilotActive} onClick={onFlyToTarget} disabled={!flyTargetLabel && !flyAutopilotActive} label={flyAutopilotActive ? "cancel" : "fly to"} title={flyAutopilotActive ? "Cancel auto flight" : "Fly toward selected target"} />
+                <HudBtn compact strip active={showFlightHud} onClick={onToggleFlightHud} label={showFlightHud ? "hide hud" : "show hud"} title="Toggle flight HUD" />
+              </TopStripGroup>
+
+              <TopStripDivider />
+
+              <HudToolbar
+                {...toolbarProps}
+                compact
+                embedded
+                showReset={false}
+                onReset={() => {}}
+                onPhotoMode={undefined}
+                onToggleFlyMode={undefined}
+                onToggleLayout={undefined}
+                onToggleGnet={undefined}
+                onToggleVestingClaimed={undefined}
+              />
+
+              <TopStripDivider />
+
+              <TopStripGroup padding="0 0 0 2px">
+                <HudBtn compact strip active={false} onClick={onToggleFlyMode} label="exit flight" title="Exit flight mode" />
+              </TopStripGroup>
+            </TopStrip>
+          ) : (
+            <TopStrip left={0} right={0} top={0} zIndex={21} nowrap>
+              <TopStripGroup gap={8}>
+                {systems.map((system) => (
+                  <TopStripChip
+                    key={system.id}
+                    label={system.navLabel}
+                    active={system.id === toolbarActiveSystemId}
+                    onClick={selectedSystemStarId === system.starId ? undefined : () => onJumpToStar(system.starId)}
+                    accent={system.accent}
+                    noTooltip
+                  />
+                ))}
+                <TopStripDivider />
+                <TopStripChip label="info" active={infoChipActive} onClick={handleInfoToggle} accent="#9cc9d8" title="Open system panel" />
+                <TopStripChip label="list" active={showNamesList} onClick={handleListToggle} accent="#9cc9d8" title="Open directory" />
+              </TopStripGroup>
+
+              <HudToolbar {...toolbarProps} compact embedded />
+
+              <TopStripDivider />
+
+              {!wc.connectedAddress ? (
+                <TopStripGroup padding="0 0 0 2px">
+                  <TopStripChip label="connect wallet" onClick={wc.connectWallet} accent="#00e5ff" title="Connect wallet" />
+                </TopStripGroup>
+              ) : (
+                <TopStripGroup padding="0 0 0 2px">
+                  <TopStripChip label="wallet" active accent="#6ef7a7" title="Connected wallet" />
+                  {connectedLabel && <TopStripChip label={connectedLabel} active accent="#6ef7a7" title={wc.connectedAddress ?? undefined} />}
+                  {wc.canRename && (
+                    <div style={{
+                      display: "flex",
+                      alignItems: "center",
+                      gap: 4,
+                      padding: "0 0 0 2px",
+                      flexShrink: 0,
+                    }}>
+                      <input
+                        value={wc.nameInput}
+                        onChange={(e) => wc.setNameInput(e.target.value)}
+                        onKeyDown={(e) => {
+                          if (e.key === "Enter" && !wc.isSaving && wc.nameInput.trim()) {
+                            wc.savePlanetName();
+                          }
+                        }}
+                        maxLength={32}
+                        placeholder={wc.myWallet?.customName || "designation"}
+                        disabled={wc.isSaving}
+                        title="Rename connected wallet"
+                        style={{
                         width: 140,
                         minWidth: 0,
                         height: 24,
@@ -1036,9 +1471,49 @@ export default function SystemHud({
               </TopStripGroup>
             )}
           </TopStrip>
+          )}
+
+          {flyModeEnabled && flyPickerOpen && !isMobile && (
+            <div style={{
+              position: "fixed",
+              right: 18,
+              top: 42,
+              width: 336,
+              zIndex: 36,
+              fontFamily: "'JetBrains Mono', 'SF Mono', 'Fira Code', Menlo, monospace",
+              fontSize: 12,
+              color: "#8a9bb0",
+              boxShadow: "0 18px 42px rgba(0,0,0,0.28)",
+            }}>
+              <PhotoObjectPicker
+                sections={photoTargetSections}
+                selectedId={selectedAddress}
+                onSelect={(item) => onFlyTargetSelect(item.id)}
+              />
+            </div>
+          )}
+
+          {showTraffic && (
+            <div style={{
+              position: "fixed", left: 12, top: attachedMenuTop + 8, zIndex: 20, width: trafficPanelOpen ? 344 : 64,
+              fontFamily: "'JetBrains Mono', 'SF Mono', 'Fira Code', Menlo, monospace",
+              fontSize: 12, color: "#8a9bb0",
+              transition: "width 0.2s ease",
+            }}>
+              <TrafficPanel
+                items={trafficItems}
+                attached
+                collapsed={!trafficPanelOpen}
+                rxLed={rxLed}
+                ecoLed={ecoLed}
+                onSelect={onTrafficSelect}
+                onToggleCollapsed={onToggleTrafficPanel}
+              />
+            </div>
+          )}
 
           <div style={{
-            position: "fixed", right: 12, top: attachedMenuTop + 8, zIndex: 20, width: showHelp ? 500 : 392,
+            position: "fixed", right: 12, top: attachedMenuTop + 8, zIndex: 20, width: showHelp ? 500 : showBugReport ? 420 : 392,
             fontFamily: "'JetBrains Mono', 'SF Mono', 'Fira Code', Menlo, monospace",
             fontSize: 12, color: "#8a9bb0",
             display: "flex", flexDirection: "column", gap: 10,
@@ -1053,6 +1528,22 @@ export default function SystemHud({
                 panelEase={PANEL_EASE}
                 panelAnimationState={bridgePanelAnimationState}
                 bridge={panelBridge}
+              />
+            )}
+
+            {transitBeaconPanelVisible && panelTransitBeacon && (activeDesktopPanel === "transit-beacon-overview" || activeDesktopPanel === "transit-beacon-info") && (
+              <TransitBeaconInfoCard
+                activeMode={activeDesktopPanel}
+                overviewPhase={transitBeaconOverviewPhase}
+                overviewVisible={transitBeaconOverviewVisible}
+                overviewFadeMs={OVERVIEW_FADE_MS}
+                panelSwapMs={PANEL_SWAP_MS}
+                panelEase={PANEL_EASE}
+                panelAnimationState={transitBeaconPanelAnimationState}
+                beacon={panelTransitBeacon}
+                trafficItems={trafficItems}
+                rxLed={rxLed}
+                ecoLed={ecoLed}
               />
             )}
 
@@ -1078,20 +1569,28 @@ export default function SystemHud({
                 attached
               />
             )}
+            {showBugReport && (
+              <BugReportPanel
+                connectedAddress={wc.connectedAddress}
+                reporterDefault={wc.myWallet?.customName ?? (wc.connectedAddress ? `${wc.connectedAddress.slice(0, 6)}...${wc.connectedAddress.slice(-4)}` : "")}
+                selectedLabel={selectedBridge?.label ?? selectedTransitBeacon?.label ?? displaySystem?.navLabel ?? null}
+                onSubmitted={() => setShowBugReport(false)}
+              />
+            )}
             {showHelp && <HelpPanel />}
           </div>
         </>
       ))}
 
       {/* ── Top-left stats overlay ── */}
-      {!photoMode && isMobile && !hasDetachedFocus && (
+      {!photoMode && isMobile && (
         <div style={{
           position: "fixed",
-          left: isMobile ? 8 : 16,
-          top: isMobile ? 8 : 16,
+          left: 8,
+          top: 34,
           zIndex: 20,
           fontFamily: "'JetBrains Mono', 'SF Mono', monospace",
-          fontSize: isMobile ? 10 : 11,
+          fontSize: 10,
           color: "#8a9bb0",
           display: "flex",
           flexDirection: "column",
@@ -1102,37 +1601,41 @@ export default function SystemHud({
           border: "1px solid rgba(0,229,255,0.12)",
           borderLeft: "2px solid rgba(0,229,255,0.4)",
           borderRadius: 4,
-          padding: isMobile ? "5px 8px" : "8px 12px",
+          padding: "5px 8px",
         }}>
-          <div style={{ color: displaySystem?.accent ?? "#6a9aaa", fontSize: 9, letterSpacing: "0.18em", textTransform: "uppercase", marginBottom: 2 }}>
-            {isMobile
-              ? `${displaySystem?.navLabel ?? "system"}\u03b1`
-              : displaySystem?.eyebrow}
-          </div>
-          {(isMobile ? displaySystem?.summaryRows.slice(0, 2) : displaySystem?.summaryRows)?.map((row) => (
-            <div key={row.label}>
-              <span style={{ color: "#6a8090" }}>{isMobile ? `${row.label.slice(0, 1)} ` : `${row.label.padEnd(8, " ")}`}</span>
-              <span style={{ color: row.accent ?? "#8ab0c0" }}>{row.value}</span>
-            </div>
-          ))}
-          {!isMobile && displaySystem?.updatedAt ? (
-            <div style={{ marginTop: 4, fontSize: 9, color: "#5a7a8a" }}>
-              updated {new Date(displaySystem.updatedAt).toLocaleTimeString()}
-            </div>
-          ) : null}
-          {!isMobile && blockInfo && displaySystem?.id !== "gubi-pool" && (
-            <div style={{ marginTop: 2, fontSize: 9, color: "#4a6e7e", letterSpacing: "0.08em" }}>
-              <span style={{ color: "#3a5a6a" }}>blk </span>
-              <span style={{ color: "#5a9aaa" }}>{blockInfo.blockNumber.toLocaleString()}</span>
-            </div>
-          )}
-          {!isMobile && (
-            <div style={{ marginTop: 3, fontSize: 9, color: "#4a6575", lineHeight: 1.4 }}>
-              {displaySystem?.descriptionLines.map((line) => (
-                <div key={line}>{line}</div>
+          {selectedBridge ? (
+            <>
+              <div style={{ color: "#78eeff", fontSize: 9, letterSpacing: "0.18em", textTransform: "uppercase", marginBottom: 2 }}>
+                {selectedBridge.label}
+              </div>
+              <div>
+                <span style={{ color: "#6a8090" }}>s </span>
+                <span style={{ color: selectedBridge.status === "active" ? "#00e5ff" : "#8a9bb0" }}>{selectedBridge.status}</span>
+              </div>
+            </>
+          ) : selectedTransitBeacon ? (
+            <>
+              <div style={{ color: "#ffd68f", fontSize: 9, letterSpacing: "0.18em", textTransform: "uppercase", marginBottom: 2 }}>
+                {selectedTransitBeacon.label}
+              </div>
+              <div>
+                <span style={{ color: "#6a8090" }}>t </span>
+                <span style={{ color: "#8ab0c0" }}>{trafficItems.length}</span>
+              </div>
+            </>
+          ) : !hasDetachedFocus ? (
+            <>
+              <div style={{ color: displaySystem?.accent ?? "#6a9aaa", fontSize: 9, letterSpacing: "0.18em", textTransform: "uppercase", marginBottom: 2 }}>
+                {`${displaySystem?.navLabel ?? "system"}\u03b1`}
+              </div>
+              {displaySystem?.summaryRows.slice(0, 2).map((row) => (
+                <div key={row.label}>
+                  <span style={{ color: "#6a8090" }}>{`${row.label.slice(0, 1)} `}</span>
+                  <span style={{ color: row.accent ?? "#8ab0c0" }}>{row.value}</span>
+                </div>
               ))}
-            </div>
-          )}
+            </>
+          ) : null}
         </div>
       )}
     </>

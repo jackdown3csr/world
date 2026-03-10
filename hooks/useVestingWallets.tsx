@@ -14,6 +14,7 @@ import type { VestingWalletEntry, VestingPayload } from "@/lib/types";
 
 interface VestingState {
   wallets: VestingWalletEntry[];
+  currentEpoch: number;
   updatedAt: number;
   loading: boolean;
   error: string | null;
@@ -27,6 +28,7 @@ type Action =
 
 const initialState: VestingState = {
   wallets: [],
+  currentEpoch: 0,
   updatedAt: 0,
   loading: true,
   error: null,
@@ -41,6 +43,7 @@ function reducer(state: VestingState, action: Action): VestingState {
       return {
         ...state,
         wallets: action.payload.wallets,
+        currentEpoch: action.payload.currentEpoch ?? 0,
         updatedAt: action.payload.updatedAt,
         loading: false,
         error: null,

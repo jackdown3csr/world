@@ -200,6 +200,7 @@ export default function CameraController({
   /* ── Escape key → stop tracking body, return to fly if was flying ── */
   useEffect(() => {
     function onKeyDown(e: KeyboardEvent) {
+      if (e.repeat) return;
       if (e.key === "Escape" && mode.current === "orbit" && trackingAddr.current) {
         trackingAddr.current = null;
         isSnapping.current   = false;

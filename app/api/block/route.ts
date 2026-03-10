@@ -37,8 +37,7 @@ export async function GET() {
       { blockNumber, blockTimestamp },
       { headers: { "Cache-Control": "no-store" } },
     );
-  } catch (err) {
-    console.error("[/api/block]", err);
+  } catch {
     return NextResponse.json({ error: "RPC unavailable" }, { status: 503 });
   }
 }

@@ -28,7 +28,7 @@ LINE3 = "CONTRACTS AND CAPITAL FLOWS. VISUALIZED."
 
 # ── Sizes & position ──────────────────────────────────────────────────────────
 X          = 44
-Y          = 36
+BOTTOM_PAD = 72
 SIZE1      = 136    # SECTOR
 SIZE2      = 52     # GALACTICA
 SIZE3      = 26     # subtitle
@@ -58,14 +58,14 @@ def txt(draw, pos, text, font, colour, shadow_offset=2):
 def draw_overlay(image_path: str) -> None:
     if not os.path.exists(IMAGE_SRC):
         shutil.copy2(image_path, IMAGE_SRC)
-        print(f"Backed up → {IMAGE_SRC}")
+        print(f"Backed up -> {IMAGE_SRC}")
         src = image_path
     else:
         src = IMAGE_SRC
 
     img = Image.open(src).convert("RGBA")
     w, h = img.size
-    print(f"Opened {src}  ({w}×{h})")
+    print(f"Opened {src}  ({w}x{h})")
 
     f1 = load_font(SIZE1, FONT_BOLD, FONT_SEMIBOLD, FONT_REG)
     f2 = load_font(SIZE2, FONT_SEMIBOLD, FONT_BOLD, FONT_REG)
@@ -75,19 +75,21 @@ def draw_overlay(image_path: str) -> None:
     draw    = ImageDraw.Draw(overlay)
 
     text_x = X
+    h1 = f1.getbbox(LINE1)[3]
+    h2 = f2.getbbox(LINE2)[3]
+    h3 = f3.getbbox(LINE3)[3]
+    total_height = h1 + GAP12 + h2 + GAP23 + h3 + 3
+    text_y = max(24, h - BOTTOM_PAD - total_height)
 
     # Line 1 — SECTOR
-    h1 = f1.getbbox(LINE1)[3]
-    txt(draw, (text_x, Y), LINE1, f1, C_WHITE, shadow_offset=3)
+    txt(draw, (text_x, text_y), LINE1, f1, C_WHITE, shadow_offset=3)
 
     # Line 2 — GALACTICA  (letter-spaced via ordinary text, tracked manually)
-    y2 = Y + h1 + GAP12
+    y2 = text_y + h1 + GAP12
     # use stroke_width for the faint outline look
     draw.text((text_x + 3 + 2, y2 + 2), LINE2, font=f2, fill=C_SHADOW, spacing=4)
     draw.text((text_x + 3,     y2),     LINE2, font=f2, fill=C_ORANGE,
               stroke_width=0)
-
-    h2 = f2.getbbox(LINE2)[3]
 
     # Thin separator line
     sep_y  = y2 + h2 + GAP23 // 2
@@ -100,7 +102,7 @@ def draw_overlay(image_path: str) -> None:
 
     result = Image.alpha_composite(img, overlay)
     result.save(image_path)
-    print(f"Saved → {image_path}")
+    print(f"Saved -> {image_path}")
 
 
 if __name__ == "__main__":

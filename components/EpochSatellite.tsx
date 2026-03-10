@@ -16,7 +16,7 @@ import * as THREE from "three";
 import { registerSceneObject, unregisterSceneObject } from "@/lib/sceneRegistry";
 
 export const EPOCH_ADDRESS = "__epoch__";
-const BODY_RADIUS   = 4;
+const BODY_RADIUS   = 2.2;
 
 /* ── Shared materials ────────────────────────────────────── */
 const matBus     = new THREE.MeshStandardMaterial({ color: "#8a9aaa", metalness: 0.8,  roughness: 0.25 });
@@ -37,6 +37,7 @@ interface EpochSatelliteProps {
   orbitRadius: number;
   showLabel?: boolean;
   onSelect?: (addr: string) => void;
+  interactive?: boolean;
   paused?: boolean;
 }
 
@@ -45,6 +46,7 @@ export default function EpochSatellite({
   orbitRadius,
   showLabel = true,
   onSelect,
+  interactive = true,
   paused = false,
 }: EpochSatelliteProps) {
   const groupRef   = useRef<THREE.Group>(null);
@@ -72,8 +74,8 @@ export default function EpochSatellite({
   /* ── Parabolic dish geometry (lathe profile) ─────────── */
   const dishGeo = useMemo(() => {
     const pts: THREE.Vector2[] = [];
-    const R = 2.4;
-    const depth = 0.6;
+    const R = 1.45;
+    const depth = 0.34;
     const segs = 16;
     for (let i = 0; i <= segs; i++) {
       const t = i / segs;           // 0 = center, 1 = rim
@@ -84,7 +86,8 @@ export default function EpochSatellite({
     return new THREE.LatheGeometry(pts, 24);
   }, []);
 
-  useFrame((state, delta) => {
+  useFrame((state, rawDelta) => {
+    const delta = Math.min(rawDelta, 1 / 30);
     if (!paused) {
       angleRef.current += orbitSpeed * delta;
       scanTimeRef.current += delta;
@@ -123,15 +126,15 @@ export default function EpochSatellite({
       {/* Hit-test sphere */}
       <mesh
         userData={{ walletAddress: EPOCH_ADDRESS, bodyRadius: BODY_RADIUS, bodyType: "satellite" }}
-        onPointerEnter={() => { setHovered(true); document.body.style.cursor = "pointer"; }}
-        onPointerLeave={() => { setHovered(false); document.body.style.cursor = "auto"; }}
-        onClick={onClick}
+        onPointerEnter={interactive ? () => { setHovered(true); document.body.style.cursor = "pointer"; } : undefined}
+        onPointerLeave={interactive ? () => { setHovered(false); document.body.style.cursor = "auto"; } : undefined}
+        onClick={interactive ? onClick : undefined}
       >
-        <sphereGeometry args={[6, 8, 8]} />
+        <sphereGeometry args={[3.5, 8, 8]} />
         <meshBasicMaterial transparent opacity={0} depthWrite={false} />
       </mesh>
 
-      <group ref={probeRef}>
+      <group ref={probeRef} scale={0.58}>
         {/* ── Spacecraft bus (decagonal prism, gold foil) ── */}
         <mesh material={matFoil}>
           <cylinderGeometry args={[1.0, 1.0, 0.7, 10]} />
@@ -192,8 +195,8 @@ export default function EpochSatellite({
       {/* Subtle glow */}
       <pointLight
         color="#55bbcc"
-        intensity={hovered ? 1.5 : 0.3}
-        distance={25}
+        intensity={interactive && hovered ? 0.7 : 0.08}
+        distance={12}
         decay={2}
       />
 
@@ -201,25 +204,25 @@ export default function EpochSatellite({
       <group ref={labelRef}>
         {showLabel && (
           <SpriteLabel
-            position={[0, 5, 0]}
-            text={`EPOCH ${epoch > 0 ? `#${epoch}` : "\u2014"}`}
+            position={[0, 3.8, 0]}
+            text={epoch > 0 ? `Epoch - ${epoch}` : "Epoch - \u2014"}
             color="#7ccedd"
-            fontSize={0.4}
-            opacity={0.9}
-            onClick={() => onSelect?.(EPOCH_ADDRESS)}
+            fontSize={0.26}
+            opacity={0.56}
+            onClick={interactive ? () => onSelect?.(EPOCH_ADDRESS) : undefined}
           />
         )}
 
-        {hovered && (
-          <Html position={[0, 9, 0]} center zIndexRange={[8000, 0]} style={{ pointerEvents: "none" }}>
+        {interactive && hovered && (
+          <Html position={[0, 6, 0]} center zIndexRange={[8000, 0]} style={{ pointerEvents: "none" }}>
             <div
               style={{
                 background: "rgba(2, 6, 14, 0.93)",
                 border: "1px solid rgba(0,200,220,0.25)",
                 borderLeft: "2px solid rgba(0,200,220,0.6)",
-                padding: "8px 12px",
+                padding: "7px 10px",
                 fontFamily: "'JetBrains Mono','SF Mono',monospace",
-                fontSize: 10,
+                fontSize: 9,
                 color: "#8aafcc",
                 whiteSpace: "nowrap",
               }}
@@ -241,7 +244,7 @@ export default function EpochSatellite({
                   current
                 </span>
                 <span style={{ color: "#00e5ff" }}>
-                  {epoch > 0 ? `#${epoch}` : "\u2014"}
+                  {epoch > 0 ? `Epoch - ${epoch}` : "Epoch - \u2014"}
                 </span>
               </div>
             </div>

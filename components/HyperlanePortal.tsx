@@ -117,10 +117,11 @@ interface HyperlanePortalProps {
   bridge: BridgeSceneObject;
   onSelect: (bridgeId: string) => void;
   showLabel?: boolean;
+  interactive?: boolean;
   paused?: boolean;
 }
 
-export default function HyperlanePortal({ bridge, onSelect, showLabel = true, paused = false }: HyperlanePortalProps) {
+export default function HyperlanePortal({ bridge, onSelect, showLabel = true, interactive = true, paused = false }: HyperlanePortalProps) {
   const rigRef  = useRef<THREE.Group>(null);
   const ringRef = useRef<THREE.Group>(null);
   const simTimeRef = useRef(0);
@@ -191,7 +192,8 @@ export default function HyperlanePortal({ bridge, onSelect, showLabel = true, pa
       };
     }), [R]);
 
-  useFrame((_, delta) => {
+  useFrame((_, rawDelta) => {
+    const delta = Math.min(rawDelta, 1 / 30);
     if (!paused) simTimeRef.current += delta;
     const t = simTimeRef.current;
     outboundPulseRef.current = Math.max(0, outboundPulseRef.current - delta * 0.58);
@@ -214,7 +216,7 @@ export default function HyperlanePortal({ bridge, onSelect, showLabel = true, pa
   });
 
   return (
-    <BridgeObject bridge={bridge} onSelect={onSelect} showLabel={showLabel}>
+    <BridgeObject bridge={bridge} onSelect={onSelect} showLabel={showLabel} interactive={interactive}>
       <group ref={rigRef}>
         <pointLight color="#4de8ff" intensity={1.4 + activityStrength * 2.2} distance={160 + activityStrength * 40} decay={2} />
         <pointLight color="#1a6aff" intensity={0.6 + activityStrength * 1.4} distance={210 + activityStrength * 40} decay={2} position={[0, 0, -22]} />

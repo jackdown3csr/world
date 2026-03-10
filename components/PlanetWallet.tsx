@@ -151,20 +151,25 @@ interface PlanetWalletProps {
   showRenamedOnly?: boolean;
   onShiftSelect?: (addr: string) => void;
   detailVariant?: WalletTooltipVariant;
+  interactionEnabled?: boolean;
   paused?: boolean;
+  /** System prefix for scene registry keys, e.g. "vescrow". When set, registers as "prefix:0x...". */
+  sceneIdPrefix?: string;
 }
 
-export default function PlanetWallet({ data, starWorldPosition, selected, panelOpen, onSelect, onDeselect, selectedAddress, onSelectAddress, showLabel, showMoonLabels, showRingLabels, showRenamedOnly, onShiftSelect, detailVariant = "wallet", paused = false }: PlanetWalletProps) {
+export default function PlanetWallet({ data, starWorldPosition, selected, panelOpen, onSelect, onDeselect, selectedAddress, onSelectAddress, showLabel, showMoonLabels, showRingLabels, showRenamedOnly, onShiftSelect, detailVariant = "wallet", interactionEnabled = true, paused = false, sceneIdPrefix }: PlanetWalletProps) {
   const orbitRef = useRef<THREE.Group>(null);
   const meshRef  = useRef<THREE.Mesh>(null);
   const simTimeRef = useRef(0);
 
   useEffect(() => {
     if (!meshRef.current) return;
-    const id = data.wallet.address.toLowerCase();
+    const id = sceneIdPrefix
+      ? `${sceneIdPrefix}:${data.wallet.address.toLowerCase()}`
+      : data.wallet.address.toLowerCase();
     registerSceneObject(id, meshRef.current, data.radius, "planet");
     return () => unregisterSceneObject(id);
-  }, [data.wallet.address, data.radius]);
+  }, [sceneIdPrefix, data.wallet.address, data.radius]);
   const [hovered, setHovered] = useState(false);
   const starWorldPos = useMemo(
     () => new THREE.Vector3(starWorldPosition[0], starWorldPosition[1], starWorldPosition[2]),
@@ -231,7 +236,8 @@ export default function PlanetWallet({ data, starWorldPosition, selected, panelO
   const _lodPos = useMemo(() => new THREE.Vector3(), []);
   const lodRef = useRef(0);
 
-  useFrame((state, delta) => {
+  useFrame((state, rawDelta) => {
+    const delta = Math.min(rawDelta, 1 / 30);
     if (!paused) simTimeRef.current += delta;
     const t = simTimeRef.current;
     if (orbitRef.current) orbitRef.current.rotation.y = data.initialAngle + data.orbitSpeed * t;
@@ -314,9 +320,9 @@ export default function PlanetWallet({ data, starWorldPosition, selected, panelO
           position={[data.orbitRadius, 0, 0]}
           scale={data.radius}
           userData={{ walletAddress: data.wallet.address.toLowerCase(), bodyRadius: data.radius, bodyType: "planet" }}
-          onPointerEnter={onPointerEnter}
-          onPointerLeave={onPointerLeave}
-          onClick={onClick}
+          onPointerEnter={interactionEnabled ? onPointerEnter : undefined}
+          onPointerLeave={interactionEnabled ? onPointerLeave : undefined}
+          onClick={interactionEnabled ? onClick : undefined}
         >
           <primitive object={PLANET_GEOS[lodRef.current]} attach="geometry" />
           <primitive object={material} attach="material" />
@@ -359,13 +365,15 @@ export default function PlanetWallet({ data, starWorldPosition, selected, panelO
               showMoonLabels={showMoonLabels}
               showRingLabels={showRingLabels}
               showRenamedOnly={showRenamedOnly}
+              interactionEnabled={interactionEnabled}
               paused={paused}
+              sceneIdPrefix={sceneIdPrefix}
             />
           </group>
         )}
 
         {/* Tooltip */}
-        {(hovered || (selected && panelOpen)) && (
+        {((interactionEnabled && hovered) || (selected && panelOpen)) && (
           <Html
             position={[data.orbitRadius, data.radius + 0.6, 0]}
             center
@@ -385,7 +393,7 @@ export default function PlanetWallet({ data, starWorldPosition, selected, panelO
             color={detailVariant === "vesting" ? "#7ccedd" : detailVariant === "pool" ? "#ffe08a" : "#90b8d0"}
             fontSize={0.4}
             opacity={0.85}
-            onClick={onSelect}
+            onClick={interactionEnabled ? onSelect : undefined}
           />
           ) : null
         )}
@@ -405,7 +413,9 @@ export default function PlanetWallet({ data, starWorldPosition, selected, panelO
             showLabel={showMoonLabels}
             showRenamedOnly={showRenamedOnly}
             detailVariant={detailVariant}
+            interactionEnabled={interactionEnabled}
             paused={paused}
+            sceneId={sceneIdPrefix ? `${sceneIdPrefix}:${moon.wallet.address.toLowerCase()}` : undefined}
           />
         ))}
       </group>

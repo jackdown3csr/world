@@ -255,6 +255,7 @@ async function main() {
     console.log("No vesting wallets found. Writing empty payload.");
     const emptyPayload: VestingPayload = {
       updatedAt: Date.now(),
+      currentEpoch: Number(currentEpoch),
       wallets: [],
     };
     await redis.set(KEY_VESTING_PAYLOAD, JSON.stringify(emptyPayload));
@@ -348,6 +349,7 @@ async function main() {
   /* ─ 8. Save to Redis ─────────────────────────────────── */
   const payload: VestingPayload = {
     updatedAt: Date.now(),
+    currentEpoch: Number(currentEpoch),
     wallets,
   };
 

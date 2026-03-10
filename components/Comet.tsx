@@ -260,7 +260,7 @@ function sr(s: number): number { const x = Math.sin(s * 127.1 + 311.7) * 43758.5
 
 export const COMET_ADDRESS = "cascopea";
 
-export default function Comet({ starPositions, onSelect, showLabel = true, paused = false }: { starPositions: [number, number, number][]; onSelect?: (addr: string) => void; showLabel?: boolean; paused?: boolean }) {
+export default function Comet({ starPositions, onSelect, showLabel = true, interactive = true, paused = false }: { starPositions: [number, number, number][]; onSelect?: (addr: string) => void; showLabel?: boolean; interactive?: boolean; paused?: boolean }) {
   const groupRef    = useRef<THREE.Group>(null);
   const comaRef     = useRef<THREE.Mesh>(null);
   const nucMatRef   = useRef<THREE.ShaderMaterial | null>(null);
@@ -546,7 +546,7 @@ export default function Comet({ starPositions, onSelect, showLabel = true, pause
       {/* Invisible hit-detection sphere — nucleus is sub-pixel at typical distances */}
       <mesh
         userData={{ walletAddress: COMET_ADDRESS, bodyRadius: NUCLEUS_R, bodyType: "comet" }}
-        onClick={(e) => { e.stopPropagation(); onSelect?.(COMET_ADDRESS); }}
+        onClick={interactive ? (e) => { e.stopPropagation(); onSelect?.(COMET_ADDRESS); } : undefined}
       >
         <sphereGeometry args={[12, 8, 8]} />
         <meshBasicMaterial transparent opacity={0} depthWrite={false} />
@@ -581,7 +581,7 @@ export default function Comet({ starPositions, onSelect, showLabel = true, pause
           fontSize={0.35}
           opacity={0.45}
           outlineWidth={0}
-          onClick={() => onSelect?.(COMET_ADDRESS)}
+          onClick={interactive ? () => onSelect?.(COMET_ADDRESS) : undefined}
           alwaysVisible
         />
       )}

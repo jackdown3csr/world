@@ -23,20 +23,25 @@ function randDir(): THREE.Vector3 {
 const VERT = /* glsl */ `
   attribute float aAlpha;
   varying float vAlpha;
+  varying float vDist;
   void main() {
     vAlpha = aAlpha;
     vec4 mv = modelViewMatrix * vec4(position, 1.0);
-    gl_PointSize = clamp(360.0 / -mv.z, 0.6, 3.5);
+    vDist  = -mv.z;
+    gl_PointSize = clamp(360.0 / vDist, 0.5, 2.8);
     gl_Position  = projectionMatrix * mv;
   }
 `;
 const FRAG = /* glsl */ `
   varying float vAlpha;
+  varying float vDist;
   void main() {
-    float d = length(gl_PointCoord - 0.5) * 2.0;
-    float a = smoothstep(1.0, 0.1, d) * vAlpha;
-    vec3 col = mix(__LO__, __HI__, d);
-    gl_FragColor = vec4(col, a * 0.70);
+    float d    = length(gl_PointCoord - 0.5) * 2.0;
+    /* fade out smoothly beyond eye-distance ~200 world-units */
+    float fade = 1.0 - smoothstep(180.0, 520.0, vDist);
+    float a    = smoothstep(1.0, 0.1, d) * vAlpha * fade;
+    vec3 col   = mix(__LO__, __HI__, d);
+    gl_FragColor = vec4(col, a * 0.45);
   }
 `;
 
@@ -69,7 +74,7 @@ export default function SolarWind({ origin = [0, 0, 0], color = "warm", paused =
       vel[i * 3]     = dir.x * spd;
       vel[i * 3 + 1] = dir.y * spd;
       vel[i * 3 + 2] = dir.z * spd;
-      alpha[i] = 0.10 + Math.random() * 0.40;
+      alpha[i] = 0.08 + Math.random() * 0.28;
     }
 
     vels.current = vel;

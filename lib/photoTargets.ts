@@ -97,7 +97,9 @@ function createWalletGroups(system: SceneSystemDefinition): PhotoTargetSection["
 function createDecoratorGroup(system: SceneSystemDefinition): PhotoTargetSection["groups"][number] | null {
   if (!system.decorators?.length) return null;
 
-  const items: PhotoTargetItem[] = system.decorators.map((decorator) => {
+  const items: PhotoTargetItem[] = system.decorators
+    .filter((d) => d.kind !== "sputnik-probe")
+    .map((decorator) => {
     if (decorator.kind === "faucet-satellite") {
       return {
         id: decorator.id,
@@ -179,6 +181,18 @@ export function buildPhotoTargetSections(
         dotColor: "rgba(200,246,255,0.9)",
         detail: "interstellar comet",
         kind: "comet",
+      }];
+    }
+
+    if (sceneObject.kind === "transit-beacon") {
+      return [{
+        id: sceneObject.id,
+        label: sceneObject.label,
+        metric: "external",
+        accent: "#8ff6ff",
+        dotColor: "rgba(143,246,255,0.9)",
+        detail: sceneObject.hint ?? "external traffic relay",
+        kind: "bridge",
       }];
     }
 

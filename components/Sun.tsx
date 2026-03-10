@@ -77,7 +77,8 @@ export default function Sun({
     return () => unregisterSceneObject(starId);
   }, [starId, scale, overviewRadius]);
 
-  useFrame((_, delta) => {
+  useFrame((_, rawDelta) => {
+    const delta = Math.min(rawDelta, 1 / 30);
     if (!paused) simTimeRef.current += delta;
     surfaceMat.uniforms.uTime.value = simTimeRef.current;
 

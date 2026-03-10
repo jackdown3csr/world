@@ -62,6 +62,7 @@ export interface VestingWalletEntry extends WalletEntry {
 
 export interface VestingPayload {
   updatedAt: number; // unix ms
+  currentEpoch?: number;
   wallets: VestingWalletEntry[];
 }
 

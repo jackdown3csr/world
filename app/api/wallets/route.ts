@@ -45,8 +45,7 @@ export async function GET() {
       status: 200,
       headers: { "Cache-Control": "no-store" },
     });
-  } catch (err) {
-    console.error("[/api/wallets] Redis read failed:", err);
+  } catch {
     return NextResponse.json(
       { error: "Failed to read wallet data from storage." },
       { status: 500 },

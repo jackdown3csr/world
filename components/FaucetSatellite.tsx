@@ -35,10 +35,11 @@ interface FaucetSatelliteProps {
   orbitRadius?: number;
   showLabel?: boolean;
   onSelect?: (addr: string) => void;
+  interactive?: boolean;
   paused?: boolean;
 }
 
-export default function FaucetSatellite({ stats, orbitRadius = FAUCET_DEFAULT_ORBIT_RADIUS, showLabel = true, onSelect, paused = false }: FaucetSatelliteProps) {
+export default function FaucetSatellite({ stats, orbitRadius = FAUCET_DEFAULT_ORBIT_RADIUS, showLabel = true, onSelect, interactive = true, paused = false }: FaucetSatelliteProps) {
   const groupRef  = useRef<THREE.Group>(null);
   const bodyRef   = useRef<THREE.Group>(null);
   const labelRef  = useRef<THREE.Group>(null);
@@ -56,7 +57,8 @@ export default function FaucetSatellite({ stats, orbitRadius = FAUCET_DEFAULT_OR
     onSelect?.(FAUCET_ADDRESS);
   }, [onSelect]);
 
-  useFrame((_, delta) => {
+  useFrame((_, rawDelta) => {
+    const delta = Math.min(rawDelta, 1 / 30);
     if (!paused) angleRef.current += ORBIT_SPEED * delta;
     const a = angleRef.current;
     if (groupRef.current) {
@@ -84,9 +86,9 @@ export default function FaucetSatellite({ stats, orbitRadius = FAUCET_DEFAULT_OR
       {/* Hover + click detection sphere on the stable parent */}
       <mesh
         userData={{ walletAddress: FAUCET_ADDRESS, bodyRadius: BODY_RADIUS, bodyType: "satellite" }}
-        onPointerEnter={() => { setHovered(true); document.body.style.cursor = "pointer"; }}
-        onPointerLeave={() => { setHovered(false); document.body.style.cursor = "auto"; }}
-        onClick={onClick}
+        onPointerEnter={interactive ? () => { setHovered(true); document.body.style.cursor = "pointer"; } : undefined}
+        onPointerLeave={interactive ? () => { setHovered(false); document.body.style.cursor = "auto"; } : undefined}
+        onClick={interactive ? onClick : undefined}
       >
         <sphereGeometry args={[6, 8, 8]} />
         <meshBasicMaterial transparent opacity={0} depthWrite={false} />
@@ -118,7 +120,7 @@ export default function FaucetSatellite({ stats, orbitRadius = FAUCET_DEFAULT_OR
       </group>
 
       {/* Glow point */}
-      <pointLight color="#00aaff" intensity={hovered ? 1.5 : 0.35} distance={20} decay={2} />
+      <pointLight color="#00aaff" intensity={interactive && hovered ? 1.5 : 0.35} distance={20} decay={2} />
 
       {/* Label + tooltip in a group that counter-rotates to stay upright */}
       <group ref={labelRef}>
@@ -130,12 +132,12 @@ export default function FaucetSatellite({ stats, orbitRadius = FAUCET_DEFAULT_OR
             color="#90b8d0"
             fontSize={0.4}
             opacity={0.85}
-            onClick={() => onSelect?.(FAUCET_ADDRESS)}
+            onClick={interactive ? () => onSelect?.(FAUCET_ADDRESS) : undefined}
           />
         )}
 
         {/* Hover tooltip: full stats */}
-        {hovered && (
+        {interactive && hovered && (
           <Html position={[0, 9, 0]} center zIndexRange={[8000, 0]} style={{ pointerEvents: "none" }}>
             <div style={{
               background: "rgba(2, 6, 14, 0.93)",

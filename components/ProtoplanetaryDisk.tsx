@@ -22,6 +22,7 @@ import * as THREE from "three";
 
 import type { AsteroidData } from "@/lib/layout";
 import WalletTooltip from "./WalletTooltip";
+import { registerInstancedSceneObject, unregisterInstancedSceneObject } from "@/lib/sceneRegistry";
 
 /* ── Flat pebble geometry variants ───────────────────────── */
 
@@ -71,7 +72,10 @@ interface ProtoplanetaryDiskProps {
   showAllNames?: boolean;
   showRenamedOnly?: boolean;
   vesting?: boolean;
+  interactive?: boolean;
   paused?: boolean;
+  /** System prefix for scene registry keys, e.g. "vesting". When set, registers as "prefix:0x...". */
+  sceneIdPrefix?: string;
 }
 
 export default function ProtoplanetaryDisk({
@@ -85,7 +89,9 @@ export default function ProtoplanetaryDisk({
   showAllNames,
   showRenamedOnly,
   vesting,
+  interactive = true,
   paused = false,
+  sceneIdPrefix,
 }: ProtoplanetaryDiskProps) {
   const groupRef = useRef<THREE.Group>(null);
   const simTimeRef = useRef(0);
@@ -163,8 +169,26 @@ export default function ProtoplanetaryDisk({
     });
   }, [asteroids, variantGroups, beltInnerRadius, beltOuterRadius, count]);
 
+  // Register each interactive disk pebble in the scene registry for camera targeting
+  useEffect(() => {
+    if (!interactive) return;
+    const ids: string[] = [];
+    variantGroups.forEach((globalIndices, v) => {
+      const mesh = meshRefs.current[v];
+      if (!mesh) return;
+      globalIndices.forEach((gi, localIdx) => {
+        const rawAddr = asteroids[gi].wallet.address.toLowerCase();
+        const id = sceneIdPrefix ? `${sceneIdPrefix}:${rawAddr}` : rawAddr;
+        registerInstancedSceneObject(id, mesh, localIdx, "asteroid");
+        ids.push(id);
+      });
+    });
+    return () => { ids.forEach(unregisterInstancedSceneObject); };
+  }, [asteroids, interactive, variantGroups, sceneIdPrefix]);
+
   /* ── Slow disk rotation ─────────────────────────────────── */
-  useFrame((_, delta) => {
+  useFrame((_, rawDelta) => {
+    const delta = Math.min(rawDelta, 1 / 30);
     if (!paused) simTimeRef.current += delta;
     if (groupRef.current)
       // Slightly faster than asteroid belt (more "active" accretion)
@@ -207,7 +231,7 @@ export default function ProtoplanetaryDisk({
     : -1;
 
   const activeIndex    = selectedIndex >= 0 ? selectedIndex
-                        : hoveredGlobalIdx >= 0 && hoveredGlobalIdx < count ? hoveredGlobalIdx
+                        : interactive && hoveredGlobalIdx >= 0 && hoveredGlobalIdx < count ? hoveredGlobalIdx
                         : -1;
   const activeAsteroid = activeIndex >= 0 ? asteroids[activeIndex] : null;
 
@@ -223,15 +247,15 @@ export default function ProtoplanetaryDisk({
             ref={(el) => { meshRefs.current[v] = el; }}
             args={[PEBBLE_GEOS[v], PEBBLE_MAT, globalIndices.length]}
             frustumCulled={false}
-            onPointerMove={makePointerMove(v)}
-            onPointerLeave={onPointerLeave}
-            onClick={makeClick(v)}
+            onPointerMove={interactive ? makePointerMove(v) : undefined}
+            onPointerLeave={interactive ? onPointerLeave : undefined}
+            onClick={interactive ? makeClick(v) : undefined}
           />
         )
       ))}
 
       {/* Tooltip for hovered / selected particle */}
-      {activeAsteroid && (
+      {interactive && activeAsteroid && (
         <Html
           position={activeAsteroid.position}
           zIndexRange={[7000, 0]}
@@ -259,7 +283,7 @@ export default function ProtoplanetaryDisk({
       )}
 
       {/* Persistent labels for disk particles */}
-      {showAllNames && asteroids.map((a, i) => {
+      {interactive && showAllNames && asteroids.map((a, i) => {
         if (showRenamedOnly && !a.wallet.customName) return null;
         if (activeIndex === i) return null;
         const label = a.wallet.customName || `${a.wallet.address.slice(0, 6)}\u2026${a.wallet.address.slice(-4)}`;

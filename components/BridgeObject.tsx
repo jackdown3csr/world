@@ -11,10 +11,11 @@ interface BridgeObjectProps {
   bridge: BridgeSceneObject;
   onSelect: (bridgeId: string) => void;
   showLabel?: boolean;
+  interactive?: boolean;
   children: ReactNode;
 }
 
-export default function BridgeObject({ bridge, onSelect, showLabel = true, children }: BridgeObjectProps) {
+export default function BridgeObject({ bridge, onSelect, showLabel = true, interactive = true, children }: BridgeObjectProps) {
   const groupRef = useRef<THREE.Group>(null);
 
   useEffect(() => {
@@ -45,9 +46,9 @@ export default function BridgeObject({ bridge, onSelect, showLabel = true, child
           bodyRadius: bridge.bodyRadius,
           bodyType: "bridge",
         }}
-        onClick={handleClick}
-        onPointerOver={handlePointerOver}
-        onPointerOut={handlePointerOut}
+        onClick={interactive ? handleClick : undefined}
+        onPointerOver={interactive ? handlePointerOver : undefined}
+        onPointerOut={interactive ? handlePointerOut : undefined}
       >
         <sphereGeometry args={[bridge.bodyRadius * 0.95, 16, 16]} />
         <meshBasicMaterial transparent opacity={0} depthWrite={false} />
@@ -62,7 +63,7 @@ export default function BridgeObject({ bridge, onSelect, showLabel = true, child
             color="#9cecff"
             fontSize={0.55}
             opacity={1}
-            onClick={() => onSelect(bridge.id)}
+            onClick={interactive ? () => onSelect(bridge.id) : undefined}
             alwaysVisible
           />
           {statLines.map((line, index) => (

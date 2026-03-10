@@ -111,10 +111,11 @@ const FRAG = /* glsl */ `
 interface RoguePlanetProps {
   starPositions: [number, number, number][];
   onSelect?: (addr: string) => void;
+  interactive?: boolean;
   paused?: boolean;
 }
 
-export default function RoguePlanet({ starPositions, onSelect, paused = false }: RoguePlanetProps) {
+export default function RoguePlanet({ starPositions, onSelect, interactive = true, paused = false }: RoguePlanetProps) {
   const groupRef = useRef<THREE.Group>(null);
   const meshRef  = useRef<THREE.Mesh>(null);
   const simTimeRef = useRef(0);
@@ -145,7 +146,8 @@ export default function RoguePlanet({ starPositions, onSelect, paused = false }:
     [],
   );
 
-  useFrame((_, delta) => {
+  useFrame((_, rawDelta) => {
+    const delta = Math.min(rawDelta, 1 / 30);
     if (!paused) simTimeRef.current += delta;
     const t     = simTimeRef.current;
     const angle = PHASE + OMEGA * t;
@@ -175,9 +177,9 @@ export default function RoguePlanet({ starPositions, onSelect, paused = false }:
       <mesh
         ref={meshRef}
         userData={{ walletAddress: ROGUE_ADDRESS, bodyRadius: ROGUE_R, bodyType: "rogue" }}
-        onPointerEnter={(e) => { e.stopPropagation(); document.body.style.cursor = "pointer"; }}
-        onPointerLeave={() => { document.body.style.cursor = "auto"; }}
-        onClick={(e) => { e.stopPropagation(); onSelect?.(ROGUE_ADDRESS); }}
+        onPointerEnter={interactive ? (e) => { e.stopPropagation(); document.body.style.cursor = "pointer"; } : undefined}
+        onPointerLeave={interactive ? () => { document.body.style.cursor = "auto"; } : undefined}
+        onClick={interactive ? (e) => { e.stopPropagation(); onSelect?.(ROGUE_ADDRESS); } : undefined}
       >
         <sphereGeometry args={[ROGUE_R, 64, 48]} />
         <primitive object={material} attach="material" />

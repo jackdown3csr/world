@@ -107,8 +107,7 @@ export async function GET() {
       status: 200,
       headers: { "Cache-Control": "no-store" },
     });
-  } catch (err) {
-    console.error("[/api/staking]", err);
+  } catch {
     return NextResponse.json(
       { error: "Staking telemetry unavailable" },
       { status: 503 },

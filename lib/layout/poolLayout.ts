@@ -40,12 +40,10 @@ export function buildPoolSystem(tokens: PoolTokenEntry[]): SolarSystemData {
     };
   });
 
-  const maxOrbit = Math.max(...planets.map((planet) => planet.orbitRadius));
-
   return {
     planets,
     asteroids: [],
-    beltInnerRadius: maxOrbit + 260,
-    beltOuterRadius: maxOrbit + 400,
+    beltInnerRadius: 0,
+    beltOuterRadius: 0,
   };
 }

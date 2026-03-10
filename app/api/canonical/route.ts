@@ -321,8 +321,7 @@ export async function GET() {
       status: 200,
       headers: { "Cache-Control": "no-store" },
     });
-  } catch (err) {
-    console.error("[/api/canonical]", err);
+  } catch {
     return NextResponse.json(
       { error: "Canonical bridge scanner unavailable" },
       { status: 503 },

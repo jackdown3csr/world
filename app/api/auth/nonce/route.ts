@@ -24,7 +24,6 @@ export async function POST(req: Request) {
 
     return NextResponse.json({ nonce }, { status: 200 });
   } catch (err) {
-    console.error("[/api/auth/nonce] failed:", err);
     return NextResponse.json(
       { error: "Failed to issue nonce" },
       { status: 500 },

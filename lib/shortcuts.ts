@@ -5,29 +5,31 @@ export type ShortcutDef = {
 };
 
 export const toolbarShortcutMeta = {
-  labels: { keys: "L", description: "Toggle all labels", context: "toolbar" },
-  named: { keys: "N", description: "Toggle named-only labels", context: "toolbar" },
-  orbits: { keys: "O", description: "Toggle orbit rings", context: "toolbar" },
-  ranked: { keys: "K", description: "Toggle ranked layout", context: "toolbar" },
-  gnet: { keys: "J", description: "Toggle GNET ranking in ranked mode", context: "toolbar" },
+  labels:  { keys: "L", description: "Toggle all labels", context: "toolbar" },
+  named:   { keys: "N", description: "Toggle named-only labels", context: "toolbar" },
+  orbits:  { keys: "O", description: "Toggle orbit rings", context: "toolbar" },
+  traffic: { keys: "T", description: "Toggle transaction trails", context: "toolbar" },
+  ranked:  { keys: "K", description: "Toggle ranked layout", context: "toolbar" },
+  gnet:    { keys: "J", description: "Toggle GNET ranking in ranked mode", context: "toolbar" },
   claimed: { keys: "C", description: "Toggle claimed vesting layout", context: "toolbar" },
-  fly: { keys: "G", description: "Toggle fly mode", context: "toolbar" },
-  photo: { keys: "P", description: "Enter photo mode", context: "toolbar" },
-  reset: { keys: "R", description: "Reset camera to overview", context: "toolbar" },
-  help: { keys: "H", description: "Open or close help", context: "toolbar" },
+  fly:     { keys: "G", description: "Toggle fly mode", context: "toolbar" },
+  photo:   { keys: "P", description: "Enter photo mode", context: "toolbar" },
+  reset:   { keys: "R", description: "Reset camera to overview", context: "toolbar" },
+  help:    { keys: "H", description: "Open or close help", context: "toolbar" },
 } as const;
 
 export const toolbarShortcuts = {
-  labels: toolbarShortcutMeta.labels.keys,
-  named: toolbarShortcutMeta.named.keys,
-  orbits: toolbarShortcutMeta.orbits.keys,
-  ranked: toolbarShortcutMeta.ranked.keys,
-  gnet: toolbarShortcutMeta.gnet.keys,
+  labels:  toolbarShortcutMeta.labels.keys,
+  named:   toolbarShortcutMeta.named.keys,
+  orbits:  toolbarShortcutMeta.orbits.keys,
+  traffic: toolbarShortcutMeta.traffic.keys,
+  ranked:  toolbarShortcutMeta.ranked.keys,
+  gnet:    toolbarShortcutMeta.gnet.keys,
   claimed: toolbarShortcutMeta.claimed.keys,
-  fly: toolbarShortcutMeta.fly.keys,
-  photo: toolbarShortcutMeta.photo.keys,
-  reset: toolbarShortcutMeta.reset.keys,
-  help: toolbarShortcutMeta.help.keys,
+  fly:     toolbarShortcutMeta.fly.keys,
+  photo:   toolbarShortcutMeta.photo.keys,
+  reset:   toolbarShortcutMeta.reset.keys,
+  help:    toolbarShortcutMeta.help.keys,
 } as const;
 
 export const navigationShortcuts: ShortcutDef[] = [
@@ -57,6 +59,8 @@ export const photoModeShortcuts: ShortcutDef[] = [
   { keys: "G", description: "Cycle clean / grid / scope overlay.", context: "photo" },
   { keys: "H", description: "Hide or show photo HUD.", context: "photo" },
   { keys: "M", description: "Toggle frozen / live simulation.", context: "photo" },
+  { keys: "+ / −", description: "Zoom in or out (adjust FOV).", context: "photo" },
+  { keys: "Scroll", description: "Smooth FOV zoom.", context: "photo" },
 ];
 
 export const toolbarActionShortcuts: ShortcutDef[] = Object.values(toolbarShortcutMeta);

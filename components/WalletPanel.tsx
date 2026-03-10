@@ -202,6 +202,9 @@ export default function WalletPanel({
                 <div style={{ color: "#7a9ab0", fontSize: 12 }}>{lockExpiry}</div>
               </div>
             )}
+            <div style={{ gridColumn: "1 / -1", color: "#688596", fontSize: 10, lineHeight: 1.45 }}>
+              veGNET decays to expiry. Adding GNET does not extend the lock.
+            </div>
           </div>
 
           <div style={{ height: 1, background: "rgba(0,229,255,0.06)" }} />

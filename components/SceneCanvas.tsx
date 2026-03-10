@@ -23,11 +23,15 @@ import Comet from "./Comet";
 import RoguePlanet from "./RoguePlanet";
 import FaucetSatellite from "./FaucetSatellite";
 import EpochSatellite from "./EpochSatellite";
+import SputnikProbe from "./SputnikProbe";
 import CanonicalBridgePortal from "./CanonicalBridgePortal";
 import HyperlanePortal from "./HyperlanePortal";
+import TransitBeacon from "./TransitBeacon";
 import { SpriteLabelManager } from "./SpriteLabel";
 import { lookupSceneBody } from "@/lib/sceneRegistry";
 import type { SceneFocusBody } from "@/lib/sceneRegistry";
+import TransactionFlow from "./TransactionFlow";
+import type { TransactionFlowEffect } from "@/lib/blockExplorer/types";
 
 import type {
   SceneEffectDefinition,
@@ -71,9 +75,11 @@ function getFocusPingRadius(body: SceneFocusBody) {
 function FocusPing({
   selectedAddress,
   selectionVersion,
+  persistent = false,
 }: {
   selectedAddress: string | null;
   selectionVersion: number;
+  persistent?: boolean;
 }) {
   const groupRef = useRef<THREE.Group>(null);
   const coreRef = useRef<THREE.Mesh>(null);
@@ -122,7 +128,7 @@ function FocusPing({
     if (!liveRef.current || !groupRef.current || !targetAddrRef.current) return;
 
     const elapsed = performance.now() * 0.001 - startedAtRef.current;
-    if (elapsed >= DURATION) {
+    if (!persistent && elapsed >= DURATION) {
       liveRef.current = false;
       groupRef.current.visible = false;
       return;
@@ -135,12 +141,18 @@ function FocusPing({
       return;
     }
 
-    const t = THREE.MathUtils.clamp(elapsed / DURATION, 0, 1);
-    const eased = 1 - Math.pow(1 - t, 2.4);
-    const fade = 1 - t;
+    const radiusScale = persistent
+      ? (body.bodyType === "star" ? 0.42 : body.bodyType === "bridge" ? 0.58 : 0.7)
+      : 1;
+    const t = persistent
+      ? (0.5 + Math.sin(elapsed * 3.2) * 0.5)
+      : THREE.MathUtils.clamp(elapsed / DURATION, 0, 1);
+    const eased = persistent ? t : 1 - Math.pow(1 - t, 2.4);
+    const fade = persistent ? 0.58 : 1 - t;
     const baseRadius = getFocusPingRadius(body);
-    const pulseScale = 1 + eased * 1.6;
-    const echoScale = 0.8 + eased * 1.15;
+    const renderRadius = baseRadius * radiusScale;
+    const pulseScale = persistent ? 1.08 + eased * 0.12 : 1 + eased * 1.6;
+    const echoScale = persistent ? 0.96 + eased * 0.1 : 0.8 + eased * 1.15;
 
     baseRadiusRef.current = baseRadius;
     groupRef.current.visible = true;
@@ -148,24 +160,24 @@ function FocusPing({
     groupRef.current.quaternion.copy(frameCamera.quaternion);
 
     if (coreRef.current) {
-      coreRef.current.scale.setScalar(baseRadius * pulseScale);
+      coreRef.current.scale.setScalar(renderRadius * pulseScale);
       const material = coreRef.current.material as THREE.MeshBasicMaterial;
       material.color.set(pingColorRef.current);
-      material.opacity = 0.34 * fade;
+      material.opacity = (persistent ? 0.11 : 0.34) * fade;
     }
 
     if (echoRef.current) {
-      echoRef.current.scale.setScalar(baseRadius * echoScale);
+      echoRef.current.scale.setScalar(renderRadius * echoScale);
       const material = echoRef.current.material as THREE.MeshBasicMaterial;
       material.color.set(pingColorRef.current);
-      material.opacity = 0.22 * (1 - eased) * fade;
+      material.opacity = (persistent ? 0.08 : 0.22) * (persistent ? 0.78 + eased * 0.12 : 1 - eased) * fade;
     }
 
     if (glowRef.current) {
-      glowRef.current.scale.setScalar(baseRadius * (0.55 + eased * 0.5));
+      glowRef.current.scale.setScalar(renderRadius * (persistent ? 0.68 + eased * 0.1 : 0.55 + eased * 0.5));
       const material = glowRef.current.material as THREE.MeshBasicMaterial;
       material.color.set(pingColorRef.current);
-      material.opacity = 0.1 * fade;
+      material.opacity = (persistent ? 0.035 : 0.1) * fade;
     }
   });
 
@@ -214,13 +226,14 @@ function FocusPing({
 export interface ScreenshotHandle { capture: () => void; }
 const ScreenshotHelper = forwardRef<ScreenshotHandle>(function ScreenshotHelper(_, ref) {
   const { gl, scene, camera } = useThree();
+  const filenamePrefix = "sector-galactica";
   useImperativeHandle(ref, () => ({
     capture() {
       gl.render(scene, camera);
       const dataURL = gl.domElement.toDataURL("image/png");
       const a = document.createElement("a");
       a.href = dataURL;
-      a.download = `vescrow-${new Date().toISOString().slice(0, 19).replace(/:/g, "-")}.png`;
+      a.download = `${filenamePrefix}-${new Date().toISOString().slice(0, 19).replace(/:/g, "-")}.png`;
       a.click();
     },
   }), [gl, scene, camera]);
@@ -279,13 +292,71 @@ function ShaderWarmup() {
 
 function CameraLensController({ fov }: { fov: number }) {
   const { camera } = useThree();
+  const targetFov = React.useRef(fov);
+  targetFov.current = fov;
+
+  useFrame((_, delta) => {
+    if (!(camera instanceof THREE.PerspectiveCamera)) return;
+    const diff = targetFov.current - camera.fov;
+    if (Math.abs(diff) < 0.05) {
+      if (diff !== 0) { camera.fov = targetFov.current; camera.updateProjectionMatrix(); }
+      return;
+    }
+    // Smooth exponential lerp — ~90 % of the way in 0.12 s
+    const speed = 18;
+    camera.fov += diff * Math.min(speed * delta, 0.92);
+    camera.updateProjectionMatrix();
+  });
+
+  return null;
+}
+
+const PHOTO_FOV_MIN = 10;
+const PHOTO_FOV_MAX = 90;
+
+/**
+ * Intercepts mouse-wheel in photo-mode orbit to change FOV instead of
+ * camera distance.  Produces smooth, small increments.
+ */
+function PhotoFovWheel({
+  photoMode,
+  cameraMode,
+  photoFov,
+  onFovChange,
+}: {
+  photoMode: boolean;
+  cameraMode: string;
+  photoFov: number;
+  onFovChange?: (fov: number) => void;
+}) {
+  const { gl } = useThree();
+  const onFovRef = React.useRef(onFovChange);
+  onFovRef.current = onFovChange;
+  const photoRef = React.useRef(photoMode);
+  photoRef.current = photoMode;
+  const modeRef = React.useRef(cameraMode);
+  modeRef.current = cameraMode;
+  const fovRef = React.useRef(photoFov);
+
+  // Keep fovRef in sync with externally-driven changes (presets, +/− keys).
+  React.useEffect(() => {
+    fovRef.current = photoFov;
+  }, [photoFov]);
 
   React.useEffect(() => {
-    if (!(camera instanceof THREE.PerspectiveCamera)) return;
-    if (Math.abs(camera.fov - fov) < 0.01) return;
-    camera.fov = fov;
-    camera.updateProjectionMatrix();
-  }, [camera, fov]);
+    const canvas = gl.domElement;
+    function onWheel(e: WheelEvent) {
+      if (!photoRef.current || modeRef.current !== "orbit") return;
+      e.preventDefault();
+      // Small, progressive step: ~1° per scroll notch
+      const step = THREE.MathUtils.clamp(e.deltaY * 0.012, -2.5, 2.5);
+      fovRef.current = THREE.MathUtils.clamp(fovRef.current + step, PHOTO_FOV_MIN, PHOTO_FOV_MAX);
+      const rounded = Math.round(fovRef.current);
+      onFovRef.current?.(rounded);
+    }
+    canvas.addEventListener("wheel", onWheel, { passive: false });
+    return () => canvas.removeEventListener("wheel", onWheel);
+  }, [gl]);
 
   return null;
 }
@@ -307,6 +378,7 @@ export interface SceneCanvasProps {
   panelOpen: boolean;
   cameraMode: CameraMode;
   flyModeEnabled: boolean;
+  flyAutopilotActive?: boolean;
   cinematicFlyEnabled: boolean;
   resetRequested: boolean;
   controlsRef: RefObject<OrbitControlsImpl>;
@@ -318,6 +390,9 @@ export interface SceneCanvasProps {
   onModeChange: (mode: CameraMode) => void;
   onZoomChange: (zoom: number) => void;
   onCameraDebug: (debug: { pos: [number,number,number]; target: [number,number,number]; distTarget: number; distOrigin: number; tracking: string | null } | null) => void;
+  onAutoFlightChange?: (active: boolean) => void;
+  onFovChange?: (fov: number) => void;
+  getFlyTarget?: () => THREE.Vector3 | null;
   onResetDone: () => void;
   selectionVersion: number;
 }
@@ -339,6 +414,7 @@ export default function SceneCanvas({
   panelOpen,
   cameraMode,
   flyModeEnabled,
+  flyAutopilotActive,
   cinematicFlyEnabled,
   resetRequested,
   controlsRef,
@@ -350,15 +426,28 @@ export default function SceneCanvas({
   onModeChange,
   onZoomChange,
   onCameraDebug,
+  onAutoFlightChange,
+  onFovChange,
+  getFlyTarget,
   onResetDone,
   selectionVersion,
 }: SceneCanvasProps) {
   const [activeSystem, setActiveSystem] = useState<SceneSystemId>(systems[0]?.id ?? "vescrow");
   const activeFlyMode = cinematicFlyEnabled ? "cinematic" : flyModeEnabled ? "flight" : null;
+  const interactionEnabled = !flyModeEnabled && cameraMode !== "fly";
+  const visualFocusAddress = selectedAddress;
   const starPositions = useMemo(() => systems.map((system) => system.position), [systems]);
 
-  const getBlockPulseTick = (systemId: SceneSystemId) => (
-    effects.find((effect) => effect.kind === "block-pulse" && effect.systemId === systemId)?.tick
+  const getBlockPulseTick = (systemId: SceneSystemId) => {
+    for (const e of effects) {
+      if (e.kind === "block-pulse" && e.systemId === systemId) return e.tick;
+    }
+    return undefined;
+  };
+
+  const transactionFlowEffects = useMemo(
+    () => effects.filter((e): e is TransactionFlowEffect => e.kind === "transaction-flow"),
+    [effects],
   );
 
   const renderDecorator = (system: SceneSystemDefinition, decorator: SceneSystemDecorator) => {
@@ -371,6 +460,7 @@ export default function SceneCanvas({
               orbitRadius={decorator.orbitRadius}
               showLabel={showAllNames && !photoMode}
               onSelect={onSelect}
+              interactive={interactionEnabled}
               paused={simulationPaused}
             />
           </group>
@@ -383,6 +473,19 @@ export default function SceneCanvas({
               orbitRadius={decorator.orbitRadius}
               showLabel={showAllNames && !photoMode}
               onSelect={onSelect}
+              interactive={interactionEnabled}
+              paused={simulationPaused}
+            />
+          </group>
+        );
+      case "sputnik-probe":
+        return (
+          <group key={decorator.id} position={system.position}>
+            <SputnikProbe
+              orbitRadius={decorator.orbitRadius}
+              selected={visualFocusAddress?.toLowerCase() === decorator.id.toLowerCase()}
+              onSelect={onSelect}
+              interactive={interactionEnabled}
               paused={simulationPaused}
             />
           </group>
@@ -401,7 +504,8 @@ export default function SceneCanvas({
             starPositions={starPositions}
             paused={simulationPaused}
             onSelect={onSelect}
-            showLabel={showAllNames && !photoMode}
+            interactive={interactionEnabled}
+            showLabel={(showAllNames || visualFocusAddress === sceneObject.id) && !photoMode}
           />
         );
       case "rogue-planet":
@@ -411,6 +515,7 @@ export default function SceneCanvas({
             starPositions={starPositions}
             paused={simulationPaused}
             onSelect={onSelect}
+            interactive={interactionEnabled}
           />
         );
       case "bridge":
@@ -419,7 +524,8 @@ export default function SceneCanvas({
             key={sceneObject.id}
             bridge={sceneObject.bridge}
             onSelect={onSelect}
-            showLabel={showAllNames && !photoMode}
+            showLabel={(showAllNames || visualFocusAddress === sceneObject.id) && !photoMode}
+            interactive={interactionEnabled}
             paused={simulationPaused}
           />
         ) : (
@@ -427,7 +533,23 @@ export default function SceneCanvas({
             key={sceneObject.id}
             bridge={sceneObject.bridge}
             onSelect={onSelect}
-            showLabel={showAllNames && !photoMode}
+            showLabel={(showAllNames || visualFocusAddress === sceneObject.id) && !photoMode}
+            interactive={interactionEnabled}
+            paused={simulationPaused}
+          />
+        );
+      case "transit-beacon":
+        return (
+          <TransitBeacon
+            key={sceneObject.id}
+            id={sceneObject.id}
+            label={sceneObject.label}
+            hint={sceneObject.hint}
+            position={sceneObject.position}
+            bodyRadius={sceneObject.bodyRadius}
+            onSelect={onSelect}
+            showLabel={(showAllNames || visualFocusAddress === sceneObject.id) && !photoMode}
+            interactive={interactionEnabled}
             paused={simulationPaused}
           />
         );
@@ -463,11 +585,11 @@ export default function SceneCanvas({
           blockNumber={system.id === "vescrow" ? getBlockPulseTick(system.id) : undefined}
           showOrbits={showOrbits}
           showAllNames={showAllNames && activeSystem === system.id}
-          showSystemLabel={showAllNames}
+          showSystemLabel={showAllNames || visualFocusAddress === system.starId}
           showRenamedOnly={showRenamedOnly || activeSystem !== system.id}
           photoMode={photoMode}
           paused={simulationPaused}
-          selectedAddress={selectedAddress}
+          selectedAddress={visualFocusAddress}
           panelOpen={panelOpen}
           onSelect={onSelect}
           onDeselect={onDeselect}
@@ -477,10 +599,12 @@ export default function SceneCanvas({
           starId={system.starId}
           starScale={system.starScale}
           detailVariant={system.detailVariant}
+          interactionEnabled={interactionEnabled}
           interactiveBelt={system.id !== "staking-remnant"}
           showBeltLabels={showAllNames && activeSystem === system.id && system.id !== "staking-remnant"}
           beltTone={"default"}
           showSolarWind={system.id !== "gubi-pool"}
+          systemId={system.id}
         />
       ))}
 
@@ -491,7 +615,14 @@ export default function SceneCanvas({
       <FocusPing
         selectedAddress={cameraFocusAddress}
         selectionVersion={selectionVersion}
+        persistent={Boolean(flyAutopilotActive)}
       />
+
+      {transactionFlowEffects.map((effect) => (
+        <TransactionFlow key={effect.id} effect={effect} />
+      ))}
+
+      <PhotoFovWheel photoMode={photoMode} cameraMode={cameraMode} photoFov={photoFov} onFovChange={onFovChange} />
 
       <OrbitControls
         ref={controlsRef}
@@ -500,11 +631,12 @@ export default function SceneCanvas({
         maxDistance={22000}
         enableDamping
         dampingFactor={0.05}
+        enableZoom={!photoMode}
         enabled={cameraMode === "orbit"}
       />
 
       {activeFlyMode && (
-        <FreeLookControls ref={freelookRef} enabled={cameraMode === "fly"} mode={activeFlyMode} />
+        <FreeLookControls ref={freelookRef} enabled={cameraMode === "fly"} mode={activeFlyMode} fov={photoFov} onAutoFlightChange={onAutoFlightChange} onFovChange={onFovChange} getFlyTarget={getFlyTarget} />
       )}
 
       <CameraController

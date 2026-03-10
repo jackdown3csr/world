@@ -146,7 +146,8 @@ export default function WalletRing({
   const [nearIndices, setNearIndices] = useState<Set<number>>(new Set());
   const LABEL_DIST = 35;
 
-  useFrame((_, delta) => {
+  useFrame((_, rawDelta) => {
+    const delta = Math.min(rawDelta, 1 / 30);
     if (groupRef.current) groupRef.current.rotation.y += 0.008 * delta;
 
     if (groupRef.current && Math.random() < 0.17) {

@@ -24,10 +24,13 @@ interface MoonBodyProps {
   showLabel?:  boolean;
   showRenamedOnly?: boolean;
   detailVariant?: WalletTooltipVariant;
+  interactionEnabled?: boolean;
   paused?: boolean;
+  /** Scoped registry key, e.g. "vescrow:0x...". Defaults to bare address. */
+  sceneId?: string;
 }
 
-export default function MoonBody({ data, starWorldPosition, planetOrbit, hostRadius, selected, panelOpen, onSelect, onDeselect, showLabel, showRenamedOnly, detailVariant = "wallet", paused = false }: MoonBodyProps) {
+export default function MoonBody({ data, starWorldPosition, planetOrbit, hostRadius, selected, panelOpen, onSelect, onDeselect, showLabel, showRenamedOnly, detailVariant = "wallet", interactionEnabled = true, paused = false, sceneId }: MoonBodyProps) {
   const hostGroupRef = useRef<THREE.Group>(null);
   const moonOrbitRef = useRef<THREE.Group>(null);
   const meshRef      = useRef<THREE.Mesh>(null);
@@ -35,10 +38,10 @@ export default function MoonBody({ data, starWorldPosition, planetOrbit, hostRad
 
   useEffect(() => {
     if (!meshRef.current) return;
-    const id = data.wallet.address.toLowerCase();
+    const id = sceneId ?? data.wallet.address.toLowerCase();
     registerSceneObject(id, meshRef.current, data.radius, "moon");
     return () => unregisterSceneObject(id);
-  }, [data.wallet.address, data.radius]);
+  }, [sceneId, data.wallet.address, data.radius]);
   const [hovered, setHovered] = useState(false);
   const starWorldPos = useMemo(
     () => new THREE.Vector3(starWorldPosition[0], starWorldPosition[1], starWorldPosition[2]),
@@ -58,7 +61,8 @@ export default function MoonBody({ data, starWorldPosition, planetOrbit, hostRad
   const _lodPos = useMemo(() => new THREE.Vector3(), []);
   const lodRef = useRef(0);
 
-  useFrame((state, delta) => {
+  useFrame((state, rawDelta) => {
+    const delta = Math.min(rawDelta, 1 / 30);
     if (!paused) simTimeRef.current += delta;
     const t = simTimeRef.current;
     if (moonOrbitRef.current)
@@ -106,15 +110,15 @@ export default function MoonBody({ data, starWorldPosition, planetOrbit, hostRad
           position={[data.orbitRadius, 0, 0]}
           scale={data.radius}
           userData={{ walletAddress: data.wallet.address.toLowerCase(), bodyRadius: data.radius, bodyType: "moon" }}
-          onPointerEnter={onPointerEnter}
-          onPointerLeave={onPointerLeave}
-          onClick={onClick}
+          onPointerEnter={interactionEnabled ? onPointerEnter : undefined}
+          onPointerLeave={interactionEnabled ? onPointerLeave : undefined}
+          onClick={interactionEnabled ? onClick : undefined}
         >
           <primitive object={MOON_GEOS[lodRef.current]} attach="geometry" />
           <primitive object={material} attach="material" />
         </mesh>
 
-        {(hovered || (selected && panelOpen)) && (
+        {((interactionEnabled && hovered) || (selected && panelOpen)) && (
           <Html
             position={[data.orbitRadius, data.radius + 0.18, 0]}
             center
@@ -133,7 +137,7 @@ export default function MoonBody({ data, starWorldPosition, planetOrbit, hostRad
             color={detailVariant === "vesting" ? "#7ccedd" : detailVariant === "pool" ? "#ffe08a" : "#80a8b8"}
             fontSize={0.3}
             opacity={0.8}
-            onClick={onSelect}
+            onClick={interactionEnabled ? onSelect : undefined}
           />
         )}
       </group>

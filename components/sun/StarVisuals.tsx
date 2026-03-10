@@ -20,7 +20,8 @@ import {
 function useAnimatedShaderTime(material: THREE.ShaderMaterial, paused: boolean) {
   const simTimeRef = useRef(0);
 
-  useFrame((_, delta) => {
+  useFrame((_, rawDelta) => {
+    const delta = Math.min(rawDelta, 1 / 30);
     if (!paused) simTimeRef.current += delta;
     material.uniforms.uTime.value = simTimeRef.current;
   });
