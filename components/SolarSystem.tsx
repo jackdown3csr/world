@@ -161,7 +161,12 @@ export default function SolarSystem() {
   }, [focusSceneTarget]);
 
   /* ── Wallet connection ── */
-  const wc = useWalletConnection(wallets, refetch, selectWalletBody);
+  const wc = useWalletConnection(wallets, refetch);
+
+  const handleFocusMyInstance = useCallback((systemId: SceneSystemId) => {
+    if (!wc.connectedAddress) return;
+    focusSceneTarget(wc.connectedAddress, true, `${systemId}:${wc.connectedAddress.toLowerCase()}`);
+  }, [focusSceneTarget, wc.connectedAddress]);
 
   /* ── UI toggles ── */
   const [showAllNames, setShowAllNames] = useState(true);
@@ -200,7 +205,7 @@ export default function SolarSystem() {
   }, [poolTokens, vestingWallets, wallets]);
 
   /* ── Transaction trails ── */
-  const [showTraffic, setShowTraffic] = useState(false);
+  const [showTraffic, setShowTraffic] = useState(true);
   const [trafficPanelOpen, setTrafficPanelOpen] = useState(true);
   const { effects: transactionEffects, recentEvents, rxLed, ecoLed } = useBlockTransactions(blockInfo?.blockNumber, showTraffic, walletSystemMap);
 
@@ -844,6 +849,7 @@ export default function SolarSystem() {
         onJumpToStar={handleSceneSelect}
         onDirectorySelect={handleDirectorySelect}
         onDisconnect={handleDisconnect}
+        onFocusMyInstance={handleFocusMyInstance}
       />
 
   <FlyHud freelookRef={freelookRef} visible={showFlightHud && flyModeEnabled && cameraMode === "fly"} />

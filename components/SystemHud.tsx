@@ -202,6 +202,7 @@ export interface SystemHudProps {
   onJumpToStar: (starKey: string) => void;
   onDirectorySelect: (address: string, customName?: string) => void;
   onDisconnect: () => void;
+  onFocusMyInstance?: (systemId: SceneSystemId) => void;
 }
 
 export default function SystemHud({
@@ -274,6 +275,7 @@ export default function SystemHud({
   onJumpToStar,
   onDirectorySelect,
   onDisconnect,
+  onFocusMyInstance,
 }: SystemHudProps) {
   const PANEL_SWAP_MS = 320;
   const OVERVIEW_FADE_MS = 760;
@@ -316,6 +318,13 @@ export default function SystemHud({
   const connectedLabel = wc.connectedAddress
     ? `${wc.connectedAddress.slice(0, 4)}...${wc.connectedAddress.slice(-4)}`
     : null;
+  const myInstances = React.useMemo(() => {
+    if (!wc.connectedAddress) return [];
+    const addr = wc.connectedAddress.toLowerCase();
+    return systems.filter((system) =>
+      system.entries.some((entry) => entry.address.toLowerCase() === addr)
+    );
+  }, [wc.connectedAddress, systems]);
   const selectedSystemStarId = selectedAddress?.startsWith("__star_") ? selectedAddress : null;
   const selectedSystem = React.useMemo(() => {
     if (!selectedAddress) return null;
@@ -1396,6 +1405,16 @@ export default function SystemHud({
                 <TopStripGroup padding="0 0 0 2px">
                   <TopStripChip label="wallet" active accent="#6ef7a7" title="Connected wallet" />
                   {connectedLabel && <TopStripChip label={connectedLabel} active accent="#6ef7a7" title={wc.connectedAddress ?? undefined} />}
+                  {myInstances.map((system) => (
+                    <TopStripChip
+                      key={system.id}
+                      label={system.navLabel}
+                      active={system.id === toolbarActiveSystemId}
+                      onClick={() => onFocusMyInstance?.(system.id)}
+                      accent={system.accent}
+                      title={`Jump to your ${system.label} object`}
+                    />
+                  ))}
                   {wc.canRename && (
                     <div style={{
                       display: "flex",
