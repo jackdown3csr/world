@@ -2,12 +2,11 @@
 
 import React, { useRef, useEffect, useState, useCallback, useMemo } from "react";
 import { useFrame, type ThreeEvent } from "@react-three/fiber";
-import { Html } from "@react-three/drei";
 import SpriteLabel from "./SpriteLabel";
 import * as THREE from "three";
 
 import type { AsteroidData } from "@/lib/layout";
-import WalletTooltip from "./WalletTooltip";
+import type { HoveredWalletInfo } from "./WalletTooltip";
 import OrbitRing from "./OrbitRing";
 import { registerInstancedSceneObject, unregisterInstancedSceneObject } from "@/lib/sceneRegistry";
 
@@ -81,6 +80,7 @@ interface AsteroidBeltProps {
   beltTone?: "default" | "ash";
   /** System prefix for scene registry keys, e.g. "vescrow". When set, registers as "prefix:0x...". */
   sceneIdPrefix?: string;
+  onHoverWallet?: (info: HoveredWalletInfo | null) => void;
 }
 
 export default function AsteroidBelt({
@@ -99,6 +99,7 @@ export default function AsteroidBelt({
   showLabels = true,
   beltTone = "default",
   sceneIdPrefix,
+  onHoverWallet,
 }: AsteroidBeltProps) {
   const groupRef = useRef<THREE.Group>(null);
   const simTimeRef = useRef(0);
@@ -210,17 +211,20 @@ export default function AsteroidBelt({
       e.stopPropagation();
       const localId = e.instanceId ?? -1;
       if (localId >= 0 && localId < variantGroups[v].length) {
-        setHoveredGlobalIdx(variantGroups[v][localId]);
+        const gi = variantGroups[v][localId];
+        setHoveredGlobalIdx(gi);
+        onHoverWallet?.({ wallet: asteroids[gi].wallet });
         document.body.style.cursor = "pointer";
       }
     },
-    [variantGroups],
+    [variantGroups, onHoverWallet, asteroids],
   );
 
   const onPointerLeave = useCallback(() => {
     setHoveredGlobalIdx(-1);
+    onHoverWallet?.(null);
     document.body.style.cursor = "auto";
-  }, []);
+  }, [onHoverWallet]);
 
   const makeClick = useCallback(
     (v: number) => (e: ThreeEvent<MouseEvent>) => {
@@ -313,34 +317,22 @@ export default function AsteroidBelt({
         );
       })}
 
-      {/* Tooltip */}
-      {interactive && activeAsteroid && (selectedIndex < 0 || panelOpen) && (
-        <Html
-          position={activeAsteroid.position}
-          center
-          zIndexRange={[10000, 0]}
-          style={{ pointerEvents: (selectedIndex >= 0 && panelOpen) ? "auto" : "none" }}
-        >
-          <WalletTooltip
-            wallet={activeAsteroid.wallet}
-            onClose={(selectedIndex >= 0 && panelOpen) ? onDeselect : undefined}
-          />
-        </Html>
-      )}
+      {/* Hover tooltip — now in WalletInfoBanner */}
 
       {/* Persistent name labels */}
       {interactive && showLabels && showAllNames && asteroids.map((a, i) => {
         if (showRenamedOnly && !a.wallet.customName) return null;
-        if (activeIndex === i) return null;
+        if (hoveredGlobalIdx === i) return null;
+        const isSelected = selectedIndex === i;
         const label = a.wallet.customName || `${a.wallet.address.slice(0, 6)}\u2026${a.wallet.address.slice(-4)}`;
         return (
           <SpriteLabel
             key={a.wallet.address}
             position={a.position as [number, number, number]}
             text={label}
-            color={labelColor}
-            fontSize={0.3}
-            opacity={0.7}
+            color={isSelected ? "#b0e0ff" : labelColor}
+            fontSize={isSelected ? 0.35 : 0.3}
+            opacity={isSelected ? 1.0 : 0.7}
             onClick={() => onSelectAddress(a.wallet.address)}
           />
         );

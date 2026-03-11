@@ -23,15 +23,15 @@ const PALETTE = {
     glow:    new THREE.Color("#50f0ff"),
   },
   generic: {
-    arc:     new THREE.Color("#1a4060"),
+    arc:     new THREE.Color("#2060a0"),   // brighter: was #1a4060
     packets: new THREE.Color("#2080a0"),
     glow:    new THREE.Color("#2090b0"),
   },
 };
 
 const PACKET_COUNT   = 1;
-const TRAIL_SEGS     = 12;
-const TRAIL_LENGTH   = 0.20; // fraction of arc shown as wake behind the shuttle
+const TRAIL_SEGS     = 24;               // was 12 — more samples → smoother dots
+const TRAIL_LENGTH   = 0.36;            // was 0.20 — longer wake
 const FALLBACK_RING_INNER = 280;
 const FALLBACK_RING_OUTER = 540;
 const FALLBACK_Y_SPREAD = 180;
@@ -133,7 +133,39 @@ function buildControl(from: THREE.Vector3, to: THREE.Vector3): THREE.Vector3 {
   return mid.add(perp);
 }
 
-/* ── Trail rendered imperatively in useFrame ────────────── */
+/* ── Trail as gaussian dots — visible at any zoom level ──── */
+
+/**
+ * Vertex: each trail sample has an aT attribute (0=tail → 1=head).
+ * gl_PointSize ramps from small at tail to larger at head, scaled by
+ * camera distance so the trail stays legible across zoom levels.
+ */
+const TRAIL_VERT = /* glsl */ `
+  attribute float aT;
+  varying float vT;
+  void main() {
+    vT = aT;
+    vec4 mv = modelViewMatrix * vec4(position, 1.0);
+    float dist = max(-mv.z, 1.0);
+    gl_PointSize = clamp((2.5 + aT * 14.0) * 220.0 / dist, 1.0, 22.0);
+    gl_Position  = projectionMatrix * mv;
+  }
+`;
+
+/**
+ * Fragment: soft gaussian disk, brighter toward the head.
+ */
+const TRAIL_FRAG = /* glsl */ `
+  uniform vec3  uColor;
+  uniform float uAlpha;
+  varying float vT;
+  void main() {
+    float d      = length(gl_PointCoord - 0.5) * 2.0;
+    float circle = smoothstep(1.0, 0.12, d);
+    float bright = 0.12 + vT * vT * 0.88;
+    gl_FragColor = vec4(uColor, circle * uAlpha * bright);
+  }
+`;
 
 /* ── Main component ─────────────────────────────────────── */
 export interface TransactionFlowProps {
@@ -151,8 +183,6 @@ export default function TransactionFlow({ effect }: TransactionFlowProps) {
   const isVestingClaim = effect.classification === "vesting-claim";
 
   const packetOffsets = useMemo(() => [0], []);
-
-  const arcOpacity = isVestingClaim ? 0.08 : effect.paletteHint === "ecosystem" ? 0.22 : 0.09;
   const packetSize: [number, number, number] = isVestingClaim
     ? [8.2, 2.2, 2.2]
     : effect.paletteHint === "ecosystem"
@@ -164,21 +194,30 @@ export default function TransactionFlow({ effect }: TransactionFlowProps) {
     packetSize[2] * 1.7,
   ];
 
-  /* Trail geometry — created once, updated imperatively each frame */
-  const { trailGeo, trailMat, trailLine } = useMemo(() => {
+  /* Trail geometry — Points of gaussian dots, updated imperatively each frame */
+  const { trailGeo, trailMat, trailPoints } = useMemo(() => {
+    const n = TRAIL_SEGS + 1;
+    const positions = new Float32Array(n * 3);
+    const aT = new Float32Array(n);
+    for (let i = 0; i < n; i++) aT[i] = i / TRAIL_SEGS; // 0=tail → 1=head
     const geo = new THREE.BufferGeometry();
-    const mat = new THREE.LineBasicMaterial({
-      color: palette.arc,
+    geo.setAttribute("position", new THREE.BufferAttribute(positions, 3).setUsage(THREE.DynamicDrawUsage));
+    geo.setAttribute("aT", new THREE.BufferAttribute(aT, 1));
+    const mat = new THREE.ShaderMaterial({
+      vertexShader:   TRAIL_VERT,
+      fragmentShader: TRAIL_FRAG,
+      uniforms: {
+        uColor: { value: palette.arc.clone() },
+        uAlpha: { value: 0 },
+      },
       transparent: true,
-      opacity: 0,
-      depthWrite: false,
-      blending: THREE.AdditiveBlending,
-      toneMapped: false,
+      depthWrite:  false,
+      blending:    THREE.AdditiveBlending,
+      toneMapped:  false,
     });
-    return { trailGeo: geo, trailMat: mat, trailLine: new THREE.Line(geo, mat) };
+    return { trailGeo: geo, trailMat: mat, trailPoints: new THREE.Points(geo, mat) };
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
-  const trailBuffer = useRef(new Float32Array((TRAIL_SEGS + 1) * 3));
 
   useEffect(() => {
     liveRef.current = true;
@@ -244,25 +283,22 @@ export default function TransactionFlow({ effect }: TransactionFlowProps) {
         glow.quaternion.copy(mesh.quaternion);
       }
 
-      // Wake trail — arc segment behind the shuttle, updated every frame
+      // Wake trail — gaussian dot arc behind the shuttle, updated every frame
       {
         const tStart = Math.max(0, tVal - TRAIL_LENGTH);
-        const buf = trailBuffer.current;
+        const posAttr = trailGeo.getAttribute("position") as THREE.BufferAttribute;
+        const buf     = posAttr.array as Float32Array;
         for (let k = 0; k <= TRAIL_SEGS; k++) {
           const tk = tStart + (tVal - tStart) * (k / TRAIL_SEGS);
           quadBezier(_pt, f, ctrl, t, tk);
-          buf[k * 3] = _pt.x;
+          buf[k * 3]     = _pt.x;
           buf[k * 3 + 1] = _pt.y;
           buf[k * 3 + 2] = _pt.z;
         }
-        const posAttr = trailGeo.getAttribute("position") as THREE.BufferAttribute | undefined;
-        if (!posAttr) {
-          trailGeo.setAttribute("position", new THREE.BufferAttribute(trailBuffer.current, 3));
-          trailGeo.setDrawRange(0, TRAIL_SEGS + 1);
-        } else {
-          posAttr.needsUpdate = true;
-        }
-        trailMat.opacity = alpha * Math.sin(tVal * Math.PI) * arcOpacity * 3.5;
+        posAttr.needsUpdate = true;
+        trailMat.uniforms.uAlpha.value =
+          alpha * Math.sin(tVal * Math.PI) *
+          (isVestingClaim ? 0.60 : effect.paletteHint === "ecosystem" ? 0.88 : 0.60);
       }
 
       const edgeAlpha  = Math.sin(tVal * Math.PI);
@@ -280,7 +316,7 @@ export default function TransactionFlow({ effect }: TransactionFlowProps) {
 
   return (
     <group ref={groupRef}>
-      <primitive object={trailLine} renderOrder={5} />
+      <primitive object={trailPoints} renderOrder={5} />
 
       {packetOffsets.map((_, i) => (
         <group key={i}>

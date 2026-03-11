@@ -86,37 +86,92 @@ export const FRAG = /* glsl */ `
 
     // ── Albedo: ocean / land / clouds ────────────────────
     float landN    = fbm(p*2.0+seed3)*0.65 + fbm(p*5.5+seed3.zxy)*0.35;
-    float seaLevel = 0.42 + uVariant * 0.22;
+
+    // ── 5 archetype palettes driven by uVariant ─────────
+    //   < 0.20 : Classic Earth — lush green, blue ocean, balanced land/sea
+    //   < 0.40 : Desert world — mostly land, red-brown, small seas, dusty
+    //   < 0.60 : Alien teal — teal vegetation, purple-blue oceans
+    //   < 0.80 : Ocean world — high sea level, scattered archipelagos, heavy clouds
+    //   >= 0.80: Cold world — grey-green tundra, partly frozen seas, thin clouds
+
+    float seaLevel, cloudStr, cityStr;
+    vec3 jungle, desert, deepO, shalO, tundra, snow;
+
+    if (uVariant < 0.20) {
+      // Classic Earth
+      seaLevel = 0.44 + uSeed * 0.08;
+      cloudStr = 0.85;
+      cityStr  = 0.38;
+      deepO  = hsv(vec3(0.61 + uHue * 0.04, 0.85, 0.28));
+      shalO  = hsv(vec3(0.55 + uHue * 0.05, 0.68, 0.50));
+      jungle = hsv(vec3(0.30 + uHue * 0.04, 0.65, 0.28));
+      desert = hsv(vec3(0.09 + uHue * 0.03, 0.45, 0.60));
+      tundra = hsv(vec3(0.38 + uHue * 0.04, 0.20, 0.50));
+      snow   = vec3(0.90, 0.93, 0.97);
+    } else if (uVariant < 0.40) {
+      // Desert world — mostly land, reddish-brown, small seas
+      seaLevel = 0.28 + uSeed * 0.06;
+      cloudStr = 0.45;
+      cityStr  = 0.25;
+      deepO  = hsv(vec3(0.58 + uHue * 0.04, 0.70, 0.22));
+      shalO  = hsv(vec3(0.52 + uHue * 0.05, 0.55, 0.40));
+      jungle = hsv(vec3(0.08 + uHue * 0.03, 0.50, 0.32));
+      desert = hsv(vec3(0.04 + uHue * 0.04, 0.60, 0.58));
+      tundra = hsv(vec3(0.06 + uHue * 0.03, 0.30, 0.45));
+      snow   = vec3(0.85, 0.82, 0.78);
+    } else if (uVariant < 0.60) {
+      // Alien teal — teal vegetation, purple-blue oceans
+      seaLevel = 0.42 + uSeed * 0.10;
+      cloudStr = 0.70;
+      cityStr  = 0.30;
+      deepO  = hsv(vec3(0.72 + uHue * 0.04, 0.75, 0.25));
+      shalO  = hsv(vec3(0.68 + uHue * 0.05, 0.60, 0.45));
+      jungle = hsv(vec3(0.46 + uHue * 0.06, 0.55, 0.32));
+      desert = hsv(vec3(0.50 + uHue * 0.04, 0.40, 0.52));
+      tundra = hsv(vec3(0.54 + uHue * 0.04, 0.25, 0.48));
+      snow   = vec3(0.88, 0.90, 0.95);
+    } else if (uVariant < 0.80) {
+      // Ocean world — high sea level, archipelagos, heavy clouds
+      seaLevel = 0.62 + uSeed * 0.08;
+      cloudStr = 1.0;
+      cityStr  = 0.15;
+      deepO  = hsv(vec3(0.60 + uHue * 0.04, 0.88, 0.22));
+      shalO  = hsv(vec3(0.54 + uHue * 0.05, 0.72, 0.48));
+      jungle = hsv(vec3(0.32 + uHue * 0.04, 0.60, 0.30));
+      desert = hsv(vec3(0.11 + uHue * 0.03, 0.40, 0.55));
+      tundra = hsv(vec3(0.40 + uHue * 0.04, 0.22, 0.52));
+      snow   = vec3(0.92, 0.95, 0.98);
+    } else {
+      // Cold world — grey-green tundra, partly frozen seas
+      seaLevel = 0.38 + uSeed * 0.06;
+      cloudStr = 0.50;
+      cityStr  = 0.20;
+      deepO  = hsv(vec3(0.56 + uHue * 0.04, 0.50, 0.24));
+      shalO  = hsv(vec3(0.52 + uHue * 0.05, 0.35, 0.42));
+      jungle = hsv(vec3(0.28 + uHue * 0.03, 0.35, 0.30));
+      desert = hsv(vec3(0.10 + uHue * 0.04, 0.28, 0.48));
+      tundra = hsv(vec3(0.34 + uHue * 0.04, 0.18, 0.44));
+      snow   = vec3(0.88, 0.90, 0.92);
+    }
+
     float oceanMask = 1.0 - smoothstep(seaLevel - 0.07, seaLevel + 0.07, landN);
     float polar     = smoothstep(0.64, 0.92, abs(lat));
     float trop      = 1.0 - smoothstep(0., 0.55, abs(lat));
 
-    vec3 deepO = hsv(vec3(0.61+uHue*0.04, 0.85, 0.28));
-    vec3 shalO = hsv(vec3(0.55+uHue*0.05, 0.68, 0.50));
     vec3 ocean = mix(deepO, shalO, smoothstep(seaLevel-0.04, seaLevel, landN));
-
-    vec3 jungle, desert;
-    if (uVariant < 0.40) {
-      jungle = hsv(vec3(0.30+uHue*0.04, 0.65, 0.28));
-      desert = hsv(vec3(0.09+uHue*0.03, 0.45, 0.60));
-    } else if (uVariant < 0.70) {
-      jungle = hsv(vec3(0.46+uHue*0.06, 0.55, 0.32));
-      desert = hsv(vec3(0.04+uHue*0.03, 0.50, 0.52));
-    } else {
-      jungle = hsv(vec3(0.10+uHue*0.03, 0.40, 0.35));
-      desert = hsv(vec3(0.07+uHue*0.04, 0.55, 0.65));
-    }
-    vec3 tundra = hsv(vec3(0.38+uHue*0.04, 0.20, 0.50));
-    vec3 snow   = vec3(0.90,0.93,0.97);
 
     vec3 land = mix(jungle, desert, smoothstep(0.3,0.7,trop*0.6+landN*0.4));
     land = mix(land, tundra, smoothstep(0.44,0.68,abs(lat)));
     land = mix(land, snow, polar);
+    // Cold world gets extra ice on seas
+    if (uVariant >= 0.80) {
+      ocean = mix(ocean, vec3(0.80, 0.85, 0.90), polar * 0.6 + smoothstep(0.50, 0.75, abs(lat)) * 0.3);
+    }
     vec3 albedo = mix(ocean, land, 1.-oceanMask);
 
-    // Clouds
+    // Clouds — density varies by archetype
     float cl = fbm(p*4.0 + vec3(uTime*0.008,0.,uSeed*5.1) + seed3*0.5);
-    float cloudAlpha = smoothstep(0.48, 0.68, cl) * 0.85;
+    float cloudAlpha = smoothstep(0.48, 0.68, cl) * cloudStr;
     albedo = mix(albedo, mix(vec3(0.88,0.91,0.96),snow,polar*0.5), cloudAlpha);
 
     // ── Diffuse ──────────────────────────────────────────
@@ -130,7 +185,7 @@ export const FRAG = /* glsl */ `
 
     // ── Night lights ─────────────────────────────────────
     float city = smoothstep(0.55, 0.75, h0*h0) * (1.-day) * (1.-cloudAlpha*0.85);
-    color += vec3(1.0, 0.88, 0.50) * city * 0.38;
+    color += vec3(1.0, 0.88, 0.50) * city * cityStr;
 
     // ── Polar aurora ─────────────────────────────────────
     float aLat   = abs(lat);

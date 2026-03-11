@@ -23,6 +23,9 @@ export interface PlanetData {
   initialAngle: number;
   hue:          number;
   seed:         number;
+  variant:      number;
+  /** 0-based rank within the planet-type group (gas_giant 0-3, ice_giant 0-3, etc.) */
+  subRank:      number;
   tilt:         number;
   moons:        MoonData[];
   ringWallets:  RingParticleData[];

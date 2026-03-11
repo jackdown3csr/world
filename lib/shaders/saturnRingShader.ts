@@ -100,8 +100,8 @@ const FRAG = /* glsl */ `
         (uMoonOrbits[i] - uInnerRadius) / (uOuterRadius - uInnerRadius),
         0.0, 1.0
       );
-      // Gap width proportional to a fixed size
-      float gapHW = 0.022;
+      // Gap width — wide enough to be clearly visible
+      float gapHW = 0.035;
       density *= smoothstep(0.0, gapHW, abs(t - moonT));
     }
 

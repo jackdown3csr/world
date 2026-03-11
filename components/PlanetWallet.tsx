@@ -2,14 +2,13 @@
 
 import React, { useRef, useMemo, useState, useCallback, useEffect } from "react";
 import { useFrame, type ThreeEvent } from "@react-three/fiber";
-import { Html } from "@react-three/drei";
 import SpriteLabel from "./SpriteLabel";
 import * as THREE from "three";
 
 import type { PlanetData } from "@/lib/layout";
 import { createPlanetMaterial, createMarsMaterial } from "@/lib/shaders/planetMaterial";
 import { PLANET_GEOS, ATMOS_HAZE_GEO, ATMOS_RIM_GEO, ATMOS_EXPIRY_GEO } from "@/lib/geometryPool";
-import WalletTooltip, { type WalletTooltipVariant } from "./WalletTooltip";
+import { type WalletTooltipVariant, type HoveredWalletInfo } from "./WalletTooltip";
 import MoonBody from "./MoonBody";
 import SaturnSystem from "./SaturnSystem";
 import { registerSceneObject, unregisterSceneObject } from "@/lib/sceneRegistry";
@@ -153,11 +152,13 @@ interface PlanetWalletProps {
   detailVariant?: WalletTooltipVariant;
   interactionEnabled?: boolean;
   paused?: boolean;
+  showOrbits?: boolean;
   /** System prefix for scene registry keys, e.g. "vescrow". When set, registers as "prefix:0x...". */
   sceneIdPrefix?: string;
+  onHoverWallet?: (info: HoveredWalletInfo | null) => void;
 }
 
-export default function PlanetWallet({ data, starWorldPosition, selected, panelOpen, onSelect, onDeselect, selectedAddress, onSelectAddress, showLabel, showMoonLabels, showRingLabels, showRenamedOnly, onShiftSelect, detailVariant = "wallet", interactionEnabled = true, paused = false, sceneIdPrefix }: PlanetWalletProps) {
+export default function PlanetWallet({ data, starWorldPosition, selected, panelOpen, onSelect, onDeselect, selectedAddress, onSelectAddress, showLabel, showMoonLabels, showRingLabels, showRenamedOnly, onShiftSelect, detailVariant = "wallet", interactionEnabled = true, paused = false, showOrbits = true, sceneIdPrefix, onHoverWallet }: PlanetWalletProps) {
   const orbitRef = useRef<THREE.Group>(null);
   const meshRef  = useRef<THREE.Mesh>(null);
   const simTimeRef = useRef(0);
@@ -179,9 +180,9 @@ export default function PlanetWallet({ data, starWorldPosition, selected, panelO
   // One ShaderMaterial per planet — unique uniforms (hue, seed, type, time)
   const material = useMemo(
     () => data.isMars
-      ? createMarsMaterial(data.hue, data.seed)
-      : createPlanetMaterial(data.planetType, data.hue, data.seed, data.ringWallets.length > 0),
-    [data.planetType, data.hue, data.seed, data.ringWallets.length, data.isMars],
+      ? createMarsMaterial(data.hue, data.seed, data.variant)
+      : createPlanetMaterial(data.planetType, data.hue, data.seed, data.variant, data.ringWallets.length > 0, data.subRank),
+    [data.planetType, data.hue, data.seed, data.variant, data.ringWallets.length, data.isMars, data.subRank],
   );
 
   // ── Outer rim-glow shell (BackSide) — non-rocky (except Mars), non-Saturn planets ──
@@ -297,10 +298,12 @@ export default function PlanetWallet({ data, starWorldPosition, selected, panelO
 
   const onPointerEnter = useCallback((e: ThreeEvent<PointerEvent>) => {
     e.stopPropagation(); setHovered(true); document.body.style.cursor = "pointer";
-  }, []);
+    onHoverWallet?.({ wallet: data.wallet, variant: detailVariant });
+  }, [onHoverWallet, data.wallet, detailVariant]);
   const onPointerLeave = useCallback(() => {
     setHovered(false); document.body.style.cursor = "auto";
-  }, []);
+    onHoverWallet?.(null);
+  }, [onHoverWallet]);
   const onClick = useCallback((e: ThreeEvent<MouseEvent>) => {
     e.stopPropagation();
     if (e.nativeEvent.shiftKey && onShiftSelect) {
@@ -367,32 +370,24 @@ export default function PlanetWallet({ data, starWorldPosition, selected, panelO
               showRenamedOnly={showRenamedOnly}
               interactionEnabled={interactionEnabled}
               paused={paused}
+              showOrbits={showOrbits}
               sceneIdPrefix={sceneIdPrefix}
+              onHoverWallet={onHoverWallet}
             />
           </group>
         )}
 
-        {/* Tooltip */}
-        {((interactionEnabled && hovered) || (selected && panelOpen)) && (
-          <Html
-            position={[data.orbitRadius, data.radius + 0.6, 0]}
-            center
-            zIndexRange={[10000, 0]}
-            style={{ pointerEvents: (selected && panelOpen) ? "auto" : "none" }}
-          >
-            <WalletTooltip wallet={data.wallet} onClose={(selected && panelOpen) ? onDeselect : undefined} variant={detailVariant} />
-          </Html>
-        )}
+        {/* Hover tooltip — now handled by the fixed WalletInfoBanner in SolarSystem. */}
 
         {/* Persistent name label */}
-        {showLabel && !hovered && !(selected && panelOpen) && (
+        {showLabel && !hovered && (
           (!showRenamedOnly || data.wallet.customName) ? (
           <SpriteLabel
             position={[data.orbitRadius, data.radius + 0.4, 0]}
             text={`${detailVariant === "vesting" ? "◈ " : detailVariant === "pool" ? "" : `#${data.vpRank} `}${data.wallet.customName || `${data.wallet.address.slice(0, 6)}\u2026${data.wallet.address.slice(-4)}`}`}
-            color={detailVariant === "vesting" ? "#7ccedd" : detailVariant === "pool" ? "#ffe08a" : "#90b8d0"}
-            fontSize={0.4}
-            opacity={0.85}
+            color={selected ? "#b0e0ff" : detailVariant === "vesting" ? "#7ccedd" : detailVariant === "pool" ? "#ffe08a" : "#90b8d0"}
+            fontSize={selected ? 0.46 : 0.4}
+            opacity={selected ? 1.0 : 0.85}
             onClick={interactionEnabled ? onSelect : undefined}
           />
           ) : null
@@ -415,7 +410,9 @@ export default function PlanetWallet({ data, starWorldPosition, selected, panelO
             detailVariant={detailVariant}
             interactionEnabled={interactionEnabled}
             paused={paused}
+            showOrbits={showOrbits}
             sceneId={sceneIdPrefix ? `${sceneIdPrefix}:${moon.wallet.address.toLowerCase()}` : undefined}
+            onHoverWallet={onHoverWallet}
           />
         ))}
       </group>

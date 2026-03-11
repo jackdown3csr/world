@@ -393,6 +393,7 @@ export interface SceneCanvasProps {
   onAutoFlightChange?: (active: boolean) => void;
   onFovChange?: (fov: number) => void;
   getFlyTarget?: () => THREE.Vector3 | null;
+  onHoverWallet?: (info: import('./WalletTooltip').HoveredWalletInfo | null) => void;
   onResetDone: () => void;
   selectionVersion: number;
 }
@@ -429,6 +430,7 @@ export default function SceneCanvas({
   onAutoFlightChange,
   onFovChange,
   getFlyTarget,
+  onHoverWallet,
   onResetDone,
   selectionVersion,
 }: SceneCanvasProps) {
@@ -605,6 +607,7 @@ export default function SceneCanvas({
           beltTone={"default"}
           showSolarWind={system.id !== "gubi-pool"}
           systemId={system.id}
+          onHoverWallet={onHoverWallet}
         />
       ))}
 

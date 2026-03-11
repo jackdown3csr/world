@@ -300,12 +300,13 @@ export default function CameraController({
         case "star":   dist = Math.max(body.bodyRadius * 12, 900); break;  // system overview, not a surface close-up
         case "planet": dist = Math.max(body.bodyRadius * 4, 12); break;
         case "moon":   dist = Math.max(body.bodyRadius * 8, 4);  break;
-        case "ring":   dist = Math.max(body.bodyRadius * 12, 8); break;
-        case "comet":  dist = 55; break;
-        case "bridge": dist = Math.max(body.bodyRadius * 3.4, 120); break;
-        case "rogue": dist = Math.max(body.bodyRadius * 14, 110); break;
+        case "ring":     dist = Math.max(body.bodyRadius * 8, 1.2); break;
+        case "asteroid":  dist = Math.max(body.bodyRadius * 8, 1.2); break;
+        case "comet":     dist = 55; break;
+        case "bridge":    dist = Math.max(body.bodyRadius * 3.4, 120); break;
+        case "rogue":     dist = Math.max(body.bodyRadius * 14, 110); break;
         case "satellite": dist = 30; break;
-        default:       dist = Math.max(body.bodyRadius * 12, 8); break;
+        default:          dist = Math.max(body.bodyRadius * 12, 8); break;
       }
 
       // Slightly tighter framing helps orbit tracking feel more "locked" to the object.
@@ -316,7 +317,7 @@ export default function CameraController({
       let camPos: THREE.Vector3;
       if (bodyType === "star") {
         const overviewRadius = body.focusRadius ?? body.bodyRadius * 8;
-        dist = Math.max(overviewRadius * 1.55, 1200);
+        dist = Math.max(overviewRadius * 1.55, 480);
         const starViewDir = new THREE.Vector3(0.78, 0.34, 1.0).normalize();
         camPos = body.position.clone().addScaledVector(starViewDir, dist);
       } else {
@@ -324,9 +325,14 @@ export default function CameraController({
         const len    = radDir.length();
         if (len > 1) radDir.divideScalar(len); else radDir.set(0, 0, 1);
 
+        // Tangential direction — perpendicular to radial in the XZ orbital plane.
+        // Camera comes from the side + slightly toward the star so the lit face is visible.
+        const tangent = new THREE.Vector3(-radDir.z, 0, radDir.x); // unit vector, already normalized
+
         camPos = body.position.clone()
-          .add(radDir.clone().multiplyScalar(dist * 0.7))
-          .add(new THREE.Vector3(0, dist * 0.4, 0));
+          .addScaledVector(tangent, dist * 0.65)    // side offset
+          .addScaledVector(radDir, -dist * 0.22)    // lean toward star → lit hemisphere faces camera
+          .add(new THREE.Vector3(0, dist * 0.42, 0)); // elevation
       }
 
       const framedTarget = body.position.clone();
@@ -388,10 +394,23 @@ export default function CameraController({
         camera.quaternion.slerp(_goalQuat, THREE.MathUtils.clamp(1 - Math.exp(-10 * delta), 0, 1));
       }
 
-      // Keep lastBodyPos synced during snap
+      // Track moving body during snap — shifts snap goal to follow orbiting/rotating objects
       if (trackingAddr.current) {
         const b = lookupSceneBody(trackingAddr.current);
-        if (b) lastBodyPos.current.copy(b.position);
+        if (b) {
+          const dx = b.position.x - lastBodyPos.current.x;
+          const dy = b.position.y - lastBodyPos.current.y;
+          const dz = b.position.z - lastBodyPos.current.z;
+          lastBodyPos.current.copy(b.position);
+          if (dx * dx + dy * dy + dz * dz > 1e-8) {
+            snapGoalCam.current.x += dx;
+            snapGoalCam.current.y += dy;
+            snapGoalCam.current.z += dz;
+            snapGoalTarget.current.x += dx;
+            snapGoalTarget.current.y += dy;
+            snapGoalTarget.current.z += dz;
+          }
+        }
       }
 
       const camDist = camera.position.distanceTo(snapGoalCam.current);

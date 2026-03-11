@@ -50,33 +50,40 @@ export default function OrbitRing({
     };
   }, [color]);
 
+  // Moon orbit rings (low opacity) use a single line; planet orbits get the 3-line halo
+  const simple = opacity < 0.14;
+
   return (
     <group rotation={[tilt, 0, 0]}>
+      {!simple && (
+        <Line
+          points={points}
+          color={tones.haze}
+          opacity={opacity * 0.18}
+          transparent
+          lineWidth={1}
+          position={[0, 0, 0]}
+          scale={[radii.outer / radius, 1, radii.outer / radius]}
+        />
+      )}
       <Line
         points={points}
-        color={tones.haze}
-        opacity={opacity * 0.18}
-        transparent
-        lineWidth={1}
-        position={[0, 0, 0]}
-        scale={[radii.outer / radius, 1, radii.outer / radius]}
-      />
-      <Line
-        points={points}
-        color={tones.base}
-        opacity={opacity * 0.82}
+        color={simple ? tones.base : tones.base}
+        opacity={simple ? opacity : opacity * 0.82}
         transparent
         lineWidth={1}
       />
-      <Line
-        points={points}
-        color={tones.core}
-        opacity={opacity * 0.42}
-        transparent
-        lineWidth={1}
-        position={[0, 0, 0]}
-        scale={[radii.inner / radius, 1, radii.inner / radius]}
-      />
+      {!simple && (
+        <Line
+          points={points}
+          color={tones.core}
+          opacity={opacity * 0.42}
+          transparent
+          lineWidth={1}
+          position={[0, 0, 0]}
+          scale={[radii.inner / radius, 1, radii.inner / radius]}
+        />
+      )}
     </group>
   );
 }

@@ -32,9 +32,9 @@ export const BASE_PLANET_SPEED = 0.012;
 
 /* ── Moon sizing / orbits ─────────────────────────────────── */
 export const MIN_MOON_R       = 0.12;
-export const MAX_MOON_R       = 0.4;
-export const MOON_FIRST_GAP   = 3.0;   // gap between planet surface and first moon orbit
-export const MOON_SURFACE_GAP = 1.8;   // gap between moon orbit and moon surface
+export const MAX_MOON_R       = 0.40;
+export const MOON_FIRST_GAP   = 3.0;   // default gap between planet surface and first moon orbit
+export const MOON_SURFACE_GAP = 2.2;   // gap between consecutive moon orbits
 
 export const BASE_MOON_SPEED       = 0.08;
 export const MAX_MOONS_PER_PLANET  = 6;

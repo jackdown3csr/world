@@ -27,6 +27,8 @@ import SplashScreen from "./SplashScreen";
 import SceneCanvas from "./SceneCanvas";
 import type { ScreenshotHandle } from "./SceneCanvas";
 import SystemHud from "./SystemHud";
+import WalletInfoBanner from "./WalletInfoBanner";
+import type { HoveredWalletInfo } from "./WalletTooltip";
 import FlyHud from "./FlyHud";
 import type { TrafficPanelItem } from "./TrafficPanel";
 import { StorageSlotPopup, RoguePopup } from "./SystemPopups";
@@ -161,7 +163,7 @@ export default function SolarSystem() {
   }, []);
 
   const selectWalletBody = useCallback((addr: string) => {
-    focusSceneTarget(addr, true, `vescrow:${addr.toLowerCase()}`);
+    focusSceneTarget(addr, false, `vescrow:${addr.toLowerCase()}`);
   }, [focusSceneTarget]);
 
   /* ── Wallet connection ── */
@@ -198,7 +200,17 @@ export default function SolarSystem() {
   const [photoSimulationMode, setPhotoSimulationMode] = useState<"frozen" | "live">("live");
   const [photoFov, setPhotoFov] = useState(55);
   const [resetRequested, setResetRequested] = useState(false);
-  const desktopPanelInsetRight = isMobile ? 0 : (showHelp ? 520 : 424);
+  const desktopPanelInsetRight = isMobile ? 0 : (showHelp ? 520 : 0);
+
+  /* ── Hover wallet banner ── */
+  const [hoveredWallet, setHoveredWallet] = useState<HoveredWalletInfo | null>(null);
+  const onHoverWallet = useCallback((info: HoveredWalletInfo | null) => {
+    setHoveredWallet((prev) => {
+      if (!info && !prev) return prev;
+      if (info && prev && info.wallet.address === prev.wallet.address) return prev;
+      return info;
+    });
+  }, []);
 
   /* ── Popups ── */
   const [storageWallet, setStorageWallet] = useState<WalletEntry | null>(null);
@@ -228,6 +240,16 @@ export default function SolarSystem() {
   const [cameraMode, setCameraMode] = useState<CameraMode>("orbit");
   const [flyModeEnabled, setFlyModeEnabled] = useState(false);
   const [showFlightHud, setShowFlightHud] = useState(true);
+
+  // Clear stale hover when interactions become disabled (fly mode, photo mode)
+  const interactionsActive = !flyModeEnabled && !photoMode && cameraMode !== "fly";
+  const prevInteractionsActive = useRef(interactionsActive);
+  useEffect(() => {
+    if (prevInteractionsActive.current && !interactionsActive) {
+      setHoveredWallet(null);
+    }
+    prevInteractionsActive.current = interactionsActive;
+  }, [interactionsActive]);
   const [flashCapture, setFlashCapture] = useState(false);
   const [photoSavedToast, setPhotoSavedToast] = useState(false);
   const [camDebug, setCamDebug] = useState<CamDebug | null>(null);
@@ -587,10 +609,10 @@ export default function SolarSystem() {
     wc.setNameInput(entry?.customName || "");
   }, [allEntries, bridges, focusSceneTarget, photoMode, walletSystemMap, wc]);
 
-  const handleDirectorySelect = useCallback((address: string, customName?: string) => {
-    const systemId = walletSystemMap[address.toLowerCase()];
-    const scopedId = systemId ? `${systemId}:${address.toLowerCase()}` : undefined;
-    focusSceneTarget(address, true, scopedId);
+  const handleDirectorySelect = useCallback((address: string, customName?: string, systemId?: SceneSystemId) => {
+    const resolvedSystemId = systemId ?? walletSystemMap[address.toLowerCase()];
+    const scopedId = resolvedSystemId ? `${resolvedSystemId}:${address.toLowerCase()}` : undefined;
+    focusSceneTarget(address, false, scopedId);
     wc.setNameInput(customName || "");
   }, [focusSceneTarget, walletSystemMap, wc]);
 
@@ -806,8 +828,13 @@ export default function SolarSystem() {
           if (!id) return null;
           return lookupSceneBody(id.toLowerCase())?.position ?? null;
         }, [cameraTargetId, selectedAddress])}
+        onHoverWallet={onHoverWallet}
         onResetDone={() => setResetRequested(false)}
       />
+
+      {interactionsActive && (
+        <WalletInfoBanner info={hoveredWallet} />
+      )}
 
       <SystemHud
         isMobile={isMobile}

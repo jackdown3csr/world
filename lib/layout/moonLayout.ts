@@ -20,20 +20,74 @@ import { fnv1a, frac, weiToFloat } from "./helpers";
  * Assign moon wallets to host planets (max 3 each).
  * Overflow (unplaced) moons get pushed into the asteroid belt.
  */
+/**
+ * Assign moon wallets to host planets.
+ * Saturn (saturnIdx) is guaranteed 6 moons for its ring-gap slots.
+ * Other planets get a size-based capacity: gas giants 5, ice giants 3,
+ * terrestrials 2, rocky/small 1.
+ * Overflow (unplaced) moons get pushed into the asteroid belt.
+ */
+
+/** Moon capacity per planet type — bigger planets attract more moons. */
+const MOON_CAP: Record<string, number> = {
+  gas_giant: 5,
+  ice_giant: 3,
+  terrestrial: 2,
+  rocky: 1,
+  molten: 1,
+  lava_ocean: 2,
+  protoplanetary: 2,
+};
+
 export function distributeMoons(
   moonEntries: { w: WalletEntry }[],
   planetCount: number,
+  saturnIdx = -1,
+  typeMap?: Map<string, string>,
+  planetAddresses?: string[],
 ): { moonGroups: Map<number, WalletEntry[]>; overflowBelt: WalletEntry[] } {
   const moonGroups = new Map<number, WalletEntry[]>();
   for (let i = 0; i < planetCount; i++) moonGroups.set(i, []);
 
   const overflowBelt: WalletEntry[] = [];
 
-  for (const { w } of moonEntries) {
-    const hostIdx = fnv1a(w.address, 0xbeef) % Math.max(planetCount, 1);
-    const grp = moonGroups.get(hostIdx)!;
-    if (grp.length < MAX_MOONS_PER_PLANET) grp.push(w);
-    else overflowBelt.push(w);
+  // Per-planet capacity: Saturn always 6, others by type
+  const cap = (idx: number) => {
+    if (idx === saturnIdx) return 6;
+    if (typeMap && planetAddresses) {
+      const t = typeMap.get(planetAddresses[idx]);
+      if (t) return MOON_CAP[t] ?? MAX_MOONS_PER_PLANET;
+    }
+    return MAX_MOONS_PER_PLANET;
+  };
+
+  // Phase 1: fill Saturn first — take the first 6 available moons
+  const remaining: { w: WalletEntry }[] = [];
+  for (const entry of moonEntries) {
+    if (saturnIdx >= 0 && (moonGroups.get(saturnIdx)!.length < 6)) {
+      moonGroups.get(saturnIdx)!.push(entry.w);
+    } else {
+      remaining.push(entry);
+    }
+  }
+
+  // Phase 2: distribute the rest by hash, respecting per-type capacity
+  for (const { w } of remaining) {
+    const safePlanetCount = Math.max(planetCount, 1);
+    const preferredHostIdx = fnv1a(w.address, 0xbeef) % safePlanetCount;
+
+    let placed = false;
+    for (let offset = 0; offset < safePlanetCount; offset++) {
+      const hostIdx = (preferredHostIdx + offset) % safePlanetCount;
+      const grp = moonGroups.get(hostIdx)!;
+      if (grp.length < cap(hostIdx)) {
+        grp.push(w);
+        placed = true;
+        break;
+      }
+    }
+
+    if (!placed) overflowBelt.push(w);
   }
 
   return { moonGroups, overflowBelt };
@@ -68,14 +122,16 @@ export function buildMoonList(
   hostRadius: number,
   stats:      MoonVPStats,
 ): MoonData[] {
-  let moonCursor = hostRadius + MOON_FIRST_GAP;
+  // Scale first-orbit gap with host size so moons don't hug large planets
+  const firstGap = Math.max(MOON_FIRST_GAP, hostRadius * 0.5 + 2.0);
+  let moonCursor = hostRadius + firstGap;
 
   return wallets.map((mw, idx) => {
     const mvp = weiToFloat(mw.votingPower);
     const mt  = Math.max(0, Math.min(1,
       (Math.log10(Math.max(mvp, 0.001)) - stats.mlogMin) / stats.mvpRange));
     const mrRaw = MIN_MOON_R + Math.pow(mt, 0.5) * (MAX_MOON_R - MIN_MOON_R);
-    const mr    = Math.min(mrRaw, hostRadius * 0.30);
+    const mr    = Math.min(mrRaw, hostRadius * 0.25);
 
     moonCursor += mr;
     const mo    = moonCursor;
@@ -86,6 +142,11 @@ export function buildMoonList(
     const baseType = Math.floor(frac(mw.address, 66) * 6) % 6;
     const moonType = ((baseType + idx * 2) % 6) as 0 | 1 | 2 | 3 | 4 | 5;
 
+    // Smaller moons get more tilt (irregular orbits), larger ones stay near-equatorial
+    const tiltRaw = (frac(mw.address, 44) - 0.5) * 0.35;  // ±~10°
+    const sizeNorm = (mr - MIN_MOON_R) / (MAX_MOON_R - MIN_MOON_R + 0.001);
+    const tilt = tiltRaw * (1.0 - sizeNorm * 0.6);
+
     return {
       wallet:       mw,
       radius:       mr,
@@ -94,7 +155,7 @@ export function buildMoonList(
       initialAngle: frac(mw.address, 11) * Math.PI * 2,
       hue:          frac(mw.address, 22),
       seed:         frac(mw.address, 33),
-      tilt:         0,
+      tilt,
       moonType,
     };
   });
@@ -131,7 +192,7 @@ export function buildSaturnMoonList(
     const mt    = Math.max(0, Math.min(1,
       (Math.log10(Math.max(mvp, 0.001)) - stats.mlogMin) / stats.mvpRange));
     const mrRaw = MIN_MOON_R + Math.pow(mt, 0.5) * (MAX_MOON_R - MIN_MOON_R);
-    const mr    = Math.min(mrRaw, hostRadius * 0.30);
+    const mr    = Math.min(mrRaw, hostRadius * 0.25);
 
     const slot  = SATURN_MOON_SLOTS[i % SATURN_MOON_SLOTS.length];
     const mo    = hostRadius * slot;
@@ -139,6 +200,10 @@ export function buildSaturnMoonList(
     // Kepler-like orbit speed: inner moons orbit faster
     const baseOrbitR = hostRadius * SATURN_MOON_SLOTS[0];
     const speed      = BASE_MOON_SPEED * Math.pow(baseOrbitR / mo, 1.5);
+
+    // Type diversity: offset by index so Saturn moons on the same planet differ
+    const baseType = Math.floor(frac(mw.address, 66) * 6) % 6;
+    const moonType = ((baseType + i * 2) % 6) as 0 | 1 | 2 | 3 | 4 | 5;
 
     return {
       wallet:       mw,
@@ -149,7 +214,7 @@ export function buildSaturnMoonList(
       hue:          frac(mw.address, 22),
       seed:         frac(mw.address, 33),
       tilt:         0,
-      moonType:     (Math.floor(frac(mw.address, 66) * 6) % 6) as 0 | 1 | 2 | 3 | 4 | 5,
+      moonType,
     };
   });
 }

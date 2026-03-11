@@ -16,35 +16,40 @@
 
 import React, { useRef, useEffect, useState, useCallback, useMemo } from "react";
 import { useFrame, type ThreeEvent } from "@react-three/fiber";
-import { Html } from "@react-three/drei";
 import SpriteLabel from "./SpriteLabel";
 import * as THREE from "three";
 
 import type { AsteroidData } from "@/lib/layout";
-import WalletTooltip from "./WalletTooltip";
+import type { HoveredWalletInfo } from "./WalletTooltip";
 import { registerInstancedSceneObject, unregisterInstancedSceneObject } from "@/lib/sceneRegistry";
 
-/* ── Flat pebble geometry variants ───────────────────────── */
+/* ── Irregular clump geometry variants ────────────────────── */
 
 const N_VARIANTS = 8;
 
-function makePebbleGeo(variantIdx: number): THREE.BufferGeometry {
+function makeClumpGeo(variantIdx: number): THREE.BufferGeometry {
   let s = variantIdx * 7919 + 12347;
   const rnd = () => { s = (s * 16807) % 2147483647; return s / 2147483647; };
 
-  // Start from an icosphere and flatten it strongly on Y → disk-like pebble
-  const geo = new THREE.IcosahedronGeometry(1, 1); // 20 faces
+  // 80-face icosphere → smooth surface (matching AsteroidBelt quality)
+  const geo = new THREE.IcosahedronGeometry(1, 2);
   const pos = geo.attributes.position as THREE.BufferAttribute;
 
-  const flatY  = 0.20 + rnd() * 0.25;   // 0.20 – 0.45  (very flat)
-  const gx     = 0.70 + rnd() * 0.60;   // 0.70 – 1.30
-  const gz     = 0.70 + rnd() * 0.60;
+  // Irregular chunk proportions — elongated on a random axis
+  const elongAxis = Math.floor(rnd() * 3);
+  const elong = 1.3 + rnd() * 0.7;          // 1.3 – 2.0 elongation
+  const short = 0.45 + rnd() * 0.30;        // 0.45 – 0.75 short axis
+  const mid   = 0.65 + rnd() * 0.30;        // 0.65 – 0.95 middle axis
+
+  const gx = elongAxis === 0 ? elong : elongAxis === 2 ? mid : short;
+  const gy = elongAxis === 1 ? elong : elongAxis === 0 ? mid : short;
+  const gz = elongAxis === 2 ? elong : elongAxis === 1 ? mid : short;
 
   for (let i = 0; i < pos.count; i++) {
     const d = 0.85 + rnd() * 0.30;
     pos.setXYZ(i,
       pos.getX(i) * gx * d,
-      pos.getY(i) * flatY * d,
+      pos.getY(i) * gy * d,
       pos.getZ(i) * gz * d,
     );
   }
@@ -52,12 +57,15 @@ function makePebbleGeo(variantIdx: number): THREE.BufferGeometry {
   return geo;
 }
 
-const PEBBLE_GEOS = Array.from({ length: N_VARIANTS }, (_, i) => makePebbleGeo(i));
+const CLUMP_GEOS = Array.from({ length: N_VARIANTS }, (_, i) => makeClumpGeo(i));
 
-const PEBBLE_MAT = new THREE.MeshStandardMaterial({
-  roughness: 0.85,
-  metalness: 0.12,
+const CLUMP_MAT = new THREE.MeshStandardMaterial({
+  roughness: 0.82,
+  metalness: 0.10,
 });
+
+/* ── Reusable temp objects (avoid per-frame allocation) ──── */
+const _tmpMat4 = new THREE.Matrix4();
 
 /* ── Component ────────────────────────────────────────────── */
 
@@ -76,6 +84,7 @@ interface ProtoplanetaryDiskProps {
   paused?: boolean;
   /** System prefix for scene registry keys, e.g. "vesting". When set, registers as "prefix:0x...". */
   sceneIdPrefix?: string;
+  onHoverWallet?: (info: HoveredWalletInfo | null) => void;
 }
 
 export default function ProtoplanetaryDisk({
@@ -92,6 +101,7 @@ export default function ProtoplanetaryDisk({
   interactive = true,
   paused = false,
   sceneIdPrefix,
+  onHoverWallet,
 }: ProtoplanetaryDiskProps) {
   const groupRef = useRef<THREE.Group>(null);
   const simTimeRef = useRef(0);
@@ -108,7 +118,26 @@ export default function ProtoplanetaryDisk({
     return groups;
   }, [asteroids]);
 
+  // Pre-compute orbital polar coordinates for differential rotation
+  const orbitalData = useMemo(() => {
+    return asteroids.map(a => {
+      const x = a.position[0];
+      const z = a.position[2];
+      return {
+        r: Math.sqrt(x * x + z * z),
+        baseAngle: Math.atan2(z, x),
+        y: a.position[1] * 0.10,
+      };
+    });
+  }, [asteroids]);
+
   const meshRefs = useRef<(THREE.InstancedMesh | null)[]>([]);
+
+  const selectedIndex = selectedAddress
+    ? asteroids.findIndex(
+        (a) => a.wallet.address.toLowerCase() === selectedAddress.toLowerCase(),
+      )
+    : -1;
 
   // Build instance matrices + gradient colors
   useEffect(() => {
@@ -125,23 +154,23 @@ export default function ProtoplanetaryDisk({
       globalIndices.forEach((gi, localId) => {
         const a = asteroids[gi];
 
-        // Flatten Y heavily — disk is very thin
+        // Position in disk plane (Y compressed)
         const diskX = a.position[0];
         const diskZ = a.position[2];
-        const diskY = a.position[1] * 0.10;   // compress height to ≈10%
+        const diskY = a.position[1] * 0.10;
 
-        // Disk pebbles — scale up so they're visible at belt radius
+        // Irregular clump scales — less aggressively flat than before
         const base = a.size * 8.0;
-        const sx   = base * (0.60 + a.seed * 0.80);
-        const sy   = base * (0.20 + a.hue  * 0.30);   // flat-ish
-        const sz   = base * (0.60 + a.seed * 0.70);
+        const sx   = base * (0.65 + a.seed * 0.70);
+        const sy   = base * (0.45 + a.hue  * 0.45);
+        const sz   = base * (0.65 + a.seed * 0.60);
 
-        // Rotation mostly around Y (lying flat in disk)
+        // More varied tumble rotation
         const quat = new THREE.Quaternion().setFromEuler(
           new THREE.Euler(
-            a.hue  * Math.PI * 0.3,
+            a.hue  * Math.PI * 0.5,
             a.seed * Math.PI * 4.0,
-            a.hue  * Math.PI * 0.2,
+            a.hue  * Math.PI * 0.4,
           )
         );
         mat4.compose(
@@ -186,13 +215,48 @@ export default function ProtoplanetaryDisk({
     return () => { ids.forEach(unregisterInstancedSceneObject); };
   }, [asteroids, interactive, variantGroups, sceneIdPrefix]);
 
-  /* ── Slow disk rotation ─────────────────────────────────── */
+  /* ── Differential disk rotation (Kepler-like) ────────────── */
   useFrame((_, rawDelta) => {
     const delta = Math.min(rawDelta, 1 / 30);
     if (!paused) simTimeRef.current += delta;
-    if (groupRef.current)
-      // Slightly faster than asteroid belt (more "active" accretion)
-      groupRef.current.rotation.y = 0.004 * simTimeRef.current;
+    const time = simTimeRef.current;
+
+    if (!groupRef.current) return;
+
+    // Group rotation at outer-edge base speed
+    const BASE_OMEGA = 0.006;
+    const refR = Math.max(beltOuterRadius, 1);
+    groupRef.current.rotation.y = BASE_OMEGA * time;
+
+    // Per-instance differential offset — inner particles orbit faster
+    variantGroups.forEach((globalIndices, v) => {
+      const mesh = meshRefs.current[v];
+      if (!mesh || globalIndices.length === 0) return;
+      let updated = false;
+
+      globalIndices.forEach((gi, localId) => {
+        const orb = orbitalData[gi];
+        if (!orb) return;
+
+        // ω ∝ r^(-1.5) normalised so outer edge = BASE_OMEGA
+        const omega = BASE_OMEGA * Math.pow(refR / Math.max(orb.r, refR * 0.3), 1.5);
+        const diffAngle = (omega - BASE_OMEGA) * time;
+        const angle = orb.baseAngle + diffAngle;
+
+        mesh.getMatrixAt(localId, _tmpMat4);
+        _tmpMat4.setPosition(
+          Math.cos(angle) * orb.r,
+          orb.y,
+          Math.sin(angle) * orb.r,
+        );
+        mesh.setMatrixAt(localId, _tmpMat4);
+        updated = true;
+      });
+
+      if (updated) mesh.instanceMatrix.needsUpdate = true;
+    });
+
+    // Tooltip anchor tracking removed — hover info is sent via onHoverWallet
   });
 
   /* ── Event handlers ─────────────────────────────────────── */
@@ -201,17 +265,20 @@ export default function ProtoplanetaryDisk({
       e.stopPropagation();
       const localId = e.instanceId ?? -1;
       if (localId >= 0 && localId < variantGroups[v].length) {
-        setHoveredGlobalIdx(variantGroups[v][localId]);
+        const gi = variantGroups[v][localId];
+        setHoveredGlobalIdx(gi);
+        onHoverWallet?.({ wallet: asteroids[gi].wallet, vesting: true });
         document.body.style.cursor = "pointer";
       }
     },
-    [variantGroups],
+    [variantGroups, onHoverWallet, asteroids],
   );
 
   const onPointerLeave = useCallback(() => {
     setHoveredGlobalIdx(-1);
+    onHoverWallet?.(null);
     document.body.style.cursor = "auto";
-  }, []);
+  }, [onHoverWallet]);
 
   const makeClick = useCallback(
     (v: number) => (e: ThreeEvent<MouseEvent>) => {
@@ -224,17 +291,6 @@ export default function ProtoplanetaryDisk({
     [variantGroups, asteroids, onSelectAddress],
   );
 
-  const selectedIndex = selectedAddress
-    ? asteroids.findIndex(
-        (a) => a.wallet.address.toLowerCase() === selectedAddress.toLowerCase(),
-      )
-    : -1;
-
-  const activeIndex    = selectedIndex >= 0 ? selectedIndex
-                        : interactive && hoveredGlobalIdx >= 0 && hoveredGlobalIdx < count ? hoveredGlobalIdx
-                        : -1;
-  const activeAsteroid = activeIndex >= 0 ? asteroids[activeIndex] : null;
-
   if (count === 0) return null;
 
   return (
@@ -245,7 +301,7 @@ export default function ProtoplanetaryDisk({
           <instancedMesh
             key={v}
             ref={(el) => { meshRefs.current[v] = el; }}
-            args={[PEBBLE_GEOS[v], PEBBLE_MAT, globalIndices.length]}
+            args={[CLUMP_GEOS[v], CLUMP_MAT, globalIndices.length]}
             frustumCulled={false}
             onPointerMove={interactive ? makePointerMove(v) : undefined}
             onPointerLeave={interactive ? onPointerLeave : undefined}
@@ -254,47 +310,22 @@ export default function ProtoplanetaryDisk({
         )
       ))}
 
-      {/* Tooltip for hovered / selected particle */}
-      {interactive && activeAsteroid && (
-        <Html
-          position={activeAsteroid.position}
-          zIndexRange={[7000, 0]}
-          style={{ pointerEvents: "none" }}
-        >
-          <WalletTooltip
-            wallet={activeAsteroid.wallet}
-            vesting={vesting}
-          />
-        </Html>
-      )}
-
-      {/* Selected particle label (stays when panel open) */}
-      {panelOpen && selectedIndex >= 0 && showAllNames && (
-        <Html
-          position={asteroids[selectedIndex].position}
-          zIndexRange={[7100, 0]}
-          style={{ pointerEvents: "none" }}
-        >
-          <WalletTooltip
-            wallet={asteroids[selectedIndex].wallet}
-            vesting={vesting}
-          />
-        </Html>
-      )}
+      {/* Tooltip — now in WalletInfoBanner */}
 
       {/* Persistent labels for disk particles */}
       {interactive && showAllNames && asteroids.map((a, i) => {
         if (showRenamedOnly && !a.wallet.customName) return null;
-        if (activeIndex === i) return null;
+        if (hoveredGlobalIdx === i) return null;
+        const isSelected = selectedIndex === i;
         const label = a.wallet.customName || `${a.wallet.address.slice(0, 6)}\u2026${a.wallet.address.slice(-4)}`;
         return (
           <SpriteLabel
             key={a.wallet.address}
             position={a.position as [number, number, number]}
             text={`◈ ${label}`}
-            color="#7ccedd"
-            fontSize={0.3}
-            opacity={0.7}
+            color={isSelected ? "#b0e0ff" : "#7ccedd"}
+            fontSize={isSelected ? 0.35 : 0.3}
+            opacity={isSelected ? 1.0 : 0.7}
             onClick={() => onSelectAddress(a.wallet.address)}
           />
         );

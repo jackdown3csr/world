@@ -200,7 +200,7 @@ export interface SystemHudProps {
   onToggleGnet: () => void;
   onToggleVestingClaimed: () => void;
   onJumpToStar: (starKey: string) => void;
-  onDirectorySelect: (address: string, customName?: string) => void;
+  onDirectorySelect: (address: string, customName?: string, systemId?: SceneSystemId) => void;
   onDisconnect: () => void;
   onFocusMyInstance?: (systemId: SceneSystemId) => void;
 }
@@ -349,6 +349,10 @@ export default function SystemHud({
     beltOuterRadius: 0,
   };
   const toolbarActiveSystemId = hasDetachedFocus ? null : displaySystem?.id ?? null;
+  const handleDirectoryItemSelect = React.useCallback(
+    (address: string, customName?: string) => onDirectorySelect(address, customName, displaySystem?.id),
+    [displaySystem?.id, onDirectorySelect],
+  );
   const isDirectoryDisabled = (toolbarActiveSystemId ?? activeSystemId) === "staking-remnant";
   const photoFovPresets = [35, 55, 70];
   const overviewTargetId = hasDetachedFocus ? null : (displaySystem?.id ?? activeSystemId);
@@ -1340,7 +1344,7 @@ export default function SystemHud({
                   <DirectoryPanel
                     solarData={activeData}
                     selectedAddress={selectedAddress}
-                    onSelect={onDirectorySelect}
+                    onSelect={handleDirectoryItemSelect}
                   />
                 )}
               </div>
@@ -1605,7 +1609,7 @@ export default function SystemHud({
               <DirectoryPanel
                 solarData={activeData}
                 selectedAddress={selectedAddress}
-                onSelect={onDirectorySelect}
+                onSelect={handleDirectoryItemSelect}
                 attached
               />
             )}

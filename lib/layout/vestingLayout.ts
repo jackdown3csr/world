@@ -135,11 +135,13 @@ export function buildVestingSystem(
 
   /* 5. Assemble planets — chaotic young system: wild tilts, fast orbits */
   const V_SPEED_MULT = 2.5;  // faster than mature veGNET system
+  const vTypeCounters: Record<string, number> = {};
   const planets: PlanetData[] = planetEntries.map(({ w }, i) => {
     const radius      = radiusMap.get(w.address)!;
     const orbitRadius = orbitByIdx[i];
     const orbitSpeed  = BASE_PLANET_SPEED * V_SPEED_MULT * Math.pow(V_FIRST_ORBIT / orbitRadius, 1.5);
     const pType       = typeMap.get(w.address)!;
+    const subRank     = (vTypeCounters[pType] = (vTypeCounters[pType] ?? -1) + 1);
     const moons       = buildMoonList(moonGroups.get(i) ?? [], radius, moonStats);
 
     // Chaotic tilts: ±60° (young system, not yet flattened to ecliptic)
@@ -154,6 +156,8 @@ export function buildVestingSystem(
       initialAngle: frac(w.address, 1) * Math.PI * 2,
       hue:          frac(w.address, 43),
       seed:         frac(w.address, 100),
+      variant:      frac(w.address, 138),
+      subRank,
       tilt:         tiltBase,
       moons,
       ringWallets:  [],   // no ring system in vesting

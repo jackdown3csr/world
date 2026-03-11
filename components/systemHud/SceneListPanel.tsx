@@ -116,7 +116,7 @@ export default function SceneListPanel({
 										type="button"
 										onClick={() => onSelect(item)}
 										style={rowStyle(isSelected)}
-										title={item.detail ?? item.label}
+
 									>
 										<span
 											style={{

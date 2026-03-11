@@ -15,9 +15,19 @@ function addrLabel(w: { customName?: string; address: string }) {
   return w.customName || `${w.address.slice(0, 6)}...${w.address.slice(-4)}`;
 }
 
+function vpCmp(a: { votingPower: string }, b: { votingPower: string }) {
+  const av = BigInt(a.votingPower || "0");
+  const bv = BigInt(b.votingPower || "0");
+  return bv > av ? 1 : bv < av ? -1 : 0;
+}
+
 function buildSections(solarData: SolarSystemData): SceneListSection[] {
-  const moonItems = solarData.planets.flatMap((planet) => planet.moons.map((moon) => moon.wallet));
-  const ringItems = solarData.planets.flatMap((planet) => planet.ringWallets.map((ring) => ring.wallet));
+  const moonItems = solarData.planets
+    .flatMap((planet) => planet.moons.map((moon) => moon.wallet))
+    .sort(vpCmp);
+  const ringItems = solarData.planets
+    .flatMap((planet) => planet.ringWallets.map((ring) => ring.wallet))
+    .sort(vpCmp);
 
   return [{
     key: "directory",
@@ -62,7 +72,7 @@ function buildSections(solarData: SolarSystemData): SceneListSection[] {
         key: "asteroids",
         label: "asteroids",
         count: solarData.asteroids.length,
-        items: solarData.asteroids.map((asteroid) => ({
+        items: [...solarData.asteroids].sort((a, b) => vpCmp(a.wallet, b.wallet)).map((asteroid) => ({
           id: asteroid.wallet.address,
           label: addrLabel(asteroid.wallet),
           metric: asteroid.wallet.votingPowerFormatted,

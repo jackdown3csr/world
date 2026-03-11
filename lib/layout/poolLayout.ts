@@ -32,6 +32,8 @@ export function buildPoolSystem(tokens: PoolTokenEntry[]): SolarSystemData {
       initialAngle: frac(token.address, 0) * Math.PI * 2,
       hue: frac(token.address, 42),
       seed: frac(token.address, 99),
+      variant: frac(token.address, 137),
+      subRank: -1,  // pool system: no rank-specific shaders, use parametric fallback
       tilt: (frac(token.address, 77) - 0.5) * 0.16,
       moons: [],
       ringWallets: [],

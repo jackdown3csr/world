@@ -5,6 +5,12 @@ import type { PoolTokenEntry, WalletEntry, VestingWalletEntry } from "@/lib/type
 
 export type WalletTooltipVariant = "wallet" | "vesting" | "pool";
 
+export type HoveredWalletInfo = {
+  wallet: WalletEntry;
+  variant?: WalletTooltipVariant;
+  vesting?: boolean;
+};
+
 interface WalletTooltipProps {
   wallet: WalletEntry;
   onClose?: () => void;

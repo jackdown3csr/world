@@ -318,7 +318,6 @@ export default function PhotoObjectPicker({
                   type="button"
                   onClick={() => onSelect(item)}
                   style={targetRowStyle(isSelected)}
-                  title={item.detail ?? item.label}
                 >
                   <span
                     style={{

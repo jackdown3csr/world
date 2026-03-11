@@ -11,9 +11,12 @@ import { PLANET_NOISE, MOON_SHADOW_GLSL } from "./planetNoise";
 
 const HEIGHT_FN = /* glsl */ `
   float typeHeight(vec3 p, vec3 seed3, float seed) {
-    // Irregular, turbulent — no regular banding
-    float h = fbm(p * 2.2 + seed3) * 0.06;
-    h += snoise(p * 5.0 + seed3.yzx) * 0.02;
+    // Large-scale asymmetric lumpiness — still accreting
+    float h = fbm(p * 0.8 + seed3 * 0.5) * 0.22;
+    // Mid-frequency surface undulation
+    h += fbm(p * 2.2 + seed3) * 0.10;
+    // Fine turbulent detail
+    h += snoise(p * 5.0 + seed3.yzx) * 0.04;
     return h;
   }
 `;
@@ -36,7 +39,7 @@ export const VERT = /* glsl */ `
     float h    = typeHeight(p, seed3, uSeed);
     float rad  = length(position);
 
-    vec3 displaced = position + normal * h * rad * 0.010;
+    vec3 displaced = position + normal * h * rad * 0.030;
 
     vPos       = position;
     vec4 wp    = modelMatrix * vec4(displaced, 1.0);

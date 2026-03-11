@@ -78,6 +78,7 @@ export interface StarSystemProps {
   beltTone?: "default" | "ash";
   /** System ID used to scope scene registry keys, e.g. "vescrow". */
   systemId?: string;
+  onHoverWallet?: (info: import('./WalletTooltip').HoveredWalletInfo | null) => void;
 }
 
 export default function StarSystem({
@@ -110,6 +111,7 @@ export default function StarSystem({
   showBeltLabels = true,
   beltTone = "default",
   systemId,
+  onHoverWallet,
 }: StarSystemProps) {
   const visibleCount = useProgressiveMount(solarData.planets.length);
   const overviewRadius = React.useMemo(() => {
@@ -118,7 +120,7 @@ export default function StarSystem({
       0,
     );
 
-    return Math.max(solarData.beltOuterRadius + 120, farPlanetOrbit + 140, 520);
+    return Math.max(solarData.beltOuterRadius + 120, farPlanetOrbit + 140, 260);
   }, [solarData]);
 
   // Scope a wallet address into "systemId:0xaddr" format when systemId is set.
@@ -188,7 +190,9 @@ export default function StarSystem({
               detailVariant={detailVariant}
               interactionEnabled={interactionEnabled}
               paused={paused}
+              showOrbits={showOrbits && !photoMode}
               sceneIdPrefix={systemId}
+              onHoverWallet={onHoverWallet}
             />
           </React.Fragment>
         ))}
@@ -208,6 +212,7 @@ export default function StarSystem({
             interactive={interactionEnabled}
             paused={paused}
             sceneIdPrefix={systemId}
+            onHoverWallet={onHoverWallet}
           />
         ) : (
           <AsteroidBelt
@@ -226,6 +231,7 @@ export default function StarSystem({
             showLabels={showBeltLabels}
             beltTone={beltTone}
             sceneIdPrefix={systemId}
+            onHoverWallet={onHoverWallet}
           />
         )}
       </group>

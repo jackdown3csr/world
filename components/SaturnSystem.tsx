@@ -10,15 +10,26 @@
 
 import React, { useRef, useMemo, useState, useCallback, useEffect } from "react";
 import { useFrame, useThree, type ThreeEvent } from "@react-three/fiber";
-import { Html } from "@react-three/drei";
 import SpriteLabel from "./SpriteLabel";
+import OrbitRing from "./OrbitRing";
 import * as THREE from "three";
 import { MOON_GEOS } from "@/lib/geometryPool";
 
 import type { PlanetData, MoonData, RingParticleData } from "@/lib/layout";
 import { createSaturnRingMaterial } from "@/lib/shaders/saturnRingShader";
 import { createMoonMaterial } from "@/lib/shaders/moonShader";
-import WalletTooltip from "./WalletTooltip";
+import type { MoonType } from "@/lib/shaders/moonShader";
+
+/** Subtle orbit-ring tint per moon type */
+const MOON_TYPE_ORBIT_COLORS: Record<MoonType, string> = {
+  0: "#667788",   // Luna — grey
+  1: "#7799bb",   // Europa — icy blue
+  2: "#aa8844",   // Io — sulfur warm
+  3: "#556655",   // Callisto — dark earthy
+  4: "#6688aa",   // Ganymede — blue-grey
+  5: "#aa7744",   // Titan — amber
+};
+import { type HoveredWalletInfo } from "./WalletTooltip";
 import { registerSceneObject, unregisterSceneObject, registerInstancedSceneObject, unregisterInstancedSceneObject } from "@/lib/sceneRegistry";
 
 /* ── Constants ────────────────────────────────────────────── */
@@ -78,7 +89,7 @@ function saturnRingRadius(
 
   // Moon-orbit gaps
   for (const mo of moonOrbits) {
-    const gapHW = 0.022 * span;
+    const gapHW = 0.035 * span;
     if (r > mo - gapHW && r < mo + gapHW) {
       r = r < mo ? mo - gapHW : mo + gapHW;
     }
@@ -101,8 +112,10 @@ interface SaturnSystemProps {
   showRenamedOnly?: boolean;
   interactionEnabled?: boolean;
   paused?:          boolean;
+  showOrbits?:      boolean;
   /** System prefix for scene registry keys, e.g. "vescrow". When set, registers as "prefix:0x...". */
   sceneIdPrefix?: string;
+  onHoverWallet?: (info: HoveredWalletInfo | null) => void;
 }
 
 /* ── Component ────────────────────────────────────────────── */
@@ -119,7 +132,9 @@ export default function SaturnSystem({
   showRenamedOnly,
   interactionEnabled = true,
   paused = false,
+  showOrbits = true,
   sceneIdPrefix,
+  onHoverWallet,
 }: SaturnSystemProps) {
 
   const hostR  = data.radius;
@@ -147,6 +162,9 @@ export default function SaturnSystem({
   /* ── Hover / selection state ── */
   const [hoveredRingIdx, setHoveredRingIdx]   = useState(-1);
   const [hoveredMoonIdx, setHoveredMoonIdx]   = useState(-1);
+  // Proximity-based orbit ring opacity for Saturn moons (quantised to avoid churn)
+  const [moonOrbitOpacity, setMoonOrbitOpacity] = useState(0);
+  const prevMoonOpacityBand = useRef(-1);
 
   /* ── Moon orbit radii (for gap computation) ── */
   const moonOrbits = useMemo(() => moons.map(m => m.orbitRadius), [moons]);
@@ -284,6 +302,15 @@ export default function SaturnSystem({
       mat.uniforms.uStarPos.value.copy(starWorldPos);
     });
 
+    // Proximity fade for moon orbit rings
+    const camDist = hostWorldPos.distanceTo(state.camera.position);
+    const raw = camDist < 50 ? 0.12 : camDist > 120 ? 0 : 0.12 * (1 - (camDist - 50) / 70);
+    const band = Math.round(raw * 20);
+    if (band !== prevMoonOpacityBand.current) {
+      prevMoonOpacityBand.current = band;
+      setMoonOrbitOpacity(band / 20);
+    }
+
     // Ring disc time
     ringDiscMat.uniforms.uTime.value = t;
     ringDiscMat.uniforms.uStarPos.value.copy(starWorldPos);
@@ -307,16 +334,19 @@ export default function SaturnSystem({
       e.stopPropagation();
       const localId = e.instanceId ?? -1;
       if (localId >= 0 && localId < variantGroups[v].length) {
-        setHoveredRingIdx(variantGroups[v][localId]);
+        const gi = variantGroups[v][localId];
+        setHoveredRingIdx(gi);
+        onHoverWallet?.({ wallet: ringWallets[gi].wallet });
         document.body.style.cursor = "pointer";
       }
     },
-    [variantGroups],
+    [variantGroups, onHoverWallet, ringWallets],
   );
   const onRockPointerOut = useCallback(() => {
     setHoveredRingIdx(-1);
+    onHoverWallet?.(null);
     document.body.style.cursor = "auto";
-  }, []);
+  }, [onHoverWallet]);
   const makeRockClick = useCallback(
     (v: number) => (e: ThreeEvent<MouseEvent>) => {
       e.stopPropagation();
@@ -331,10 +361,12 @@ export default function SaturnSystem({
   /* ── Moon event handlers ── */
   const onMoonEnter = useCallback((idx: number) => (e: ThreeEvent<PointerEvent>) => {
     e.stopPropagation(); setHoveredMoonIdx(idx); document.body.style.cursor = "pointer";
-  }, []);
+    onHoverWallet?.({ wallet: moons[idx].wallet });
+  }, [onHoverWallet, moons]);
   const onMoonLeave = useCallback(() => {
     setHoveredMoonIdx(-1); document.body.style.cursor = "auto";
-  }, []);
+    onHoverWallet?.(null);
+  }, [onHoverWallet]);
   const onMoonClick = useCallback((idx: number) => (e: ThreeEvent<MouseEvent>) => {
     e.stopPropagation(); onSelectAddress(moons[idx].wallet.address);
   }, [moons, onSelectAddress]);
@@ -387,6 +419,7 @@ export default function SaturnSystem({
                   ringWallets[gi].wallet.address.toLowerCase()),
               }}
               frustumCulled={false}
+              onPointerOver={interactionEnabled ? makeRockPointerMove(v) : undefined}
               onPointerMove={interactionEnabled ? makeRockPointerMove(v) : undefined}
               onPointerOut={interactionEnabled ? onRockPointerOut : undefined}
               onClick={interactionEnabled ? makeRockClick(v) : undefined}
@@ -397,21 +430,7 @@ export default function SaturnSystem({
           );
         })}
 
-        {/* Ring-particle tooltip */}
-        {interactionEnabled && hoveredRingIdx >= 0 && hoveredRingIdx < count && (
-          <Html
-            position={[
-              positions[hoveredRingIdx].x,
-              positions[hoveredRingIdx].y + 0.25,
-              positions[hoveredRingIdx].z,
-            ]}
-            center
-            zIndexRange={[10000, 0]}
-            style={{ pointerEvents: "none" }}
-          >
-            <WalletTooltip wallet={ringWallets[hoveredRingIdx].wallet} />
-          </Html>
-        )}
+        {/* Ring-particle tooltip — now in WalletInfoBanner */}
 
         {/* Ring-particle persistent labels */}
         {ringWallets.map((rp, i) => {
@@ -438,8 +457,15 @@ export default function SaturnSystem({
       </group>
 
       {/* ═══════════════  MOONS  ═══════════════════════════════ */}
-      {/* Each moon orbits in XZ plane — SAME plane as ring disc */}
-      {moons.map((moon, i) => {
+      {/* Each moon orbits in XZ plane — SAME plane as ring disc */}      {/* Moon orbit rings — proximity-faded, type-tinted */}
+      {showOrbits && moonOrbitOpacity > 0 && moons.map((moon) => (
+        <OrbitRing
+          key={`orbit-${moon.wallet.address}`}
+          radius={moon.orbitRadius}
+          color={MOON_TYPE_ORBIT_COLORS[moon.moonType]}
+          opacity={moonOrbitOpacity}
+        />
+      ))}      {moons.map((moon, i) => {
         const isMoonSelected = selectedAddress?.toLowerCase() === moon.wallet.address.toLowerCase();
         const isMoonHovered  = hoveredMoonIdx === i;
         return (
@@ -464,29 +490,16 @@ export default function SaturnSystem({
               <primitive object={moonMaterials[i]} attach="material" />
             </mesh>
 
-            {/* Moon tooltip */}
-            {((interactionEnabled && isMoonHovered) || (isMoonSelected && panelOpen)) && (
-              <Html
-                position={[moon.orbitRadius, moon.radius + 0.18, 0]}
-                center
-                zIndexRange={[10000, 0]}
-                style={{ pointerEvents: (isMoonSelected && panelOpen) ? "auto" : "none" }}
-              >
-                <WalletTooltip
-                  wallet={moon.wallet}
-                  onClose={(isMoonSelected && panelOpen) ? onDeselect : undefined}
-                />
-              </Html>
-            )}
+            {/* Moon tooltip — now in WalletInfoBanner */}
 
             {/* Moon persistent label */}
-            {showMoonLabels && (!showRenamedOnly || moon.wallet.customName) && !isMoonHovered && !(isMoonSelected && panelOpen) && (
+            {showMoonLabels && (!showRenamedOnly || moon.wallet.customName) && !isMoonHovered && (
               <SpriteLabel
                 position={[moon.orbitRadius, moon.radius + 0.15, 0]}
                 text={moon.wallet.customName || `${moon.wallet.address.slice(0, 6)}\u2026${moon.wallet.address.slice(-4)}`}
-                color="#80a8b8"
-                fontSize={0.3}
-                opacity={0.8}
+                color={isMoonSelected ? "#b0e0ff" : "#80a8b8"}
+                fontSize={isMoonSelected ? 0.35 : 0.3}
+                opacity={isMoonSelected ? 1.0 : 0.8}
                 onClick={interactionEnabled ? () => onSelectAddress(moon.wallet.address) : undefined}
               />
             )}

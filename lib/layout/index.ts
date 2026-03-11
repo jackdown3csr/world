@@ -51,20 +51,27 @@ export function buildSolarSystem(wallets: WalletEntry[], layoutMode: LayoutMode 
   const marsIdx    = planetEntries.findIndex((_, i) => planetTypeByRank(i) === "rocky");
   const orbitByIdx = computeOrbits(planetEntries, radiusMap, typeMap, saturnIdx, layoutMode);
 
-  /* 4. Moon distribution */
-  const { moonGroups, overflowBelt } = distributeMoons(moonEntries, N);
+  /* 4. Moon distribution — Saturn gets 6, others by planet type */
+  const planetAddresses = planetEntries.map(({ w }) => w.address);
+  const { moonGroups, overflowBelt } = distributeMoons(
+    moonEntries, N, saturnIdx, typeMap, planetAddresses,
+  );
   const moonStats = computeMoonVPStats(moonEntries);
 
   /* 5. Ring particles (assigned to Saturn = rank-0 planet) */
   const ringParticles = buildRingParticles(ringEntries);
 
   /* 6. Assemble planets */
+  const typeCounters: Record<string, number> = {};
   const planets: PlanetData[] = planetEntries.map(({ w }, i) => {
     const radius      = radiusMap.get(w.address)!;
     const orbitRadius = orbitByIdx[i];
     const orbitSpeed  = BASE_PLANET_SPEED * Math.pow(FIRST_ORBIT / orbitRadius, 1.5);
     const pType       = typeMap.get(w.address)!;
     const isSaturn    = i === saturnIdx;
+    const isMarsEntry = i === marsIdx;
+    // Don't count Mars toward rocky subRank (it uses its own hero shader)
+    const subRank     = isMarsEntry ? 0 : (typeCounters[pType] = (typeCounters[pType] ?? -1) + 1);
     const moons       = isSaturn
       ? buildSaturnMoonList(moonGroups.get(i) ?? [], radius, moonStats)
       : buildMoonList(moonGroups.get(i) ?? [], radius, moonStats);
@@ -78,17 +85,20 @@ export function buildSolarSystem(wallets: WalletEntry[], layoutMode: LayoutMode 
       initialAngle: frac(w.address, 0) * Math.PI * 2,
       hue:          frac(w.address, 42),
       seed:         frac(w.address, 99),
+      variant:      frac(w.address, 137),
+      subRank,
       // Mars gets a 25.2° tilt (like real Mars); others use address-derived tilt
       tilt:         i === marsIdx ? 0.44 : (frac(w.address, 77) - 0.5) * 0.28,
       moons,
       ringWallets:  i === saturnIdx ? ringParticles : [],
       vpRank:       i + 1,
-      isMars:       i === marsIdx,
+      isMars:       isMarsEntry,
     };
   });
 
   /* 7. Asteroid belt */
-  const asteroidWallets = [...beltEntries.map(e => e.w), ...overflowBelt];
+  const asteroidWallets = [...beltEntries.map(e => e.w), ...overflowBelt]
+    .sort((a, b) => weiToFloat(b.votingPower) - weiToFloat(a.votingPower));
   const maxOrbit        = N > 0 ? Math.max(...planets.map(p => p.orbitRadius)) : FIRST_ORBIT;
   const beltInnerRadius = maxOrbit + BELT_GAP;
   const beltOuterRadius = beltInnerRadius + BELT_WIDTH;
