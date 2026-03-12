@@ -23,15 +23,15 @@ const PALETTE = {
     glow:    new THREE.Color("#50f0ff"),
   },
   generic: {
-    arc:     new THREE.Color("#2060a0"),   // brighter: was #1a4060
-    packets: new THREE.Color("#2080a0"),
-    glow:    new THREE.Color("#2090b0"),
+    arc:     new THREE.Color("#3898d0"),
+    packets: new THREE.Color("#40a8e0"),
+    glow:    new THREE.Color("#50b8f0"),
   },
 };
 
 const PACKET_COUNT   = 1;
-const TRAIL_SEGS     = 24;               // was 12 — more samples → smoother dots
-const TRAIL_LENGTH   = 0.36;            // was 0.20 — longer wake
+const TRAIL_SEGS     = 48;
+const TRAIL_LENGTH   = 0.72;
 const FALLBACK_RING_INNER = 280;
 const FALLBACK_RING_OUTER = 540;
 const FALLBACK_Y_SPREAD = 180;
@@ -142,12 +142,13 @@ function buildControl(from: THREE.Vector3, to: THREE.Vector3): THREE.Vector3 {
  */
 const TRAIL_VERT = /* glsl */ `
   attribute float aT;
+  uniform float uDistScale;
   varying float vT;
   void main() {
     vT = aT;
     vec4 mv = modelViewMatrix * vec4(position, 1.0);
     float dist = max(-mv.z, 1.0);
-    gl_PointSize = clamp((2.5 + aT * 14.0) * 220.0 / dist, 1.0, 22.0);
+    gl_PointSize = clamp((2.5 + aT * 14.0) * uDistScale / dist, 2.5, 48.0);
     gl_Position  = projectionMatrix * mv;
   }
 `;
@@ -183,11 +184,14 @@ export default function TransactionFlow({ effect }: TransactionFlowProps) {
   const isVestingClaim = effect.classification === "vesting-claim";
 
   const packetOffsets = useMemo(() => [0], []);
+  const isLongRange = effect.fromSystemId !== effect.toSystemId;
+  const longScale = isLongRange ? 5.0 : 1;
+  const trailDistScale = isLongRange ? 900 : 220;
   const packetSize: [number, number, number] = isVestingClaim
     ? [8.2, 2.2, 2.2]
     : effect.paletteHint === "ecosystem"
-      ? [10.5, 2.8, 2.8]
-      : [7.2, 2.2, 2.2];
+      ? [10.5 * longScale, 2.8 * longScale, 2.8 * longScale]
+      : [7.2 * longScale, 2.2 * longScale, 2.2 * longScale];
   const glowSize: [number, number, number] = [
     packetSize[0] * 1.32,
     packetSize[1] * 1.7,
@@ -207,8 +211,9 @@ export default function TransactionFlow({ effect }: TransactionFlowProps) {
       vertexShader:   TRAIL_VERT,
       fragmentShader: TRAIL_FRAG,
       uniforms: {
-        uColor: { value: palette.arc.clone() },
-        uAlpha: { value: 0 },
+        uColor:     { value: palette.arc.clone() },
+        uAlpha:     { value: 0 },
+        uDistScale: { value: trailDistScale },
       },
       transparent: true,
       depthWrite:  false,
@@ -298,7 +303,7 @@ export default function TransactionFlow({ effect }: TransactionFlowProps) {
         posAttr.needsUpdate = true;
         trailMat.uniforms.uAlpha.value =
           alpha * Math.sin(tVal * Math.PI) *
-          (isVestingClaim ? 0.60 : effect.paletteHint === "ecosystem" ? 0.88 : 0.60);
+          (isVestingClaim ? 0.60 : effect.paletteHint === "ecosystem" ? 0.88 : 0.78);
       }
 
       const edgeAlpha  = Math.sin(tVal * Math.PI);
@@ -307,7 +312,7 @@ export default function TransactionFlow({ effect }: TransactionFlowProps) {
           ? 0.42
           : effect.paletteHint === "ecosystem"
             ? 0.68
-            : 0.4);
+            : 0.58);
 
       (mesh.material as THREE.MeshBasicMaterial).opacity = packetAlpha;
       (glow.material as THREE.MeshBasicMaterial).opacity = packetAlpha * (isVestingClaim ? 0.08 : 0.12);

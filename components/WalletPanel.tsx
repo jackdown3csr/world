@@ -142,7 +142,6 @@ export default function WalletPanel({
         </span>
         <button
           onClick={onDisconnect}
-          title="Disconnect"
           style={{
             background: "none",
             border: "none",
@@ -239,7 +238,6 @@ export default function WalletPanel({
               <button
                 onClick={onSaveName}
                 disabled={!canSave}
-                title="Confirm"
                 style={{
                   flexShrink: 0,
                   border: canSave

@@ -24,7 +24,7 @@ interface TrafficPanelProps {
   collapsed?: boolean;
   rxLed?: boolean;
   ecoLed?: boolean;
-  onSelect?: (address: string) => void;
+  onReplay?: (eventId: string) => void;
   onToggleCollapsed?: () => void;
 }
 
@@ -126,7 +126,7 @@ export default function TrafficPanel({
   collapsed = false,
   rxLed = false,
   ecoLed = false,
-  onSelect,
+  onReplay,
   onToggleCollapsed,
 }: TrafficPanelProps) {
   const [showAll, setShowAll] = React.useState(false);
@@ -196,7 +196,6 @@ export default function TrafficPanel({
             type="button"
             onClick={onToggleCollapsed}
             style={headerButtonStyle()}
-            title={collapsed ? "Expand traffic panel" : "Collapse traffic panel"}
           >
             {collapsed ? ">" : "-"}
           </button>
@@ -213,14 +212,13 @@ export default function TrafficPanel({
           listening for new block transactions...
         </div>
       ) : !collapsed ? visibleItems.map((item) => {
-        const clickable = Boolean(item.selectableAddress && onSelect);
+        const clickable = Boolean(onReplay);
         return (
           <button
             key={item.id}
             type="button"
-            onClick={clickable ? () => onSelect?.(item.selectableAddress as string) : undefined}
+            onClick={clickable ? () => onReplay?.(item.id) : undefined}
             style={rowStyle(clickable)}
-            title={item.txHash}
           >
             <div style={{ display: "flex", alignItems: "center", gap: 8, minWidth: 0 }}>
               <span style={{

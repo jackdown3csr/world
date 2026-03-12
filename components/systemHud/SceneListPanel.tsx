@@ -9,6 +9,10 @@ export interface SceneListItem {
 	accent?: string;
 	dotColor?: string;
 	detail?: string;
+	/** Rank movement badge: e.g. "▲3", "▼2", "NEW" */
+	badge?: string;
+	/** Color for the badge text */
+	badgeColor?: string;
 }
 
 export interface SceneListGroup {
@@ -140,6 +144,19 @@ export default function SceneListPanel({
 										>
 											{item.label}
 										</span>
+										{item.badge ? (
+											<span
+												style={{
+													color: item.badgeColor ?? "#7ae4f2",
+													fontSize: 8,
+													fontWeight: 700,
+													flexShrink: 0,
+													letterSpacing: "0.06em",
+												}}
+											>
+												{item.badge}
+											</span>
+										) : null}
 										{item.metric ? (
 											<span
 												style={{

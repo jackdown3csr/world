@@ -45,7 +45,7 @@ function Metric({ label, value, color }: { label: string; value: string; color: 
  * Fixed bottom-left HUD banner shown while hovering a wallet body.
  * Fades in/out smoothly. Always mounted; opacity driven by 'info' presence.
  */
-export default function WalletInfoBanner({ info }: { info: HoveredWalletInfo | null }) {
+export default function WalletInfoBanner({ info, pinned, onClose }: { info: HoveredWalletInfo | null; pinned?: boolean; onClose?: () => void }) {
   // Keep the last known info so content stays visible during fade-out
   const lastInfo = useRef<HoveredWalletInfo | null>(null);
   if (info) lastInfo.current = info;
@@ -73,18 +73,18 @@ export default function WalletInfoBanner({ info }: { info: HoveredWalletInfo | n
         left: 16,
         bottom: 16,
         zIndex: 2000,
-        pointerEvents: "none",
+        pointerEvents: onClose ? "auto" : "none",
         display: "flex",
         alignItems: "stretch",
         background: "rgba(2, 6, 14, 0.78)",
-        border: "1px solid rgba(0, 229, 255, 0.10)",
-        borderLeft: "2px solid rgba(0, 229, 255, 0.32)",
+        border: pinned ? "1px solid rgba(0, 229, 255, 0.22)" : "1px solid rgba(0, 229, 255, 0.10)",
+        borderLeft: pinned ? "2px solid rgba(0, 229, 255, 0.65)" : "2px solid rgba(0, 229, 255, 0.32)",
         boxShadow: "0 2px 16px rgba(0,0,0,0.40)",
         fontFamily: "'JetBrains Mono', 'SF Mono', 'Fira Code', Menlo, monospace",
         userSelect: "none",
         opacity: info ? 1 : 0,
         transform: info ? "translateY(0)" : "translateY(5px)",
-        transition: "opacity 0.18s ease, transform 0.18s ease",
+        transition: "opacity 0.18s ease, transform 0.18s ease, border-color 0.18s ease",
       }}
     >
       {/* Name / address block */}
@@ -98,15 +98,7 @@ export default function WalletInfoBanner({ info }: { info: HoveredWalletInfo | n
           gap: 2,
         }}
       >
-        <div
-          style={{
-            color: "#aabccc",
-            fontWeight: 600,
-            fontSize: 11,
-            letterSpacing: "0.03em",
-            lineHeight: 1,
-          }}
-        >
+        <div style={{ color: "#aabccc", fontWeight: 600, fontSize: 11, letterSpacing: "0.03em", lineHeight: 1 }}>
           {wallet.customName || short}
         </div>
         {wallet.customName && (
@@ -133,6 +125,28 @@ export default function WalletInfoBanner({ info }: { info: HoveredWalletInfo | n
           <Metric label="locked" value={wallet.lockedFormatted}       color="#c0a050" />
           <Metric label="unlock" value={lockEndStr}                   color="#7a9ab0" />
         </>
+      )}
+
+      {/* Close button — only when pinned */}
+      {onClose && (
+        <button
+          onClick={onClose}
+          style={{
+            background: "none",
+            border: "none",
+            borderLeft: "1px solid rgba(0,229,255,0.06)",
+            color: "#2e4a5c",
+            cursor: "pointer",
+            fontSize: 14,
+            padding: "0 10px",
+            fontFamily: "inherit",
+            transition: "color 0.15s",
+          }}
+          onMouseEnter={(e) => (e.currentTarget.style.color = "#00e5ff")}
+          onMouseLeave={(e) => (e.currentTarget.style.color = "#2e4a5c")}
+        >
+          ×
+        </button>
       )}
     </div>
   );

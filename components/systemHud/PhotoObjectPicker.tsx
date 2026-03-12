@@ -234,7 +234,6 @@ export default function PhotoObjectPicker({
             type="button"
             onClick={() => setView(getPreviousView(view))}
             style={backButtonStyle}
-            title="Go back"
           >
             back
           </button>

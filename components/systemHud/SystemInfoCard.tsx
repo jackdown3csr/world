@@ -2,6 +2,8 @@ import React from "react";
 import type { BlockInfo } from "@/hooks/useBlock";
 import type { SceneSystemDefinition } from "@/lib/sceneSystems";
 import type { PanelSwapState } from "@/hooks/usePanelSwap";
+import type { SystemMovementSummary } from "@/lib/rankSnapshot";
+import { formatSnapshotAge } from "@/lib/rankSnapshot";
 
 interface SystemInfoCardProps {
   activeMode: "overview" | "info";
@@ -13,6 +15,7 @@ interface SystemInfoCardProps {
   panelAnimationState: PanelSwapState;
   system: SceneSystemDefinition | null;
   blockInfo: BlockInfo | null;
+  movement: SystemMovementSummary | null;
 }
 
 export default function SystemInfoCard({
@@ -25,6 +28,7 @@ export default function SystemInfoCard({
   panelAnimationState,
   system,
   blockInfo,
+  movement,
 }: SystemInfoCardProps) {
   return (
     <div style={{
@@ -117,6 +121,48 @@ export default function SystemInfoCard({
           ) : null}
         </div>
 
+        {movement && movement.hasSnapshot && (
+          <div style={{ display: "flex", flexWrap: "wrap", alignItems: "center", gap: 6, marginBottom: activeMode === "info" ? 10 : 0 }}>
+            <span style={{ color: "#5d7788", fontSize: 8, letterSpacing: "0.14em", textTransform: "uppercase" }}>movement</span>
+            {movement.movedUp > 0 && (
+              <span style={movementBadgeStyle("#2a5a3a", "rgba(110,247,167,0.18)", "#6ef7a7")}>
+                {movement.movedUp}▲
+              </span>
+            )}
+            {movement.movedDown > 0 && (
+              <span style={movementBadgeStyle("#5a2a2a", "rgba(255,120,100,0.14)", "#ff8a78")}>
+                {movement.movedDown}▼
+              </span>
+            )}
+            {movement.newWallets > 0 && (
+              <span style={movementBadgeStyle("#2a4a5a", "rgba(0,229,255,0.12)", "#7ae4f2")}>
+                {movement.newWallets} new
+              </span>
+            )}
+            {movement.tierPromotions > 0 && (
+              <span style={movementBadgeStyle("#2a5a3a", "rgba(110,247,167,0.12)", "#6ef7a7")}>
+                {movement.tierPromotions} promoted
+              </span>
+            )}
+            {movement.movedUp === 0 && movement.movedDown === 0 && movement.newWallets === 0 && movement.tierPromotions === 0 && (
+              <span style={movementBadgeStyle("#1e2e38", "rgba(60,90,108,0.12)", "#3c5a6c")}>
+                stable
+              </span>
+            )}
+            <span style={{ color: "#4a6878", fontSize: 8, letterSpacing: "0.1em" }}>
+              · {formatSnapshotAge(movement.snapshotAge)}
+            </span>
+          </div>
+        )}
+
+        {movement && !movement.hasSnapshot && (
+          <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: activeMode === "info" ? 10 : 0 }}>
+            <span style={movementBadgeStyle("#2a3a4a", "rgba(114,160,184,0.12)", "#8ab0c8")}>
+              first scan
+            </span>
+          </div>
+        )}
+
         {activeMode === "info" && (
           <>
             <div style={{ height: 1, background: "rgba(255,255,255,0.06)", marginBottom: 10 }} />
@@ -156,3 +202,20 @@ const contextChipValueStyle: React.CSSProperties = {
   color: "#d9ecf6",
   fontSize: 10,
 };
+
+function movementBadgeStyle(borderColor: string, bg: string, color: string): React.CSSProperties {
+  return {
+    display: "inline-flex",
+    alignItems: "center",
+    height: 16,
+    padding: "0 6px",
+    borderRadius: 999,
+    border: `1px solid ${borderColor}`,
+    background: bg,
+    color,
+    fontSize: 8,
+    fontWeight: 700,
+    letterSpacing: "0.12em",
+    textTransform: "uppercase",
+  };
+}

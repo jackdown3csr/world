@@ -2,6 +2,7 @@
 
 import React from "react";
 import type { SolarSystemData } from "@/lib/layout";
+import type { SystemMovementSummary } from "@/lib/rankSnapshot";
 import SceneListPanel, { type SceneListSection } from "./systemHud/SceneListPanel";
 
 interface DirectoryPanelProps {
@@ -9,6 +10,7 @@ interface DirectoryPanelProps {
   selectedAddress: string | null;
   onSelect: (address: string, customName?: string) => void;
   attached?: boolean;
+  movement?: SystemMovementSummary | null;
 }
 
 function addrLabel(w: { customName?: string; address: string }) {
@@ -21,13 +23,25 @@ function vpCmp(a: { votingPower: string }, b: { votingPower: string }) {
   return bv > av ? 1 : bv < av ? -1 : 0;
 }
 
-function buildSections(solarData: SolarSystemData): SceneListSection[] {
+function buildSections(solarData: SolarSystemData, movement?: SystemMovementSummary | null): SceneListSection[] {
   const moonItems = solarData.planets
     .flatMap((planet) => planet.moons.map((moon) => moon.wallet))
     .sort(vpCmp);
   const ringItems = solarData.planets
     .flatMap((planet) => planet.ringWallets.map((ring) => ring.wallet))
     .sort(vpCmp);
+
+  function badgeFor(address: string): { badge?: string; badgeColor?: string } {
+    if (!movement?.hasSnapshot) return {};
+    const delta = movement.deltas.get(address.toLowerCase());
+    if (!delta) return {};
+    if (delta.isNew) return { badge: "NEW", badgeColor: "#7ae4f2" };
+    if (delta.tierChange === "promoted") return { badge: `▲${delta.rankDelta}`, badgeColor: "#6ef7a7" };
+    if (delta.tierChange === "demoted") return { badge: `▼${-delta.rankDelta}`, badgeColor: "#ff8a78" };
+    if (delta.rankDelta > 0) return { badge: `▲${delta.rankDelta}`, badgeColor: "#6ef7a7" };
+    if (delta.rankDelta < 0) return { badge: `▼${-delta.rankDelta}`, badgeColor: "#ff8a78" };
+    return {};
+  }
 
   return [{
     key: "directory",
@@ -42,6 +56,7 @@ function buildSections(solarData: SolarSystemData): SceneListSection[] {
           metric: planet.wallet.votingPowerFormatted,
           dotColor: `hsl(${planet.hue * 360}, 45%, 50%)`,
           detail: planet.wallet.address,
+          ...badgeFor(planet.wallet.address),
         })),
       },
       {
@@ -54,6 +69,7 @@ function buildSections(solarData: SolarSystemData): SceneListSection[] {
           metric: moon.votingPowerFormatted,
           dotColor: "rgba(148,190,210,0.75)",
           detail: moon.address,
+          ...badgeFor(moon.address),
         })),
       },
       ...(ringItems.length > 0 ? [{
@@ -66,6 +82,7 @@ function buildSections(solarData: SolarSystemData): SceneListSection[] {
           metric: ring.votingPowerFormatted,
           dotColor: "rgba(176,176,176,0.72)",
           detail: ring.address,
+          ...badgeFor(ring.address),
         })),
       }] : []),
       ...(solarData.asteroids.length > 0 ? [{
@@ -78,6 +95,7 @@ function buildSections(solarData: SolarSystemData): SceneListSection[] {
           metric: asteroid.wallet.votingPowerFormatted,
           dotColor: "rgba(138,138,138,0.72)",
           detail: asteroid.wallet.address,
+          ...badgeFor(asteroid.wallet.address),
         })),
       }] : []),
     ],
@@ -89,8 +107,9 @@ export default function DirectoryPanel({
   selectedAddress,
   onSelect,
   attached = false,
+  movement,
 }: DirectoryPanelProps) {
-  const sections = React.useMemo(() => buildSections(solarData), [solarData]);
+  const sections = React.useMemo(() => buildSections(solarData, movement), [solarData, movement]);
 
   return (
     <SceneListPanel

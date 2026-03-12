@@ -13,6 +13,7 @@ import type { LayoutMode } from "@/lib/layout";
 import type { VestingLayoutMode } from "@/lib/layout";
 import type { BlockInfo } from "@/hooks/useBlock";
 import type { SceneSystemDefinition, SceneSystemId } from "@/lib/sceneSystems";
+import type { SystemMovementSummary } from "@/lib/rankSnapshot";
 import type { BridgeSceneObject } from "@/lib/bridges";
 import type { TransitBeaconSceneObject } from "@/lib/transitBeacon";
 import { usePanelSwap } from "@/hooks/usePanelSwap";
@@ -189,7 +190,7 @@ export interface SystemHudProps {
   onToggleOrbits: () => void;
   onToggleTraffic: () => void;
   onToggleTrafficPanel: () => void;
-  onTrafficSelect: (address: string) => void;
+  onTrafficReplay: (eventId: string) => void;
   onToggleFlightHud: () => void;
   onReset: () => void;
   onToggleFlyMode: () => void;
@@ -203,6 +204,7 @@ export interface SystemHudProps {
   onDirectorySelect: (address: string, customName?: string, systemId?: SceneSystemId) => void;
   onDisconnect: () => void;
   onFocusMyInstance?: (systemId: SceneSystemId) => void;
+  rankMovement?: Map<SceneSystemId, SystemMovementSummary>;
 }
 
 export default function SystemHud({
@@ -262,7 +264,7 @@ export default function SystemHud({
   onToggleOrbits,
   onToggleTraffic,
   onToggleTrafficPanel,
-  onTrafficSelect,
+  onTrafficReplay,
   onToggleFlightHud,
   onReset,
   onToggleFlyMode,
@@ -276,6 +278,7 @@ export default function SystemHud({
   onDirectorySelect,
   onDisconnect,
   onFocusMyInstance,
+  rankMovement,
 }: SystemHudProps) {
   const PANEL_SWAP_MS = 320;
   const OVERVIEW_FADE_MS = 760;
@@ -1022,13 +1025,12 @@ export default function SystemHud({
               </div>
               <TopStrip left={0} right={0} top={0} zIndex={35} nowrap>
                 <TopStripGroup padding="0 2px 0 0">
-                  <TopStripChip label={photoTargetLabel ?? "no target"} active={Boolean(photoTargetLabel)} accent="#9cc9d8" title={photoTargetLabel ?? "No focused object"} />
-                  <TopStripChip label="targets" active={photoPickerOpen} onClick={handlePhotoPickerToggle} title={`Open object picker (${photoShortcutMap.targets})`} />
+                  <TopStripChip label={photoTargetLabel ?? "no target"} active={Boolean(photoTargetLabel)} accent="#9cc9d8" />
+                  <TopStripChip label="targets" active={photoPickerOpen} onClick={handlePhotoPickerToggle} />
                   <TopStripChip
                     label={photoFocusMode === "detached" ? "free cam" : "locked"}
                     active={photoFocusMode === "detached"}
                     onClick={photoFocusMode === "detached" ? onPhotoRefocus : onPhotoDetach}
-                    title={photoFocusMode === "detached" ? "Lock camera back to target" : `Free cam — WASD/QE rotate · HJNLIK move · Shift/Ctrl zoom · drag to look (${photoShortcutMap.detach})`}
                   />
                 </TopStripGroup>
                 <TopStripDivider />
@@ -1044,7 +1046,6 @@ export default function SystemHud({
                       label={`${preset}°`}
                       active={photoFov === preset}
                       onClick={() => onSetPhotoFov(preset)}
-                      title={`Field of view: ${preset}°`}
                     />
                   ))}
                 </TopStripGroup>
@@ -1054,31 +1055,20 @@ export default function SystemHud({
                     label={photoSimulationMode === "frozen" ? "frozen" : "freeze"}
                     active={photoSimulationMode === "frozen"}
                     onClick={() => onSetPhotoSimulationMode(photoSimulationMode === "live" ? "frozen" : "live")}
-                    title="Toggle scene simulation freeze"
                   />
                 </TopStripGroup>
                 <TopStripDivider />
                 <TopStripGroup>
-                  <TopStripChip
-                    label="labels"
-                    active={showAllNames}
-                    onClick={onToggleLabels}
-                    title="Toggle all labels"
-                  />
-                  <TopStripChip
-                    label="named"
-                    active={showRenamedOnly}
-                    onClick={onToggleRenamed}
-                    title="Toggle named-only labels"
-                  />
+                  <TopStripChip label="labels" active={showAllNames} onClick={onToggleLabels} />
+                  <TopStripChip label="named" active={showRenamedOnly} onClick={onToggleRenamed} />
                 </TopStripGroup>
                 <TopStripDivider />
                 <TopStripGroup padding="0 0 0 2px">
-                  <TopStripChip label="bug" active={showBugReport} onClick={handleBugToggle} accent="#ffbf8f" title="Open bug report" />
+                  <TopStripChip label="bug" active={showBugReport} onClick={handleBugToggle} accent="#ffbf8f" />
                 </TopStripGroup>
                 <TopStripDivider />
                 <TopStripGroup padding="0 0 0 2px">
-                  <TopStripChip label="exit" onClick={onExitPhotoMode} accent="#7ae4f2" title={`Exit photo mode (${photoShortcutMap.exit})`} />
+                  <TopStripChip label="exit" onClick={onExitPhotoMode} accent="#7ae4f2" />
                 </TopStripGroup>
               </TopStrip>
               {isMobile ? (
@@ -1135,7 +1125,6 @@ export default function SystemHud({
           {!photoHudVisible && (
             <button
               onClick={onTogglePhotoHud}
-              title={`Show HUD (${photoShortcutMap.hud})`}
               style={{
                 position: "fixed",
                 top: 8,
@@ -1249,7 +1238,6 @@ export default function SystemHud({
                 onClick={handleListToggle}
                 disabled={isDirectoryDisabled}
                 accent="#9cc9d8"
-                title={isDirectoryDisabled ? "Directory unavailable in staking system" : "Open directory"}
                 noTooltip
               />
             </div>
@@ -1335,7 +1323,7 @@ export default function SystemHud({
                     collapsed={!trafficPanelOpen}
                     rxLed={rxLed}
                     ecoLed={ecoLed}
-                    onSelect={onTrafficSelect}
+                    onReplay={onTrafficReplay}
                     onToggleCollapsed={onToggleTrafficPanel}
                   />
                 )}
@@ -1345,6 +1333,7 @@ export default function SystemHud({
                     solarData={activeData}
                     selectedAddress={selectedAddress}
                     onSelect={handleDirectoryItemSelect}
+                    movement={displaySystem ? rankMovement?.get(displaySystem.id) ?? null : null}
                   />
                 )}
               </div>
@@ -1361,15 +1350,15 @@ export default function SystemHud({
           {flyModeEnabled ? (
             <TopStrip left={0} right={0} top={0} zIndex={21} nowrap>
               <TopStripGroup gap={4}>
-                <HudBtn compact strip active={flyPickerOpen} onClick={handleFlyPickerToggle} label="list" title="Open flight target list" />
+                <HudBtn compact strip active={flyPickerOpen} onClick={handleFlyPickerToggle} label="list" />
               </TopStripGroup>
 
               <TopStripDivider />
 
               <TopStripGroup gap={4} padding="0 2px">
-                <HudBtn compact strip active={Boolean(flyTargetLabel)} disabled={!flyTargetLabel} label={flyTargetLabel ?? "no target"} title={flyTargetLabel ?? "No flight target selected"} />
-                <HudBtn compact strip active={Boolean(flyTargetLabel) || flyAutopilotActive} onClick={onFlyToTarget} disabled={!flyTargetLabel && !flyAutopilotActive} label={flyAutopilotActive ? "cancel" : "fly to"} title={flyAutopilotActive ? "Cancel auto flight" : "Fly toward selected target"} />
-                <HudBtn compact strip active={showFlightHud} onClick={onToggleFlightHud} label={showFlightHud ? "hide hud" : "show hud"} title="Toggle flight HUD" />
+                <HudBtn compact strip active={Boolean(flyTargetLabel)} disabled={!flyTargetLabel} label={flyTargetLabel ?? "no target"} />
+                <HudBtn compact strip active={Boolean(flyTargetLabel) || flyAutopilotActive} onClick={onFlyToTarget} disabled={!flyTargetLabel && !flyAutopilotActive} label={flyAutopilotActive ? "cancel" : "fly to"} />
+                <HudBtn compact strip active={showFlightHud} onClick={onToggleFlightHud} label={showFlightHud ? "hide hud" : "show hud"} />
               </TopStripGroup>
 
               <TopStripDivider />
@@ -1390,7 +1379,7 @@ export default function SystemHud({
               <TopStripDivider />
 
               <TopStripGroup padding="0 0 0 2px">
-                <HudBtn compact strip active={false} onClick={onToggleFlyMode} label="exit flight" title="Exit flight mode" />
+                <HudBtn compact strip active={false} onClick={onToggleFlyMode} label="exit flight" />
               </TopStripGroup>
             </TopStrip>
           ) : (
@@ -1407,14 +1396,13 @@ export default function SystemHud({
                   />
                 ))}
                 <TopStripDivider />
-                <TopStripChip label="info" active={infoChipActive} onClick={handleInfoToggle} accent="#9cc9d8" title="Open system panel" />
+                <TopStripChip label="info" active={infoChipActive} onClick={handleInfoToggle} accent="#9cc9d8" />
                 <TopStripChip
                   label="list"
                   active={showNamesList}
                   onClick={handleListToggle}
                   disabled={isDirectoryDisabled}
                   accent="#9cc9d8"
-                  title={isDirectoryDisabled ? "Directory unavailable in staking system" : "Open directory"}
                 />
               </TopStripGroup>
 
@@ -1424,12 +1412,12 @@ export default function SystemHud({
 
               {!wc.connectedAddress ? (
                 <TopStripGroup padding="0 0 0 2px">
-                  <TopStripChip label="connect wallet" onClick={wc.connectWallet} accent="#00e5ff" title="Connect wallet" />
+                  <TopStripChip label="connect wallet" onClick={wc.connectWallet} accent="#00e5ff" />
                 </TopStripGroup>
               ) : (
                 <TopStripGroup padding="0 0 0 2px">
-                  <TopStripChip label="wallet" active accent="#6ef7a7" title="Connected wallet" />
-                  {connectedLabel && <TopStripChip label={connectedLabel} active accent="#6ef7a7" title={wc.connectedAddress ?? undefined} />}
+                  <TopStripChip label="wallet" active accent="#6ef7a7" />
+                  {connectedLabel && <TopStripChip label={connectedLabel} active accent="#6ef7a7" />}
                   {myInstances.map((system) => (
                     <TopStripChip
                       key={system.id}
@@ -1437,7 +1425,6 @@ export default function SystemHud({
                       active={system.id === toolbarActiveSystemId}
                       onClick={() => onFocusMyInstance?.(system.id)}
                       accent={system.accent}
-                      title={`Jump to your ${system.label} object`}
                     />
                   ))}
                   {wc.canRename && (
@@ -1459,7 +1446,6 @@ export default function SystemHud({
                         maxLength={32}
                         placeholder={wc.myWallet?.customName || "designation"}
                         disabled={wc.isSaving}
-                        title="Rename connected wallet"
                         style={{
                         width: 140,
                         minWidth: 0,
@@ -1479,7 +1465,6 @@ export default function SystemHud({
                       type="button"
                       onClick={() => wc.savePlanetName()}
                       disabled={wc.isSaving || !wc.nameInput.trim()}
-                      title="Save designation"
                       style={{
                         height: 24,
                         minWidth: 24,
@@ -1508,10 +1493,9 @@ export default function SystemHud({
                     label={wc.status.includes("saved") ? "saved" : "wallet"}
                     active={wc.status.includes("saved")}
                     accent={wc.status.includes("saved") ? "#6ef7a7" : "#88a8b8"}
-                    title={wc.status}
                   />
                 )}
-                <TopStripChip label="off" onClick={onDisconnect} accent="#88a8b8" title="Disconnect wallet" />
+                <TopStripChip label="off" onClick={onDisconnect} accent="#88a8b8" />
               </TopStripGroup>
             )}
           </TopStrip>
@@ -1550,7 +1534,7 @@ export default function SystemHud({
                 collapsed={!trafficPanelOpen}
                 rxLed={rxLed}
                 ecoLed={ecoLed}
-                onSelect={onTrafficSelect}
+                onReplay={onTrafficReplay}
                 onToggleCollapsed={onToggleTrafficPanel}
               />
             </div>
@@ -1602,6 +1586,7 @@ export default function SystemHud({
                 panelAnimationState={panelAnimationState}
                 system={panelSystem}
                 blockInfo={blockInfo}
+                movement={panelSystem ? rankMovement?.get(panelSystem.id) ?? null : null}
               />
             )}
 
@@ -1611,6 +1596,7 @@ export default function SystemHud({
                 selectedAddress={selectedAddress}
                 onSelect={handleDirectoryItemSelect}
                 attached
+                movement={displaySystem ? rankMovement?.get(displaySystem.id) ?? null : null}
               />
             )}
             {showBugReport && (

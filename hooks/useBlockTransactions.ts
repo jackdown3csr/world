@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { mapEventsToSceneEffects } from "@/lib/blockExplorer/mapEventsToSceneEffects";
-import type { AddressSystemMap } from "@/lib/blockExplorer/mapEventsToSceneEffects";
+import type { AddressSystemMap, AddressMultiSystemMap } from "@/lib/blockExplorer/mapEventsToSceneEffects";
 import type { BlockExplorerEvent } from "@/lib/blockExplorer/types";
 import type { TransactionFlowEffect } from "@/lib/blockExplorer/types";
 import type { BlockExplorerApiResponse } from "@/lib/blockExplorer/types";
@@ -40,6 +40,7 @@ export function useBlockTransactions(
   blockNumber: number | null | undefined,
   enabled: boolean,
   addressSystemMap?: AddressSystemMap,
+  addressMultiSystemMap?: AddressMultiSystemMap,
 ): BlockTransactionFeed & BlockTransactionLeds {
   const [effects, setEffects] = useState<TransactionFlowEffect[]>([]);
   const [recentEvents, setRecentEvents] = useState<BlockExplorerEvent[]>([]);
@@ -92,7 +93,7 @@ export function useBlockTransactions(
           if (!res.ok || controller.signal.aborted) return;
 
           const data: BlockExplorerApiResponse = await res.json();
-          const newEffects = mapEventsToSceneEffects(data.events, EFFECT_DURATION_MS, addressSystemMap);
+          const newEffects = mapEventsToSceneEffects(data.events, EFFECT_DURATION_MS, addressSystemMap, addressMultiSystemMap);
 
           setEffects((prev) => {
             const existingIds = new Set(prev.map((e) => e.id));
@@ -127,7 +128,7 @@ export function useBlockTransactions(
     })();
 
     return () => controller.abort();
-  }, [addressSystemMap, blockNumber, enabled]);
+  }, [addressSystemMap, addressMultiSystemMap, blockNumber, enabled]);
 
   // Prune expired effects on an interval
   useEffect(() => {

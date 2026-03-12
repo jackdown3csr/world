@@ -19,6 +19,7 @@ import {
 import type { BlockExplorerEvent, SceneAnchorSystemId, TransactionFlowEffect } from "./types";
 
 export type AddressSystemMap = Record<string, SceneSystemId>;
+export type AddressMultiSystemMap = Record<string, SceneSystemId[]>;
 
 export const CANONICAL_BRIDGE_SCENE_ID = "__bridge_canonical__";
 export const HYPERLANE_BRIDGE_SCENE_ID = "__bridge_hyperlane__";
@@ -62,6 +63,22 @@ function resolveWalletSystem(
   return addressSystemMap[address.toLowerCase()] ?? null;
 }
 
+/**
+ * Resolve a wallet address to its scoped scene ID.
+ * Scene bodies are registered as `systemId:address` (e.g. `vesting:0x1234`).
+ * If the wallet belongs to a known system, returns the scoped ID;
+ * otherwise returns the raw lowercase address.
+ */
+function resolveWalletSceneId(
+  address: string | null,
+  addressSystemMap?: AddressSystemMap,
+): string | null {
+  if (!address) return null;
+  const system = resolveWalletSystem(address, addressSystemMap);
+  const lower = address.toLowerCase();
+  return system ? `${system}:${lower}` : lower;
+}
+
 const UNKNOWN_TRAFFIC_SYSTEM: SceneAnchorSystemId = "transit-beacon";
 
 /**
@@ -78,7 +95,8 @@ function mapEvent(
   durationMs: number,
   nowMs: number,
   addressSystemMap?: AddressSystemMap,
-): TransactionFlowEffect {
+  addressMultiSystemMap?: AddressMultiSystemMap,
+): TransactionFlowEffect[] {
   const staggerMs = event.priority * 400; // slightly stagger by priority tier
   const startedAt = nowMs + staggerMs;
   const expiresAt = startedAt + durationMs;
@@ -94,7 +112,7 @@ function mapEvent(
   switch (event.classification) {
     // wallet → vEscrow star
     case "vescrow-lock":
-      fromId = event.fromAddress;
+      fromId = resolveWalletSceneId(event.fromAddress, addressSystemMap);
       toId = toContractId;
       fromSystemId = "vescrow";
       toSystemId = "vescrow";
@@ -103,7 +121,7 @@ function mapEvent(
     // vEscrow star → wallet
     case "vescrow-unlock":
       fromId = toContractId; // the contract is the source of funds
-      toId = event.fromAddress;
+      toId = resolveWalletSceneId(event.fromAddress, addressSystemMap);
       fromSystemId = "vescrow";
       toSystemId = "vescrow";
       break;
@@ -111,7 +129,7 @@ function mapEvent(
     // RewardDistributor → wallet
     case "vesting-claim":
       fromId = toContractId;
-      toId = event.fromAddress;
+      toId = resolveWalletSceneId(event.fromAddress, addressSystemMap);
       fromSystemId = "vesting";
       toSystemId = "vesting";
       break;
@@ -119,7 +137,7 @@ function mapEvent(
     // faucet → wallet
     case "faucet-claim":
       fromId = toContractId;
-      toId = event.fromAddress;
+      toId = resolveWalletSceneId(event.fromAddress, addressSystemMap);
       fromSystemId = "vescrow";
       toSystemId = resolveWalletSystem(event.fromAddress, addressSystemMap) ?? "vescrow";
       break;
@@ -127,14 +145,14 @@ function mapEvent(
     // staking → wallet
     case "staking-withdraw":
       fromId = toContractId;
-      toId = event.fromAddress;
+      toId = resolveWalletSceneId(event.fromAddress, addressSystemMap);
       fromSystemId = "staking-remnant";
       toSystemId = "staking-remnant";
       break;
 
     // wallet → bridge
     case "bridge-out":
-      fromId = event.fromAddress;
+      fromId = resolveWalletSceneId(event.fromAddress, addressSystemMap);
       toId = toContractId;
       fromSystemId = resolveWalletSystem(event.fromAddress, addressSystemMap) ?? "vescrow";
       toSystemId = resolveContractSystem(event.toAddress);
@@ -143,87 +161,79 @@ function mapEvent(
     // bridge → wallet (inbound — less common to see in raw block)
     case "bridge-in":
       fromId = fromContractId;
-      toId = event.toAddress;
+      toId = resolveWalletSceneId(event.toAddress, addressSystemMap);
       fromSystemId = resolveContractSystem(event.fromAddress);
       toSystemId = resolveWalletSystem(event.toAddress, addressSystemMap) ?? "vescrow";
       break;
 
-    // generic transfer: wallet → wallet
+    // generic transfer / contract call: fan out one effect per system the wallet belongs to
     case "generic-transfer":
-      {
-      const fromKnownSystem = resolveWalletSystem(event.fromAddress, addressSystemMap);
-      const toKnownSystem = resolveWalletSystem(event.toAddress, addressSystemMap);
-      if (toContractId === CANONICAL_BRIDGE_SCENE_ID || toContractId === HYPERLANE_BRIDGE_SCENE_ID) {
-        fromId = event.fromAddress;
-        toId = toContractId;
-        fromSystemId = fromKnownSystem ?? UNKNOWN_TRAFFIC_SYSTEM;
-        toSystemId = UNKNOWN_TRAFFIC_SYSTEM;
-      } else if (fromContractId === CANONICAL_BRIDGE_SCENE_ID || fromContractId === HYPERLANE_BRIDGE_SCENE_ID) {
-        fromId = fromContractId;
-        toId = event.toAddress;
-        fromSystemId = UNKNOWN_TRAFFIC_SYSTEM;
-        toSystemId = toKnownSystem ?? UNKNOWN_TRAFFIC_SYSTEM;
-      } else if (fromKnownSystem && toKnownSystem) {
-        fromId = event.fromAddress;
-        toId = event.toAddress;
-        fromSystemId = fromKnownSystem;
-        toSystemId = toKnownSystem;
-      } else if (fromKnownSystem) {
-        fromId = event.fromAddress;
-        toId = TRANSIT_BEACON_ID;
-        fromSystemId = fromKnownSystem;
-        toSystemId = UNKNOWN_TRAFFIC_SYSTEM;
-      } else if (toKnownSystem) {
-        fromId = TRANSIT_BEACON_ID;
-        toId = event.toAddress;
-        fromSystemId = UNKNOWN_TRAFFIC_SYSTEM;
-        toSystemId = toKnownSystem;
-      } else {
-        fromId = event.fromAddress;
-        toId = TRANSIT_BEACON_ID;
-        fromSystemId = UNKNOWN_TRAFFIC_SYSTEM;
-        toSystemId = UNKNOWN_TRAFFIC_SYSTEM;
-      }
-      break;
-      }
-
-    // generic contract call: wallet → unknown contract star (use star of nearest system)
     case "generic-contract-call":
     default:
       {
-      const fromKnownSystem = resolveWalletSystem(event.fromAddress, addressSystemMap);
-      const toKnownSystem = resolveWalletSystem(event.toAddress, addressSystemMap);
+      // Bridge sub-cases stay single-effect
       if (toContractId === CANONICAL_BRIDGE_SCENE_ID || toContractId === HYPERLANE_BRIDGE_SCENE_ID) {
-        fromId = event.fromAddress;
+        fromId = resolveWalletSceneId(event.fromAddress, addressSystemMap);
         toId = toContractId;
-        fromSystemId = fromKnownSystem ?? UNKNOWN_TRAFFIC_SYSTEM;
+        fromSystemId = resolveWalletSystem(event.fromAddress, addressSystemMap) ?? UNKNOWN_TRAFFIC_SYSTEM;
         toSystemId = UNKNOWN_TRAFFIC_SYSTEM;
-      } else if (fromContractId === CANONICAL_BRIDGE_SCENE_ID || fromContractId === HYPERLANE_BRIDGE_SCENE_ID) {
-        fromId = fromContractId;
-        toId = event.toAddress;
-        fromSystemId = UNKNOWN_TRAFFIC_SYSTEM;
-        toSystemId = toKnownSystem ?? UNKNOWN_TRAFFIC_SYSTEM;
-      } else if (fromKnownSystem) {
-        fromId = event.fromAddress;
-        toId = TRANSIT_BEACON_ID;
-        fromSystemId = fromKnownSystem;
-        toSystemId = UNKNOWN_TRAFFIC_SYSTEM;
-      } else if (toKnownSystem) {
-        fromId = TRANSIT_BEACON_ID;
-        toId = event.toAddress;
-        fromSystemId = UNKNOWN_TRAFFIC_SYSTEM;
-        toSystemId = toKnownSystem;
-      } else {
-        fromId = event.fromAddress;
-        toId = TRANSIT_BEACON_ID;
-        fromSystemId = UNKNOWN_TRAFFIC_SYSTEM;
-        toSystemId = UNKNOWN_TRAFFIC_SYSTEM;
+        break;
       }
+      if (fromContractId === CANONICAL_BRIDGE_SCENE_ID || fromContractId === HYPERLANE_BRIDGE_SCENE_ID) {
+        fromId = fromContractId;
+        toId = resolveWalletSceneId(event.toAddress, addressSystemMap);
+        fromSystemId = UNKNOWN_TRAFFIC_SYSTEM;
+        toSystemId = resolveWalletSystem(event.toAddress, addressSystemMap) ?? UNKNOWN_TRAFFIC_SYSTEM;
+        break;
+      }
+
+      // Fan-out: emit one effect per system the sender wallet belongs to
+      const fromSystems = addressMultiSystemMap?.[event.fromAddress.toLowerCase()] ?? [];
+      const toSystems = addressMultiSystemMap?.[event.toAddress?.toLowerCase() ?? ""] ?? [];
+
+      if (fromSystems.length > 0 || toSystems.length > 0) {
+        const fanOutEffects: TransactionFlowEffect[] = [];
+        const sourceSystems = fromSystems.length > 0 ? fromSystems : [null];
+        const targetSystems = toSystems.length > 0 ? toSystems : [null];
+
+        for (const srcSys of sourceSystems) {
+          for (const tgtSys of targetSystems) {
+            const lower = event.fromAddress.toLowerCase();
+            const fId = srcSys ? `${srcSys}:${lower}` : TRANSIT_BEACON_ID;
+            const tLower = event.toAddress?.toLowerCase() ?? null;
+            const tId = tgtSys && tLower ? `${tgtSys}:${tLower}` : TRANSIT_BEACON_ID;
+            const suffix = `${srcSys ?? "x"}-${tgtSys ?? "x"}`;
+            fanOutEffects.push({
+              id: `txflow:${event.id}:${suffix}`,
+              kind: "transaction-flow",
+              fromId: fId,
+              toId: tId,
+              fromSystemId: srcSys ?? UNKNOWN_TRAFFIC_SYSTEM,
+              toSystemId: tgtSys ?? UNKNOWN_TRAFFIC_SYSTEM,
+              startedAt,
+              expiresAt,
+              priority: event.priority,
+              visualVariant: event.visualVariant,
+              classification: event.classification,
+              paletteHint: "generic",
+              txHash: event.txHash,
+              label: event.label,
+            });
+          }
+        }
+        return fanOutEffects;
+      }
+
+      // Fallback: unknown wallet → transit beacon
+      fromId = event.fromAddress.toLowerCase();
+      toId = TRANSIT_BEACON_ID;
+      fromSystemId = UNKNOWN_TRAFFIC_SYSTEM;
+      toSystemId = UNKNOWN_TRAFFIC_SYSTEM;
       break;
       }
   }
 
-  return {
+  return [{
     id: `txflow:${event.id}`,
     kind: "transaction-flow",
     fromId,
@@ -238,7 +248,7 @@ function mapEvent(
     paletteHint: event.isEcosystem ? "ecosystem" : "generic",
     txHash: event.txHash,
     label: event.label,
-  };
+  }];
 }
 
 /**
@@ -250,7 +260,8 @@ export function mapEventsToSceneEffects(
   events: BlockExplorerEvent[],
   durationMs = 45_000,
   addressSystemMap?: AddressSystemMap,
+  addressMultiSystemMap?: AddressMultiSystemMap,
 ): TransactionFlowEffect[] {
   const nowMs = Date.now();
-  return events.map((event) => mapEvent(event, durationMs, nowMs, addressSystemMap));
+  return events.flatMap((event) => mapEvent(event, durationMs, nowMs, addressSystemMap, addressMultiSystemMap));
 }

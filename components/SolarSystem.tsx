@@ -40,6 +40,9 @@ import { EPOCH_ADDRESS } from "./EpochSatellite";
 import { ROGUE_ADDRESS } from "./RoguePlanet";
 import type { SceneEffectDefinition, SceneGlobalObject } from "@/lib/sceneSystems";
 import { useBlockTransactions } from "@/hooks/useBlockTransactions";
+import { useRankSnapshots } from "@/hooks/useRankSnapshot";
+import { mapEventsToSceneEffects } from "@/lib/blockExplorer/mapEventsToSceneEffects";
+import type { TransactionFlowEffect } from "@/lib/blockExplorer/types";
 import {
   ARBSYS_ADDRESS,
   HYPERLANE_MAILBOX,
@@ -204,6 +207,7 @@ export default function SolarSystem() {
 
   /* ── Hover wallet banner ── */
   const [hoveredWallet, setHoveredWallet] = useState<HoveredWalletInfo | null>(null);
+  const [pinnedWallet, setPinnedWallet] = useState<HoveredWalletInfo | null>(null);
   const onHoverWallet = useCallback((info: HoveredWalletInfo | null) => {
     setHoveredWallet((prev) => {
       if (!info && !prev) return prev;
@@ -228,10 +232,34 @@ export default function SolarSystem() {
     return entries;
   }, [poolTokens, vestingWallets, wallets]);
 
+  const walletMultiSystemMap = useMemo<Record<string, SceneSystemId[]>>(() => {
+    const entries: Record<string, SceneSystemId[]> = {};
+    const push = (addr: string, sys: SceneSystemId) => {
+      const key = addr.toLowerCase();
+      (entries[key] ??= []).push(sys);
+    };
+    for (const wallet of wallets) push(wallet.address, "vescrow");
+    for (const wallet of vestingWallets) push(wallet.address, "vesting");
+    for (const token of poolTokens) push(token.address, "gubi-pool");
+    return entries;
+  }, [poolTokens, vestingWallets, wallets]);
+
   /* ── Transaction trails ── */
   const [showTraffic, setShowTraffic] = useState(true);
   const [trafficPanelOpen, setTrafficPanelOpen] = useState(true);
-  const { effects: transactionEffects, recentEvents, rxLed, ecoLed } = useBlockTransactions(blockInfo?.blockNumber, showTraffic, walletSystemMap);
+  const { effects: transactionEffects, recentEvents, rxLed, ecoLed } = useBlockTransactions(blockInfo?.blockNumber, showTraffic, walletSystemMap, walletMultiSystemMap);
+  const [replayEffects, setReplayEffects] = useState<TransactionFlowEffect[]>([]);
+
+  const handleTrafficReplay = useCallback((eventId: string) => {
+    const event = recentEvents.find((e) => e.id === eventId);
+    if (!event) return;
+    const now = Date.now();
+    setReplayEffects((prev) => {
+      const live = prev.filter((e) => e.expiresAt > now);
+      const fresh = mapEventsToSceneEffects([event], 10_000, walletSystemMap, walletMultiSystemMap);
+      return [...live, ...fresh.map((e) => ({ ...e, id: `replay-${e.id}-${now}` }))];
+    });
+  }, [recentEvents, walletSystemMap, walletMultiSystemMap]);
 
   /* ── Camera ── */
   const controlsRef = useRef<OrbitControlsImpl>(null);
@@ -463,13 +491,16 @@ export default function SolarSystem() {
         tick: blockFlash,
       },
       ...transactionEffects,
+      ...replayEffects,
     ]
-  ), [blockFlash, transactionEffects]);
+  ), [blockFlash, transactionEffects, replayEffects]);
 
   const activeSystemId = useMemo(
     () => getNearestSystemId(camDebug?.pos ?? null, systems),
     [camDebug, systems],
   );
+
+  const rankMovement = useRankSnapshots(systems);
 
   const photoTargetSections = useMemo(
     () => buildPhotoTargetSections(systems, globalObjects),
@@ -541,6 +572,8 @@ export default function SolarSystem() {
       if (event.classification === "faucet-claim") return "VE";
       if (event.classification === "vesting-claim") return "VEST";
       if (event.classification === "staking-withdraw") return "STAKE";
+      // generic transfers / contract calls — show BEACON regardless of wallet home system
+      if (event.classification === "generic-transfer" || event.classification === "generic-contract-call") return "BEACON";
 
       const fromChip = chipForAddress(event.fromAddress);
       const toChip = chipForAddress(event.toAddress);
@@ -592,11 +625,13 @@ export default function SolarSystem() {
     if (address === ROGUE_ADDRESS) {
       focusSceneTarget(address, false);
       setRogueClicked(true);
+      setPinnedWallet(null);
       return;
     }
     if (isBridgeId(address)) {
       if (!getBridgeById(bridges, address)) return;
       focusSceneTarget(address, false);
+      setPinnedWallet(null);
       return;
     }
     // Parse "systemId:0xaddr" scoped IDs emitted by StarSystem
@@ -604,10 +639,22 @@ export default function SolarSystem() {
     const isScoped = colonIdx > 0 && !address.startsWith("__");
     const rawAddr = isScoped ? address.slice(colonIdx + 1) : address;
     const scopedId = isScoped ? address : (walletSystemMap[address.toLowerCase()] ? `${walletSystemMap[address.toLowerCase()]}:${address.toLowerCase()}` : undefined);
-    const entry = allEntries.find((item) => item.address.toLowerCase() === rawAddr.toLowerCase());
+    // Look up entry from the specific system that was clicked, so that a wallet
+    // in both vescrow AND vesting gets the correct typed entry (e.g. VestingWalletEntry).
+    const clickedSystemId = isScoped ? address.slice(0, colonIdx) : null;
+    const targetEntries = clickedSystemId
+      ? (systems.find((s) => s.id === clickedSystemId)?.entries ?? allEntries)
+      : allEntries;
+    const entry = targetEntries.find((item) => item.address.toLowerCase() === rawAddr.toLowerCase());
     focusSceneTarget(rawAddr, Boolean(entry), scopedId);
     wc.setNameInput(entry?.customName || "");
-  }, [allEntries, bridges, focusSceneTarget, photoMode, walletSystemMap, wc]);
+    if (entry) {
+      const system = clickedSystemId ?? walletSystemMap[rawAddr.toLowerCase()];
+      setPinnedWallet({ wallet: entry, variant: system === "gubi-pool" ? "pool" : "wallet", vesting: system === "vesting" });
+    } else {
+      setPinnedWallet(null);
+    }
+  }, [allEntries, bridges, focusSceneTarget, photoMode, systems, walletSystemMap, wc]);
 
   const handleDirectorySelect = useCallback((address: string, customName?: string, systemId?: SceneSystemId) => {
     const resolvedSystemId = systemId ?? walletSystemMap[address.toLowerCase()];
@@ -833,7 +880,11 @@ export default function SolarSystem() {
       />
 
       {interactionsActive && (
-        <WalletInfoBanner info={hoveredWallet} />
+        <WalletInfoBanner
+          info={pinnedWallet ?? hoveredWallet}
+          pinned={!!pinnedWallet}
+          onClose={pinnedWallet ? () => setPinnedWallet(null) : undefined}
+        />
       )}
 
       <SystemHud
@@ -893,7 +944,7 @@ export default function SolarSystem() {
         onToggleOrbits={() => setShowOrbits((v) => !v)}
         onToggleTraffic={handleToggleTraffic}
         onToggleTrafficPanel={() => setTrafficPanelOpen((value) => !value)}
-        onTrafficSelect={handleSceneSelect}
+        onTrafficReplay={handleTrafficReplay}
         onToggleFlightHud={() => setShowFlightHud((v) => !v)}
         onReset={handleReset}
         onToggleFlyMode={handleToggleFlyMode}
@@ -907,6 +958,7 @@ export default function SolarSystem() {
         onDirectorySelect={handleDirectorySelect}
         onDisconnect={handleDisconnect}
         onFocusMyInstance={handleFocusMyInstance}
+        rankMovement={rankMovement}
       />
 
   <FlyHud freelookRef={freelookRef} visible={showFlightHud && flyModeEnabled && cameraMode === "fly"} />

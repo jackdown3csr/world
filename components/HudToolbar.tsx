@@ -261,27 +261,27 @@ export default function HudToolbar({
       }}
     >
       <Group label="browse" mobile={mobile} compact={compact}>
-        <HudBtn active={showAllNames} onClick={onToggleLabels} icon={icons.label} label="labels" shortcut={toolbarShortcuts.labels} title={`${toolbarShortcutMeta.labels.description} (${toolbarShortcutMeta.labels.keys})`} mobile={mobile} compact={compact} strip={strip} />
-        <HudBtn active={showRenamedOnly && showAllNames} onClick={onToggleRenamed} icon={icons.named} label="named" shortcut={toolbarShortcuts.named} title={`${toolbarShortcutMeta.named.description} (${toolbarShortcutMeta.named.keys})`} disabled={!showAllNames} mobile={mobile} compact={compact} strip={strip} />
+        <HudBtn active={showAllNames} onClick={onToggleLabels} icon={icons.label} label="labels" shortcut={toolbarShortcuts.labels} mobile={mobile} compact={compact} strip={strip} />
+        <HudBtn active={showRenamedOnly && showAllNames} onClick={onToggleRenamed} icon={icons.named} label="named" shortcut={toolbarShortcuts.named} disabled={!showAllNames} mobile={mobile} compact={compact} strip={strip} />
       </Group>
 
       <Group label="scene" mobile={mobile} compact={compact}>
-        <HudBtn active={showOrbits} onClick={onToggleOrbits} icon={icons.orbit} label="orbits" shortcut={toolbarShortcuts.orbits} title={`${toolbarShortcutMeta.orbits.description} (${toolbarShortcutMeta.orbits.keys})`} mobile={mobile} compact={compact} strip={strip} />
+        <HudBtn active={showOrbits} onClick={onToggleOrbits} icon={icons.orbit} label="orbits" shortcut={toolbarShortcuts.orbits} mobile={mobile} compact={compact} strip={strip} />
         {onToggleTraffic && (
-          <HudBtn active={showTraffic} onClick={onToggleTraffic} icon={icons.traffic} label="traffic" shortcut={toolbarShortcuts.traffic} title={`${toolbarShortcutMeta.traffic.description} (${toolbarShortcutMeta.traffic.keys})`} mobile={mobile} compact={compact} strip={strip} />
+          <HudBtn active={showTraffic} onClick={onToggleTraffic} icon={icons.traffic} label="traffic" shortcut={toolbarShortcuts.traffic} mobile={mobile} compact={compact} strip={strip} />
         )}
       </Group>
 
       {showLayoutGroup && (
         <Group label="layout" mobile={mobile} compact={compact}>
           {layoutVariant === "vescrow" && onToggleLayout && (
-            <HudBtn active={rankedLayout} onClick={onToggleLayout} icon={icons.ranked} label="ranked" shortcut={toolbarShortcuts.ranked} title={`${toolbarShortcutMeta.ranked.description} (${toolbarShortcutMeta.ranked.keys})`} mobile={mobile} compact={compact} strip={strip} />
+            <HudBtn active={rankedLayout} onClick={onToggleLayout} icon={icons.ranked} label="ranked" shortcut={toolbarShortcuts.ranked} mobile={mobile} compact={compact} strip={strip} />
           )}
           {layoutVariant === "vescrow" && onToggleGnet && (
-            <HudBtn active={gnetRanked} onClick={onToggleGnet} icon={icons.gnet} label="gnet" shortcut={toolbarShortcuts.gnet} title={`${toolbarShortcutMeta.gnet.description} (${toolbarShortcutMeta.gnet.keys})`} disabled={!rankedLayout} mobile={mobile} compact={compact} strip={strip} />
+            <HudBtn active={gnetRanked} onClick={onToggleGnet} icon={icons.gnet} label="gnet" shortcut={toolbarShortcuts.gnet} disabled={!rankedLayout} mobile={mobile} compact={compact} strip={strip} />
           )}
           {layoutVariant === "vesting" && onToggleVestingClaimed && (
-            <HudBtn active={vestingClaimed} onClick={onToggleVestingClaimed} icon={icons.gnet} label="claimed" shortcut={toolbarShortcuts.claimed} title={`${toolbarShortcutMeta.claimed.description} (${toolbarShortcutMeta.claimed.keys})`} mobile={mobile} compact={compact} strip={strip} />
+            <HudBtn active={vestingClaimed} onClick={onToggleVestingClaimed} icon={icons.gnet} label="claimed" shortcut={toolbarShortcuts.claimed} mobile={mobile} compact={compact} strip={strip} />
           )}
         </Group>
       )}
@@ -289,23 +289,23 @@ export default function HudToolbar({
       <Group label="modes" mobile={mobile} compact={compact}>
         {onToggleFlyMode && !mobile && (
           <div style={{ display: "flex", alignItems: "stretch", background: compact ? "transparent" : "rgba(255,255,255,0.02)", borderRadius: compact ? 4 : 999, overflow: "hidden", gap: compact ? 4 : 0 }}>
-            <HudBtn active={flyModeEnabled} onClick={onToggleFlyMode} icon={icons.fly} label="fly" shortcut={toolbarShortcuts.fly} title={`${toolbarShortcutMeta.fly.description} (${toolbarShortcutMeta.fly.keys})`} mobile={mobile} compact={compact} strip={strip} />
+            <HudBtn active={flyModeEnabled} onClick={onToggleFlyMode} icon={icons.fly} label="fly" shortcut={toolbarShortcuts.fly} mobile={mobile} compact={compact} strip={strip} />
           </div>
         )}
         {onPhotoMode && (
-          <HudBtn active={false} onClick={onPhotoMode} icon={icons.photo} label="photo" shortcut={toolbarShortcuts.photo} title={`${toolbarShortcutMeta.photo.description} (${toolbarShortcutMeta.photo.keys})`} mobile={mobile} compact={compact} strip={strip} />
+          <HudBtn active={false} onClick={onPhotoMode} icon={icons.photo} label="photo" shortcut={toolbarShortcuts.photo} mobile={mobile} compact={compact} strip={strip} />
         )}
       </Group>
 
       <Group label="utility" mobile={mobile} compact={compact}>
         {showReset && (
-          <HudBtn active={false} onClick={onReset} icon={icons.reset} label="reset" shortcut={toolbarShortcuts.reset} title={`${toolbarShortcutMeta.reset.description} (${toolbarShortcutMeta.reset.keys})`} mobile={mobile} compact={compact} strip={strip} />
+          <HudBtn active={false} onClick={onReset} icon={icons.reset} label="reset" shortcut={toolbarShortcuts.reset} mobile={mobile} compact={compact} strip={strip} />
         )}
         {showHelpButton && (
-          <HudBtn active={showHelp} onClick={onToggleHelp} icon={icons.help} label="help" shortcut={toolbarShortcuts.help} title={`${toolbarShortcutMeta.help.description} (${toolbarShortcutMeta.help.keys})`} mobile={mobile} compact={compact} iconOnly={compact} strip={strip} />
+          <HudBtn active={showHelp} onClick={onToggleHelp} icon={icons.help} label="help" shortcut={toolbarShortcuts.help} mobile={mobile} compact={compact} iconOnly={compact} strip={strip} />
         )}
         {onToggleBugReport && (
-          <HudBtn active={showBugReport} onClick={onToggleBugReport} icon={icons.bug} label="bug" title="Open or close bug report" mobile={mobile} compact={compact} strip={strip} />
+          <HudBtn active={showBugReport} onClick={onToggleBugReport} icon={icons.bug} label="bug" mobile={mobile} compact={compact} strip={strip} />
         )}
       </Group>
 
