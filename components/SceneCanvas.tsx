@@ -562,7 +562,7 @@ export default function SceneCanvas({
 
   return (
     <Canvas
-      camera={{ position: [0, 500, 1600], fov: 55, near: 0.1, far: 60000 }}
+      camera={{ position: [0, 1010, 1340], fov: 55, near: 0.1, far: 60000 }}
       style={{ width: "100%", height: "100%" }}
       gl={{ antialias: true, alpha: false, preserveDrawingBuffer: true }}
       dpr={[1, isMobile ? 1.5 : 2]}

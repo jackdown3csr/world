@@ -79,6 +79,17 @@ function resolveWalletSceneId(
   return system ? `${system}:${lower}` : lower;
 }
 
+/**
+ * Build a scoped scene ID forcing a specific system prefix.
+ * Used for ecosystem-specific events where the system is known from the
+ * contract being called, not from addressSystemMap (which uses last-write-wins
+ * and may point to a different system for dual-registered wallets).
+ */
+function scopedWalletId(address: string | null, system: SceneSystemId): string | null {
+  if (!address) return null;
+  return `${system}:${address.toLowerCase()}`;
+}
+
 const UNKNOWN_TRAFFIC_SYSTEM: SceneAnchorSystemId = "transit-beacon";
 
 /**
@@ -112,7 +123,7 @@ function mapEvent(
   switch (event.classification) {
     // wallet → vEscrow star
     case "vescrow-lock":
-      fromId = resolveWalletSceneId(event.fromAddress, addressSystemMap);
+      fromId = scopedWalletId(event.fromAddress, "vescrow");
       toId = toContractId;
       fromSystemId = "vescrow";
       toSystemId = "vescrow";
@@ -121,7 +132,7 @@ function mapEvent(
     // vEscrow star → wallet
     case "vescrow-unlock":
       fromId = toContractId; // the contract is the source of funds
-      toId = resolveWalletSceneId(event.fromAddress, addressSystemMap);
+      toId = scopedWalletId(event.fromAddress, "vescrow");
       fromSystemId = "vescrow";
       toSystemId = "vescrow";
       break;
@@ -129,7 +140,7 @@ function mapEvent(
     // RewardDistributor → wallet
     case "vesting-claim":
       fromId = toContractId;
-      toId = resolveWalletSceneId(event.fromAddress, addressSystemMap);
+      toId = scopedWalletId(event.fromAddress, "vesting");
       fromSystemId = "vesting";
       toSystemId = "vesting";
       break;
@@ -145,7 +156,7 @@ function mapEvent(
     // staking → wallet
     case "staking-withdraw":
       fromId = toContractId;
-      toId = resolveWalletSceneId(event.fromAddress, addressSystemMap);
+      toId = scopedWalletId(event.fromAddress, "staking-remnant");
       fromSystemId = "staking-remnant";
       toSystemId = "staking-remnant";
       break;
