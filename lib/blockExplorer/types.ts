@@ -11,6 +11,8 @@ export type SceneAnchorSystemId = SceneSystemId | "transit-beacon";
 export type BlockExplorerClassification =
   | "vescrow-lock"
   | "vescrow-unlock"
+  | "vescrow-increase"
+  | "vescrow-extend"
   | "faucet-claim"
   | "staking-withdraw"
   | "vesting-claim"

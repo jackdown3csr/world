@@ -127,8 +127,10 @@ function mapEvent(
   let toSystemId: SceneAnchorSystemId;
 
   switch (event.classification) {
-    // wallet → vEscrow star
+    // wallet → vEscrow star (lock, add amount, extend time)
     case "vescrow-lock":
+    case "vescrow-increase":
+    case "vescrow-extend":
       fromId = scopedWalletId(event.fromAddress, "vescrow");
       toId = toContractId;
       fromSystemId = "vescrow";

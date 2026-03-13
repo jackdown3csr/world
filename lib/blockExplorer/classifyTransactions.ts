@@ -134,7 +134,7 @@ function classify(to: string | null, input: string, value: string): Classificati
   if (toLower === RD_ADDRESS) {
     return {
       classification: "vesting-claim",
-      label: "vesting claim",
+      label: "VESTing CLAIM",
       isEcosystem: true,
       priority: 2,
       visualVariant: "trail",
@@ -147,7 +147,7 @@ function classify(to: string | null, input: string, value: string): Classificati
   if (toLower === GUBI_RD_ADDRESS) {
     return {
       classification: "gubi-claim",
-      label: "gUBI claim",
+      label: "GUBI CLAIM",
       isEcosystem: true,
       priority: 2,
       visualVariant: "trail",
@@ -160,7 +160,7 @@ function classify(to: string | null, input: string, value: string): Classificati
   if (toLower === GUBI_POOL_VAULT) {
     return {
       classification: "gubi-burn",
-      label: "gUBI burn",
+      label: "GUBI BURN",
       isEcosystem: true,
       priority: 2,
       visualVariant: "trail",
@@ -174,7 +174,7 @@ function classify(to: string | null, input: string, value: string): Classificati
     if (sel === WGNET9_SELECTORS.deposit) {
       return {
         classification: "wgnet-wrap",
-        label: "wGNET wrap",
+        label: "GNET -> wGNET",
         isEcosystem: true,
         priority: 3,
         visualVariant: "trail",
@@ -185,7 +185,7 @@ function classify(to: string | null, input: string, value: string): Classificati
     if (sel === WGNET9_SELECTORS.withdraw) {
       return {
         classification: "wgnet-unwrap",
-        label: "wGNET unwrap",
+        label: "wGNET -> GNET",
         isEcosystem: true,
         priority: 3,
         visualVariant: "trail",
@@ -200,7 +200,7 @@ function classify(to: string | null, input: string, value: string): Classificati
   if (toLower === FAUCET_ADDRESS) {
     return {
       classification: "faucet-claim",
-      label: "faucet claim",
+      label: "FAUCET",
       isEcosystem: true,
       priority: 2,
       visualVariant: "trail",
@@ -211,11 +211,9 @@ function classify(to: string | null, input: string, value: string): Classificati
 
   // ── Staking remnant ────────────────────────────────────
   if (toLower === STAKING_PROXY) {
-    const isExit =
-      sel === STAKING_SELECTORS.withdraw || sel === STAKING_SELECTORS.exit;
     return {
       classification: "staking-withdraw",
-      label: isExit ? "staking exit" : "staking tx",
+      label: "UNSTAKE",
       isEcosystem: true,
       priority: 3,
       visualVariant: "trail",

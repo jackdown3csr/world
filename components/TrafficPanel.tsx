@@ -55,7 +55,7 @@ function chipStyle(label: string): React.CSSProperties {
     border = "rgba(120, 238, 255, 0.34)";
     background = "rgba(64, 238, 255, 0.12)";
     color = "#87f4ff";
-  } else if (upper === "BURN") {
+  } else if (upper === "BURN" || upper.includes("GUBI BURN")) {
     border = "rgba(255, 100, 80, 0.4)";
     background = "rgba(255, 80, 60, 0.14)";
     color = "#ff7a6a";
