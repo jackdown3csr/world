@@ -548,7 +548,7 @@ export default function SolarSystem() {
       if (systemId === "vescrow") return "VE";
       if (systemId === "vesting") return "VEST";
       if (systemId === "gubi-pool") return "POOL";
-      if (systemId === "staking-remnant") return "STAKE";
+      if (systemId === "staking-remnant") return "UNSTAKE";
       return null;
     };
 
@@ -572,7 +572,7 @@ export default function SolarSystem() {
       if (event.classification === "vescrow-lock" || event.classification === "vescrow-unlock") return "VE";
       if (event.classification === "faucet-claim") return "VE";
       if (event.classification === "vesting-claim") return "VEST";
-      if (event.classification === "staking-withdraw") return "STAKE";
+      if (event.classification === "staking-withdraw") return "UNSTAKE";
       if (event.classification === "gubi-claim") return "GUBI";
       if (event.classification === "wgnet-unwrap" || event.classification === "wgnet-wrap") return "WGNET";
       // generic transfers / contract calls — show BEACON regardless of wallet home system
