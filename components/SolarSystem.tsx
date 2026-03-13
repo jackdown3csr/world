@@ -567,12 +567,16 @@ export default function SolarSystem() {
         || toLower === ARBSYS_ADDRESS
         || toLower === HYPERLANE_MAILBOX;
 
+      if (event.classification === "bridge-in") return "BRIDGE IN";
+      if (event.classification === "bridge-out") return "BRIDGE OUT";
       if (touchesBridge) return "BRIDGE";
-      if (event.classification === "vescrow-lock" || event.classification === "vescrow-unlock") return "VE";
-      if (event.classification === "faucet-claim") return "VE";
+      if (event.classification === "vescrow-lock") return "VE LOCK";
+      if (event.classification === "vescrow-unlock") return "VE UNLOCK";
+      if (event.classification === "faucet-claim") return "FAUCET";
       if (event.classification === "vesting-claim") return "VEST";
       if (event.classification === "staking-withdraw") return "UNSTAKE";
       if (event.classification === "gubi-claim") return "GUBI";
+      if (event.classification === "gubi-burn") return "BURN";
       if (event.classification === "wgnet-unwrap" || event.classification === "wgnet-wrap") return "WGNET";
       // generic transfers / contract calls — show BEACON regardless of wallet home system
       if (event.classification === "generic-transfer" || event.classification === "generic-contract-call") return "BEACON";

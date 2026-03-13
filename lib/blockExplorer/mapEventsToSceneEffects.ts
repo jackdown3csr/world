@@ -12,6 +12,7 @@ import {
   ARBSYS_ADDRESS,
   FAUCET_ADDRESS as FAUCET_CONTRACT_ADDRESS,
   GUBI_POOL_VAULT,
+  GUBI_RD_ADDRESS,
   HYPERLANE_MAILBOX,
   RD_ADDRESS,
   STAKING_PROXY,
@@ -29,6 +30,7 @@ const FAUCET_SCENE_ID = "faucet";
 const CONTRACT_STAR_IDS: Record<string, string> = {
   [VE_ADDRESS]:         "__star_vescrow__",
   [RD_ADDRESS]:         "__star_vesting__",
+  [GUBI_RD_ADDRESS]:    "__star_gubi_pool__",
   [STAKING_PROXY]:      "__star_staking_remnant__",
   [GUBI_POOL_VAULT]:    "__star_gubi_pool__",
   [FAUCET_CONTRACT_ADDRESS]: FAUCET_SCENE_ID,
@@ -39,6 +41,7 @@ const CONTRACT_STAR_IDS: Record<string, string> = {
 const CONTRACT_FALLBACK_SYSTEM: Record<string, SceneSystemId> = {
   [VE_ADDRESS]:         "vescrow",
   [RD_ADDRESS]:         "vesting",
+  [GUBI_RD_ADDRESS]:    "gubi-pool",
   [STAKING_PROXY]:      "staking-remnant",
   [GUBI_POOL_VAULT]:    "gubi-pool",
   [FAUCET_CONTRACT_ADDRESS]: "vescrow",
@@ -187,7 +190,15 @@ function mapEvent(
       break;
     }
 
-    // gUBI pool star → wallet (burn gUBI, receive wGNET + ARCHAI; fan-out like unstake)
+    // wallet → gUBI pool (burn gUBI tokens at IndexPool, receive wGNET + ARCHAI)
+    case "gubi-burn":
+      fromId = resolveWalletSceneId(event.fromAddress, addressSystemMap);
+      toId = toContractId;
+      fromSystemId = resolveWalletSystem(event.fromAddress, addressSystemMap) ?? "gubi-pool";
+      toSystemId = "gubi-pool";
+      break;
+
+    // gUBI RewardDistributor → wallet (claimReward: fan-out like unstake)
     case "gubi-claim": {
       const gubiStar = toContractId; // __star_gubi_pool__
       const toSystems = addressMultiSystemMap?.[event.fromAddress.toLowerCase()] ?? [];

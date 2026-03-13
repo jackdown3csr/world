@@ -16,6 +16,8 @@ import type {
 /* ── Ecosystem contract addresses (lowercase) ───────────── */
 export const VE_ADDRESS     = "0xdfbe5ac59027c6f38ac3e2edf6292672a8ecffe4";
 export const RD_ADDRESS     = "0x80bcb71f63f11344f5483d108374fa394a587abe";
+/** gUBI RewardDistributor — claimReward() mints gUBI tokens to the caller */
+export const GUBI_RD_ADDRESS = "0x07297e1aa709c85e81c1a9498080ae010be91d80";
 export const STAKING_PROXY  = "0x90b07e15cfb173726de904ca548dd96f73c12428";
 export const ARBSYS_ADDRESS = "0x0000000000000000000000000000000000000064";
 export const HYPERLANE_MAILBOX = "0x3a464f746d23ab22155710f44db16dca53e0775e";
@@ -141,16 +143,29 @@ function classify(to: string | null, input: string, value: string): Classificati
     };
   }
 
-  // ── gUBI pool claim/burn ────────────────────────────────
-  if (toLower === GUBI_POOL_VAULT) {
+  // ── gUBI RewardDistributor (claimReward → receive gUBI tokens) ────
+  if (toLower === GUBI_RD_ADDRESS) {
     return {
       classification: "gubi-claim",
       label: "gUBI claim",
       isEcosystem: true,
       priority: 2,
       visualVariant: "trail",
-      sourceKind: "star",   // arc comes FROM gubi star TO wallet
+      sourceKind: "star",
       targetKind: "wallet",
+    };
+  }
+
+  // ── gUBI pool vault (burnIndexToken: wallet burns gUBI → receives wGNET+ARCHAI) ─
+  if (toLower === GUBI_POOL_VAULT) {
+    return {
+      classification: "gubi-burn",
+      label: "gUBI burn",
+      isEcosystem: true,
+      priority: 2,
+      visualVariant: "trail",
+      sourceKind: "wallet",
+      targetKind: "star",
     };
   }
 

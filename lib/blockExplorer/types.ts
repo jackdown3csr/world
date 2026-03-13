@@ -15,6 +15,7 @@ export type BlockExplorerClassification =
   | "staking-withdraw"
   | "vesting-claim"
   | "gubi-claim"
+  | "gubi-burn"
   | "wgnet-unwrap"
   | "wgnet-wrap"
   | "bridge-in"
