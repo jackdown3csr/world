@@ -169,6 +169,46 @@ Before finishing significant changes:
 - verify both mobile and desktop implications for HUD changes
 - verify API consumer compatibility when response contracts change
 
+## Agent Working Methodology
+
+### Plan before acting
+
+For any non-trivial task (3+ steps, architectural decisions, or changes touching multiple files):
+
+- Write out the plan before touching code. Use the todo list tool to make it visible and trackable.
+- Confirm the plan is coherent before starting implementation.
+- If something goes wrong mid-task, **stop and re-plan** — do not keep pushing through a broken approach.
+
+### Use subagents for research and exploration
+
+- Offload file exploration, pattern searches, and parallel analysis to subagents to keep the main context clean.
+- For complex investigations, use search subagents rather than chaining many sequential reads manually.
+- One focused task per subagent invocation — avoid open-ended prompts.
+
+### Self-improvement after corrections
+
+- When the user corrects a mistake, identify the root cause and internalize the lesson.
+- Update repo memory (`/memories/repo/`) with patterns or rules that prevent the same mistake in the future.
+- Check repo and session memory at the start of complex tasks for relevant prior lessons.
+
+### Verification before done
+
+- Never consider a task complete without proving it works: run `npx tsc --noEmit`, check relevant behavior, and confirm no regressions.
+- Diff behavior between before and after for non-trivial changes.
+- Ask: "Would a senior engineer approve this?" If not, iterate.
+
+### Demand elegance — proportionally
+
+- For non-trivial changes, ask: "Is there a more elegant solution?"
+- If a fix feels hacky, pause and implement the clean version instead.
+- Skip this for simple, isolated fixes — do not over-engineer.
+
+### Bug fixing
+
+- When given a bug report: diagnose from logs, errors, and failing behavior, then fix it — zero context switching for the user.
+- Find the root cause. Avoid temporary patches. Hold to senior-level engineering standards.
+- Simplicity first: make every change as small and targeted as possible while fully fixing the problem.
+
 ## Preferred Outcomes
 
 Successful changes in this repository usually have these qualities:
