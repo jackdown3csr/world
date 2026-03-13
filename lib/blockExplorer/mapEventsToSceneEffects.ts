@@ -187,13 +187,35 @@ function mapEvent(
       break;
     }
 
-    // wallet → gUBI pool (burn gUBI, receive wGNET + ARCHAI)
-    case "gubi-claim":
-      fromId = resolveWalletSceneId(event.fromAddress, addressSystemMap);
-      toId = toContractId;
-      fromSystemId = resolveWalletSystem(event.fromAddress, addressSystemMap) ?? "gubi-pool";
-      toSystemId = "gubi-pool";
+    // gUBI pool star → wallet (burn gUBI, receive wGNET + ARCHAI; fan-out like unstake)
+    case "gubi-claim": {
+      const gubiStar = toContractId; // __star_gubi_pool__
+      const toSystems = addressMultiSystemMap?.[event.fromAddress.toLowerCase()] ?? [];
+      if (toSystems.length > 0) {
+        return toSystems.map((sys) => ({
+          id: `txflow:${event.id}:gubi-${sys}`,
+          kind: "transaction-flow" as const,
+          fromId: gubiStar,
+          toId: `${sys}:${event.fromAddress.toLowerCase()}`,
+          fromSystemId: "gubi-pool" as SceneAnchorSystemId,
+          toSystemId: sys as SceneAnchorSystemId,
+          startedAt,
+          expiresAt,
+          priority: event.priority,
+          visualVariant: event.visualVariant,
+          classification: event.classification,
+          paletteHint: "ecosystem" as const,
+          txHash: event.txHash,
+          label: event.label,
+        }));
+      }
+      // Wallet not in any known system — beacon fallback
+      fromId = gubiStar;
+      toId = TRANSIT_BEACON_ID;
+      fromSystemId = "gubi-pool";
+      toSystemId = UNKNOWN_TRAFFIC_SYSTEM;
       break;
+    }
 
     // wallet → wGNET9 → wallet (self: wrap GNET→wGNET or unwrap wGNET→GNET)
     case "wgnet-unwrap":

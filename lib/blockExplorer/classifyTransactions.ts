@@ -149,8 +149,8 @@ function classify(to: string | null, input: string, value: string): Classificati
       isEcosystem: true,
       priority: 2,
       visualVariant: "trail",
-      sourceKind: "wallet",
-      targetKind: "star",
+      sourceKind: "star",   // arc comes FROM gubi star TO wallet
+      targetKind: "wallet",
     };
   }
 

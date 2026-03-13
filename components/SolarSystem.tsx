@@ -570,7 +570,7 @@ export default function SolarSystem() {
       if (touchesBridge) return "BRIDGE";
       if (event.classification === "vescrow-lock" || event.classification === "vescrow-unlock") return "VE";
       if (event.classification === "faucet-claim") return "VE";
-      if (event.classification === "vesting-claim") return "GUBI";
+      if (event.classification === "vesting-claim") return "VEST";
       if (event.classification === "staking-withdraw") return "UNSTAKE";
       if (event.classification === "gubi-claim") return "GUBI";
       if (event.classification === "wgnet-unwrap" || event.classification === "wgnet-wrap") return "WGNET";
