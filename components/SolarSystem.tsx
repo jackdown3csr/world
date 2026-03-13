@@ -43,6 +43,7 @@ import { useBlockTransactions } from "@/hooks/useBlockTransactions";
 import { useRankSnapshots } from "@/hooks/useRankSnapshot";
 import { mapEventsToSceneEffects } from "@/lib/blockExplorer/mapEventsToSceneEffects";
 import type { TransactionFlowEffect } from "@/lib/blockExplorer/types";
+import { OnboardingOverlay } from "./OnboardingOverlay";
 import {
   ARBSYS_ADDRESS,
   HYPERLANE_MAILBOX,
@@ -544,8 +545,8 @@ export default function SolarSystem() {
     }
 
     const chipForSystem = (systemId: SceneSystemId | null | undefined) => {
-      if (systemId === "vescrow") return "VE";
-      if (systemId === "vesting") return "GUBI";
+      if (systemId === "vescrow") return "VEscrow";
+      if (systemId === "vesting") return "VESTing";
       if (systemId === "gubi-pool") return "GUBI";
       if (systemId === "staking-remnant") return "UNSTAKE";
       return null;
@@ -570,14 +571,17 @@ export default function SolarSystem() {
       if (event.classification === "bridge-in") return "BRIDGE IN";
       if (event.classification === "bridge-out") return "BRIDGE OUT";
       if (touchesBridge) return "BRIDGE";
-      if (event.classification === "vescrow-lock") return "VE LOCK";
-      if (event.classification === "vescrow-unlock") return "VE UNLOCK";
+      if (event.classification === "vescrow-lock") return "VEscrow LOCK";
+      if (event.classification === "vescrow-unlock") return "VEscrow UNLOCK";
+      if (event.classification === "vescrow-increase") return "VEscrow ADD";
+      if (event.classification === "vescrow-extend") return "VEscrow EXTEND";
       if (event.classification === "faucet-claim") return "FAUCET";
-      if (event.classification === "vesting-claim") return "VEST";
+      if (event.classification === "vesting-claim") return "VESTing CLAIM";
       if (event.classification === "staking-withdraw") return "UNSTAKE";
-      if (event.classification === "gubi-claim") return "GUBI";
-      if (event.classification === "gubi-burn") return "BURN";
-      if (event.classification === "wgnet-unwrap" || event.classification === "wgnet-wrap") return "WGNET";
+      if (event.classification === "gubi-claim") return "GUBI CLAIM";
+      if (event.classification === "gubi-burn") return "GUBI BURN";
+      if (event.classification === "wgnet-wrap") return "GNET -> wGNET";
+      if (event.classification === "wgnet-unwrap") return "wGNET -> GNET";
       // generic transfers / contract calls — show BEACON regardless of wallet home system
       if (event.classification === "generic-transfer" || event.classification === "generic-contract-call") return "BEACON";
 
@@ -968,6 +972,11 @@ export default function SolarSystem() {
       />
 
   <FlyHud freelookRef={freelookRef} visible={showFlightHud && flyModeEnabled && cameraMode === "fly"} />
+
+      <OnboardingOverlay
+        isMobile={isMobile}
+        onCameraTarget={(id) => { setCameraTargetId(id); setSelectionVersion((v) => v + 1); }}
+      />
 
       {storageWallet && (
         <StorageSlotPopup wallet={storageWallet} onClose={() => setStorageWallet(null)} />
