@@ -50,6 +50,13 @@ const WGNET9_SELECTORS = {
   withdraw: "2e1a7d4d", // withdraw(uint256) — unwrap wGNET → GNET
 } as const;
 
+/** Hyperlane Mailbox selectors */
+const HYPERLANE_SELECTORS = {
+  dispatch:             "fa31de01", // dispatch(uint32,bytes32,bytes) — send message out
+  dispatchWithMetadata: "48aee8d4", // dispatch(uint32,bytes32,bytes,bytes) — send with metadata
+  process:              "7c39d130", // process(bytes,bytes) — deliver incoming message
+} as const;
+
 const SYSTEM_SELECTORS = {
   startBlock: "6bf6a42d",
 } as const;
@@ -149,16 +156,29 @@ function classify(to: string | null, input: string, value: string): Classificati
 
   // ── wGNET9 wrap / unwrap ───────────────────────────────
   if (toLower === WGNET9_ADDRESS) {
-    const isUnwrap = sel === WGNET9_SELECTORS.withdraw;
-    return {
-      classification: isUnwrap ? "wgnet-unwrap" : "wgnet-wrap",
-      label: isUnwrap ? "wGNET unwrap" : "wGNET wrap",
-      isEcosystem: true,
-      priority: 3,
-      visualVariant: "trail",
-      sourceKind: "wallet",
-      targetKind: "wallet",
-    };
+    if (sel === WGNET9_SELECTORS.deposit) {
+      return {
+        classification: "wgnet-wrap",
+        label: "wGNET wrap",
+        isEcosystem: true,
+        priority: 3,
+        visualVariant: "trail",
+        sourceKind: "wallet",
+        targetKind: "wallet",
+      };
+    }
+    if (sel === WGNET9_SELECTORS.withdraw) {
+      return {
+        classification: "wgnet-unwrap",
+        label: "wGNET unwrap",
+        isEcosystem: true,
+        priority: 3,
+        visualVariant: "trail",
+        sourceKind: "wallet",
+        targetKind: "wallet",
+      };
+    }
+    // Other calls to wGNET9 (transfer, approve, etc.) fall through to generic
   }
 
   // ── Faucet claim flow ──────────────────────────────────
@@ -202,8 +222,20 @@ function classify(to: string | null, input: string, value: string): Classificati
     };
   }
 
-  // ── Hyperlane mailbox ─────────────────────────────────
+  // ── Hyperlane mailbox: dispatch = outbound, process = inbound ─────────
   if (toLower === HYPERLANE_MAILBOX) {
+    if (sel === HYPERLANE_SELECTORS.process) {
+      return {
+        classification: "bridge-in",
+        label: "hyperlane bridge",
+        isEcosystem: true,
+        priority: 4,
+        visualVariant: "trail",
+        sourceKind: "bridge",
+        targetKind: "wallet",
+      };
+    }
+    // dispatch() or dispatch()+metadata → outbound
     return {
       classification: "bridge-out",
       label: "hyperlane bridge",

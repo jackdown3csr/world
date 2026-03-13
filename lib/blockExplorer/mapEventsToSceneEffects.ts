@@ -40,6 +40,7 @@ const CONTRACT_FALLBACK_SYSTEM: Record<string, SceneSystemId> = {
   [VE_ADDRESS]:         "vescrow",
   [RD_ADDRESS]:         "vesting",
   [STAKING_PROXY]:      "staking-remnant",
+  [GUBI_POOL_VAULT]:    "gubi-pool",
   [FAUCET_CONTRACT_ADDRESS]: "vescrow",
   [ARBSYS_ADDRESS]:     "vescrow",
   [HYPERLANE_MAILBOX]:  "vescrow",
@@ -155,13 +156,36 @@ function mapEvent(
       toSystemId = resolveWalletSystem(event.fromAddress, addressSystemMap) ?? "vescrow";
       break;
 
-    // staking → wallet
-    case "staking-withdraw":
-      fromId = toContractId;
-      toId = scopedWalletId(event.fromAddress, "staking-remnant");
+    // staking star → wallet (fan-out to every system the wallet appears in,
+    // so the arc lands on the actual vescrow/vesting body, not a phantom staking clone)
+    case "staking-withdraw": {
+      const stakingStar = toContractId; // __star_staking_remnant__
+      const toSystems = addressMultiSystemMap?.[event.fromAddress.toLowerCase()] ?? [];
+      if (toSystems.length > 0) {
+        return toSystems.map((sys) => ({
+          id: `txflow:${event.id}:unstake-${sys}`,
+          kind: "transaction-flow" as const,
+          fromId: stakingStar,
+          toId: `${sys}:${event.fromAddress.toLowerCase()}`,
+          fromSystemId: "staking-remnant" as SceneAnchorSystemId,
+          toSystemId: sys as SceneAnchorSystemId,
+          startedAt,
+          expiresAt,
+          priority: event.priority,
+          visualVariant: event.visualVariant,
+          classification: event.classification,
+          paletteHint: "ecosystem" as const,
+          txHash: event.txHash,
+          label: event.label,
+        }));
+      }
+      // Wallet not known in any system — beacon fallback
+      fromId = stakingStar;
+      toId = TRANSIT_BEACON_ID;
       fromSystemId = "staking-remnant";
-      toSystemId = "staking-remnant";
+      toSystemId = UNKNOWN_TRAFFIC_SYSTEM;
       break;
+    }
 
     // wallet → gUBI pool (burn gUBI, receive wGNET + ARCHAI)
     case "gubi-claim":
@@ -188,12 +212,13 @@ function mapEvent(
       toSystemId = resolveContractSystem(event.toAddress);
       break;
 
-    // bridge → wallet (inbound — less common to see in raw block)
+    // bridge → wallet (inbound — process() call; actual recipient unknown from tx data,
+    // so the arc goes bridge object → transit beacon to indicate incoming traffic)
     case "bridge-in":
-      fromId = fromContractId;
-      toId = resolveWalletSceneId(event.toAddress, addressSystemMap);
-      fromSystemId = resolveContractSystem(event.fromAddress);
-      toSystemId = resolveWalletSystem(event.toAddress, addressSystemMap) ?? "vescrow";
+      fromId = toContractId; // event.toAddress = HYPERLANE_MAILBOX → __bridge_hyperlane__
+      toId = TRANSIT_BEACON_ID;
+      fromSystemId = resolveContractSystem(event.toAddress);
+      toSystemId = UNKNOWN_TRAFFIC_SYSTEM;
       break;
 
     // generic transfer / contract call: fan out one effect per system the wallet belongs to
@@ -254,10 +279,14 @@ function mapEvent(
         return fanOutEffects;
       }
 
-      // Fallback: unknown wallet → transit beacon
+      // Fallback: unknown wallet → transit beacon.
+      // fromId uses the raw address so pickRandomBeltBody in TransactionFlow
+      // can seed a deterministic pick from the vescrow asteroid belt.
+      // fromSystemId = "vescrow" so the belt lookup finds real bodies instead
+      // of resolving to beacon (same position as toId → zero distance → hidden).
       fromId = event.fromAddress.toLowerCase();
       toId = TRANSIT_BEACON_ID;
-      fromSystemId = UNKNOWN_TRAFFIC_SYSTEM;
+      fromSystemId = "vescrow";
       toSystemId = UNKNOWN_TRAFFIC_SYSTEM;
       break;
       }
