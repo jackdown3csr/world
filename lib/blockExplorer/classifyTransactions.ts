@@ -266,7 +266,7 @@ function classify(to: string | null, input: string, value: string): Classificati
   if (value !== "0x0" && value !== "0x" && input === "0x") {
     return {
       classification: "generic-transfer",
-      label: "transfer",
+      label: "gnet transfer",
       isEcosystem: false,
       priority: 8,
       visualVariant: "trail",
