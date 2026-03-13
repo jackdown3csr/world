@@ -279,7 +279,7 @@ function classify(to: string | null, input: string, value: string): Classificati
   if (toLower && input.length > 2) {
     return {
       classification: "generic-contract-call",
-      label: "tx",
+      label: "beacon tx",
       isEcosystem: false,
       priority: 9,
       visualVariant: "trail",
@@ -290,7 +290,7 @@ function classify(to: string | null, input: string, value: string): Classificati
 
   return {
     classification: "unknown",
-    label: "tx",
+    label: "beacon tx",
     isEcosystem: false,
     priority: 9,
     visualVariant: "trail",

@@ -246,16 +246,19 @@ export default function TrafficPanel({
                 boxShadow: item.ecosystem ? "0 0 5px rgba(0,229,255,0.48)" : "0 0 4px rgba(114,160,184,0.28)",
               }} />
               <span style={{
-                color: "#c7dbe6",
+                ...( item.systemChip && item.systemChip !== "BEACON"
+                  ? { color: chipStyle(item.systemChip).color as string }
+                  : { color: "#c7dbe6" }
+                ),
                 fontSize: 10,
                 letterSpacing: "0.05em",
                 textTransform: "uppercase",
                 whiteSpace: "nowrap",
                 flexShrink: 0,
               }}>
-                {item.label}
+                {item.systemChip && item.systemChip !== "BEACON" ? item.systemChip : item.label}
               </span>
-              {/* systemChip hidden — kept for future use */}
+              {/* systemChip pill hidden — kept for future use */}
               <span style={{
                 color: item.ecosystem ? "#7deeff" : "#6b879a",
                 fontSize: 9,
