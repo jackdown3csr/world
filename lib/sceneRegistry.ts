@@ -109,3 +109,30 @@ export function lookupSceneBody(id: string): SceneFocusBody | null {
 
   return null;
 }
+
+/**
+ * Pick a random registered body whose key starts with `prefix`.
+ * Used as fallback for unregistered wallets — lands the effect on
+ * an actual scene object (e.g. a random asteroid / disk clump) in
+ * the same system rather than a synthetic position.
+ *
+ * `seed` makes the pick deterministic per-address so the same unknown
+ * wallet always targets the same random body within a session.
+ */
+export function lookupRandomBodyByPrefix(
+  prefix: string,
+  seed: number,
+  bodyType?: string,
+): SceneFocusBody | null {
+  // Collect keys matching prefix (and optionally bodyType) from both registries
+  const keys: string[] = [];
+  for (const [k, v] of _registry.entries()) {
+    if (k.startsWith(prefix) && (!bodyType || v.bodyType === bodyType)) keys.push(k);
+  }
+  for (const [k, v] of _instancedRegistry.entries()) {
+    if (k.startsWith(prefix) && (!bodyType || v.bodyType === bodyType)) keys.push(k);
+  }
+  if (keys.length === 0) return null;
+  const pick = keys[Math.abs(seed) % keys.length];
+  return lookupSceneBody(pick);
+}

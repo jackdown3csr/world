@@ -12,7 +12,7 @@
 import { useRef, useMemo, useEffect } from "react";
 import { useFrame } from "@react-three/fiber";
 import * as THREE from "three";
-import { lookupSceneBody } from "@/lib/sceneRegistry";
+import { lookupSceneBody, lookupRandomBodyByPrefix } from "@/lib/sceneRegistry";
 import type { TransactionFlowEffect } from "@/lib/blockExplorer/types";
 
 /* ── Color palettes ──────────────────────────────────────── */
@@ -32,20 +32,14 @@ const PALETTE = {
 const PACKET_COUNT   = 1;
 const TRAIL_SEGS     = 48;
 const TRAIL_LENGTH   = 0.72;
-const FALLBACK_Y_SPREAD = 180;
 const PACKET_AXIS = new THREE.Vector3(1, 0, 0);
 
-/** Per-system fallback ring bounds: [innerRadius, outerRadius, ySpread].
- *  ySpread matches the actual disk/belt thickness of each system.
- *  vescrow asteroid belt: buildAsteroids yOffset ±1.25 → kept wide for planet moons too
- *  vesting protoplanetary disk: diskY = position[1]*0.10 → effectively ±0.125, use ~2
- */
-const SYSTEM_FALLBACK_RING: Record<string, [number, number, number]> = {
-  "vescrow":         [280, 540,  180],
-  "vesting":         [ 90, 240,    2],   // nearly flat protoplanetary disk
-  "gubi-pool":       [120, 340,   60],
-  "staking-remnant": [200, 450,   80],
-  "transit-beacon":  [280, 540,  180],
+/** System prefix used in sceneRegistry keys, e.g. "vesting:" */
+const SYSTEM_PREFIX: Record<string, string> = {
+  "vescrow":         "vescrow:",
+  "vesting":         "vesting:",
+  "gubi-pool":       "gubi-pool:",
+  "staking-remnant": "staking-remnant:",
 };
 
 /* ── Module-level scratch vector (never allocated in render) ─ */
@@ -71,27 +65,21 @@ function hashString(input: string): number {
   return h >>> 0;
 }
 
-function buildFallbackWalletPosition(id: string, fallbackSystem: string): THREE.Vector3 | null {
-  const starId = SYSTEM_TO_STAR[fallbackSystem];
-  if (!starId) return null;
-  const star = lookupSceneBody(starId);
-  if (!star) return null;
-
-  const [ringInner, ringOuter, ySpread] = SYSTEM_FALLBACK_RING[fallbackSystem] ?? [280, 540, FALLBACK_Y_SPREAD];
-
-  const seedA = hashString(`${id}:a`);
-  const seedB = hashString(`${id}:b`);
-  const seedC = hashString(`${id}:c`);
-
-  const angle = (seedA / 0xffffffff) * Math.PI * 2;
-  const radius = ringInner + (seedB / 0xffffffff) * (ringOuter - ringInner);
-  const y = ((seedC / 0xffffffff) * 2 - 1) * ySpread;
-
-  return star.position.clone().add(new THREE.Vector3(
-    Math.cos(angle) * radius,
-    y,
-    Math.sin(angle) * radius,
-  ));
+/**
+ * Pick a random asteroid/disk body in the target system.
+ * Deterministic per-wallet (hashString seed). Falls back to the system star
+ * if no matching bodies are registered yet.
+ */
+function pickRandomBeltBody(id: string, fallbackSystem: string): THREE.Vector3 | null {
+  const prefix = SYSTEM_PREFIX[fallbackSystem];
+  if (!prefix) return null;
+  const seed = hashString(`${id}:belt`);
+  const body = lookupRandomBodyByPrefix(prefix, seed, "asteroid");
+  if (body) return body.position.clone();
+  // No belt bodies? Try any body in the system
+  const any = lookupRandomBodyByPrefix(prefix, seed);
+  if (any) return any.position.clone();
+  return null;
 }
 
 function resolvePosition(id: string | null): THREE.Vector3 | null {
@@ -110,8 +98,8 @@ function getEffectPosition(primaryId: string | null, fallbackSystem: string): TH
   const primary = resolvePosition(primaryId);
   if (primary) return primary;
   if (primaryId) {
-    const fallbackWallet = buildFallbackWalletPosition(primaryId, fallbackSystem);
-    if (fallbackWallet) return fallbackWallet;
+    const belt = pickRandomBeltBody(primaryId, fallbackSystem);
+    if (belt) return belt;
   }
   const starId = SYSTEM_TO_STAR[fallbackSystem];
   if (starId) {
