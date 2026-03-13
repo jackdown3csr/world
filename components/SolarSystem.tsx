@@ -385,6 +385,7 @@ export default function SolarSystem() {
             { label: "monthly", value: poolStats.totalMonthlyEmission, accent: "#a0c8d8" },
           ] : []),
           ...(poolVault ? [
+            { label: "gUBI", value: poolVault.gubiFormatted, accent: "#9bf7c8" },
             { label: "WGNET", value: poolVault.wgnetFormatted, accent: "#ffc860" },
             { label: "Archai", value: poolVault.archaiFormatted, accent: "#d8a0f0" },
           ] : []),
@@ -572,6 +573,8 @@ export default function SolarSystem() {
       if (event.classification === "faucet-claim") return "VE";
       if (event.classification === "vesting-claim") return "VEST";
       if (event.classification === "staking-withdraw") return "STAKE";
+      if (event.classification === "gubi-claim") return "GUBI";
+      if (event.classification === "wgnet-unwrap" || event.classification === "wgnet-wrap") return "WGNET";
       // generic transfers / contract calls — show BEACON regardless of wallet home system
       if (event.classification === "generic-transfer" || event.classification === "generic-contract-call") return "BEACON";
 

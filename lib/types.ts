@@ -88,6 +88,8 @@ export interface PoolStats {
 }
 
 export interface VaultBalances {
+  gubi: string;
+  gubiFormatted: string;
   wgnet: string;
   wgnetFormatted: string;
   archai: string;

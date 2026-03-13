@@ -11,6 +11,7 @@ import { TRANSIT_BEACON_ID } from "@/lib/transitBeacon";
 import {
   ARBSYS_ADDRESS,
   FAUCET_ADDRESS as FAUCET_CONTRACT_ADDRESS,
+  GUBI_POOL_VAULT,
   HYPERLANE_MAILBOX,
   RD_ADDRESS,
   STAKING_PROXY,
@@ -29,6 +30,7 @@ const CONTRACT_STAR_IDS: Record<string, string> = {
   [VE_ADDRESS]:         "__star_vescrow__",
   [RD_ADDRESS]:         "__star_vesting__",
   [STAKING_PROXY]:      "__star_staking_remnant__",
+  [GUBI_POOL_VAULT]:    "__star_gubi_pool__",
   [FAUCET_CONTRACT_ADDRESS]: FAUCET_SCENE_ID,
   [ARBSYS_ADDRESS]:     CANONICAL_BRIDGE_SCENE_ID,
   [HYPERLANE_MAILBOX]:  HYPERLANE_BRIDGE_SCENE_ID,
@@ -159,6 +161,23 @@ function mapEvent(
       toId = scopedWalletId(event.fromAddress, "staking-remnant");
       fromSystemId = "staking-remnant";
       toSystemId = "staking-remnant";
+      break;
+
+    // wallet → gUBI pool (burn gUBI, receive wGNET + ARCHAI)
+    case "gubi-claim":
+      fromId = resolveWalletSceneId(event.fromAddress, addressSystemMap);
+      toId = toContractId;
+      fromSystemId = resolveWalletSystem(event.fromAddress, addressSystemMap) ?? "gubi-pool";
+      toSystemId = "gubi-pool";
+      break;
+
+    // wallet → wGNET9 → wallet (self: wrap GNET→wGNET or unwrap wGNET→GNET)
+    case "wgnet-unwrap":
+    case "wgnet-wrap":
+      fromId = resolveWalletSceneId(event.fromAddress, addressSystemMap);
+      toId = resolveWalletSceneId(event.fromAddress, addressSystemMap); // same wallet
+      fromSystemId = resolveWalletSystem(event.fromAddress, addressSystemMap) ?? "gubi-pool";
+      toSystemId = resolveWalletSystem(event.fromAddress, addressSystemMap) ?? "gubi-pool";
       break;
 
     // wallet → bridge

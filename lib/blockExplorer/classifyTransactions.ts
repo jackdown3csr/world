@@ -21,6 +21,10 @@ export const ARBSYS_ADDRESS = "0x0000000000000000000000000000000000000064";
 export const HYPERLANE_MAILBOX = "0x3a464f746d23ab22155710f44db16dca53e0775e";
 export const FAUCET_ADDRESS = "0x522b3595017537d29258f7f770e78aa5de1ec9cb";
 export const SYSTEM_SELF_ADDRESS = "0x00000000000000000000000000000000000a4b05";
+/** gUBI pool vault — users call redeem/burn here, receiving wGNET + ARCHAI */
+export const GUBI_POOL_VAULT = "0x50af2aab1455c1c06b3b8e623549dde437f54eef";
+/** wGNET9 token contract — WETH9-style wrap/unwrap: deposit() wraps GNET→wGNET, withdraw() unwraps wGNET→GNET */
+export const WGNET9_ADDRESS  = "0x690f1eef8aceaad09ac695d9111af081045c6d5b7";
 
 /**
  * 4-byte selectors for VotingEscrow functions (Curve-style Vyper ABI).
@@ -38,6 +42,12 @@ const STAKING_SELECTORS = {
   withdraw: "2e1a7d4d", // withdraw(uint256) — standard ERC20 staking
   exit:     "e9fad8ee", // exit()
   stake:    "a694fc3a", // stake(uint256)
+} as const;
+
+/** wGNET9 (WETH9-style) selectors */
+const WGNET9_SELECTORS = {
+  deposit:  "d0e30db0", // deposit() — wrap GNET → wGNET
+  withdraw: "2e1a7d4d", // withdraw(uint256) — unwrap wGNET → GNET
 } as const;
 
 const SYSTEM_SELECTORS = {
@@ -120,6 +130,33 @@ function classify(to: string | null, input: string, value: string): Classificati
       priority: 2,
       visualVariant: "trail",
       sourceKind: "star",
+      targetKind: "wallet",
+    };
+  }
+
+  // ── gUBI pool claim/burn ────────────────────────────────
+  if (toLower === GUBI_POOL_VAULT) {
+    return {
+      classification: "gubi-claim",
+      label: "gUBI claim",
+      isEcosystem: true,
+      priority: 2,
+      visualVariant: "trail",
+      sourceKind: "wallet",
+      targetKind: "star",
+    };
+  }
+
+  // ── wGNET9 wrap / unwrap ───────────────────────────────
+  if (toLower === WGNET9_ADDRESS) {
+    const isUnwrap = sel === WGNET9_SELECTORS.withdraw;
+    return {
+      classification: isUnwrap ? "wgnet-unwrap" : "wgnet-wrap",
+      label: isUnwrap ? "wGNET unwrap" : "wGNET wrap",
+      isEcosystem: true,
+      priority: 3,
+      visualVariant: "trail",
+      sourceKind: "wallet",
       targetKind: "wallet",
     };
   }

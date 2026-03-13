@@ -59,6 +59,22 @@ function chipStyle(label: string): React.CSSProperties {
     border = "rgba(255, 210, 120, 0.3)";
     background = "rgba(255, 210, 120, 0.1)";
     color = "#ffd68f";
+  } else if (upper === "GUBI") {
+    border = "rgba(120, 255, 190, 0.34)";
+    background = "rgba(120, 255, 190, 0.12)";
+    color = "#7fffc0";
+  } else if (upper === "WGNET") {
+    border = "rgba(255, 200, 96, 0.34)";
+    background = "rgba(255, 200, 96, 0.12)";
+    color = "#ffd980";
+  } else if (upper.includes("GUBI")) {
+    border = "rgba(120, 255, 190, 0.3)";
+    background = "rgba(120, 255, 190, 0.1)";
+    color = "#9bf7c8";
+  } else if (upper.includes("WGNET")) {
+    border = "rgba(255, 200, 80, 0.35)";
+    background = "rgba(255, 200, 80, 0.12)";
+    color = "#ffd060";
   } else if (upper.includes("POOL")) {
     border = "rgba(120, 255, 190, 0.3)";
     background = "rgba(120, 255, 190, 0.1)";

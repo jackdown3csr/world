@@ -9,8 +9,9 @@ const STATS_API_URL = "https://admin-panel.galactica.com/api/stats?chainId=61341
 const RPC_URL =
   process.env.RPC_URL || "https://galactica-mainnet.g.alchemy.com/public";
 
-const POOL_VAULT = "0x50AF2AAb1455C1C06B3b8e623549dDE437F54EeF";
-const WGNET_TOKEN = "0x690F1eEf8AcEaD09Ac695d9111Af081045c6d5b7";
+const POOL_VAULT   = "0x50AF2AAb1455C1C06B3b8e623549dDE437F54EeF";
+const GUBI_TOKEN   = "0xFEa4F549eFB1F8B2cBA8d029e6845Ee431e142AA";
+const WGNET_TOKEN  = "0x690F1eEf8AcEaD09Ac695d9111Af081045c6d5b7";
 const ARCHAI_TOKEN = "0x22b48a764d2aAAe14d751aD2B5fcdf6C0A4d95D7";
 
 // ERC-20 balanceOf(address) selector
@@ -87,6 +88,7 @@ export async function GET() {
         next: { revalidate: 60 },
       }).catch(() => null),
       Promise.all([
+        erc20BalanceOf(GUBI_TOKEN),
         erc20BalanceOf(WGNET_TOKEN),
         erc20BalanceOf(ARCHAI_TOKEN),
       ]).catch(() => null),
@@ -132,8 +134,10 @@ export async function GET() {
 
     let vault: PoolPayload["vault"] = null;
     if (vaultResult) {
-      const [wgnetBal, archaiBal] = vaultResult;
+      const [gubiBal, wgnetBal, archaiBal] = vaultResult;
       vault = {
+        gubi: gubiBal.toString(),
+        gubiFormatted: formatBalance(gubiBal.toString(), "gUBI"),
         wgnet: wgnetBal.toString(),
         wgnetFormatted: formatBalance(wgnetBal.toString(), "WGNET"),
         archai: archaiBal.toString(),
