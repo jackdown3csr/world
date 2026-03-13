@@ -255,11 +255,7 @@ export default function TrafficPanel({
               }}>
                 {item.label}
               </span>
-              {item.systemChip ? (
-                <span style={chipStyle(item.systemChip)}>
-                  {item.systemChip}
-                </span>
-              ) : null}
+              {/* systemChip hidden — kept for future use */}
               <span style={{
                 color: item.ecosystem ? "#7deeff" : "#6b879a",
                 fontSize: 9,
