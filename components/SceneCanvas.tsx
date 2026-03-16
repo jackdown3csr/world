@@ -507,7 +507,7 @@ export default function SceneCanvas({
             paused={simulationPaused}
             onSelect={onSelect}
             interactive={interactionEnabled}
-            showLabel={(showAllNames || visualFocusAddress === sceneObject.id) && !photoMode}
+            showLabel={showAllNames && !photoMode}
           />
         );
       case "rogue-planet":
@@ -526,7 +526,7 @@ export default function SceneCanvas({
             key={sceneObject.id}
             bridge={sceneObject.bridge}
             onSelect={onSelect}
-            showLabel={(showAllNames || visualFocusAddress === sceneObject.id) && !photoMode}
+            showLabel={showAllNames && !photoMode}
             interactive={interactionEnabled}
             paused={simulationPaused}
           />
@@ -535,7 +535,7 @@ export default function SceneCanvas({
             key={sceneObject.id}
             bridge={sceneObject.bridge}
             onSelect={onSelect}
-            showLabel={(showAllNames || visualFocusAddress === sceneObject.id) && !photoMode}
+            showLabel={showAllNames && !photoMode}
             interactive={interactionEnabled}
             paused={simulationPaused}
           />
@@ -550,7 +550,7 @@ export default function SceneCanvas({
             position={sceneObject.position}
             bodyRadius={sceneObject.bodyRadius}
             onSelect={onSelect}
-            showLabel={(showAllNames || visualFocusAddress === sceneObject.id) && !photoMode}
+            showLabel={showAllNames && !photoMode}
             interactive={interactionEnabled}
             paused={simulationPaused}
           />
@@ -587,7 +587,7 @@ export default function SceneCanvas({
           blockNumber={system.id === "vescrow" ? getBlockPulseTick(system.id) : undefined}
           showOrbits={showOrbits}
           showAllNames={showAllNames && activeSystem === system.id}
-          showSystemLabel={showAllNames || visualFocusAddress === system.starId}
+          showSystemLabel={showAllNames}
           showRenamedOnly={showRenamedOnly || activeSystem !== system.id}
           photoMode={photoMode}
           paused={simulationPaused}
