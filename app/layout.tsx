@@ -42,18 +42,6 @@ export default function RootLayout({
   return (
     <html lang="en">
       <body className={inter.className}>
-        {/* Static boot cover — same colour as SplashScreen so the JS-load gap is invisible.
-            Removed by SolarSystem on first mount. */}
-        <div
-          id="sg-boot"
-          style={{
-            position: "fixed",
-            inset: 0,
-            zIndex: 10000,
-            background: "#010204",
-            pointerEvents: "none",
-          }}
-        />
         {children}
         <Analytics />
       </body>

@@ -23,7 +23,6 @@ import { buildPhotoTargetSections, findPhotoTargetById } from "@/lib/photoTarget
 import { getNearestSystemId, type SceneSystemDefinition, type SceneSystemId } from "@/lib/sceneSystems";
 import { lookupSceneBody } from "@/lib/sceneRegistry";
 
-import SplashScreen from "./SplashScreen";
 import SceneCanvas from "./SceneCanvas";
 import type { ScreenshotHandle } from "./SceneCanvas";
 import SystemHud from "./SystemHud";
@@ -69,7 +68,7 @@ interface CamDebug {
  * Top-level 3D scene: a solar system where each wallet is a celestial body.
  * Purely an orchestration layer — 3D content lives in SceneCanvas, UI in SystemHud.
  */
-export default function SolarSystem() {
+export default function SolarSystem({ onReady }: { onReady?: () => void }) {
   const isMobile = useIsMobile();
 
   /* ── Data ── */
@@ -190,13 +189,18 @@ export default function SolarSystem() {
   const [showAllNames, setShowAllNames] = useState(true);
   const [showRenamedOnly, setShowRenamedOnly] = useState(true);
   const [showNamesList, setShowNamesList] = useState(false);
-  // Remove the static boot cover rendered by layout.tsx before JS loaded.
-  useEffect(() => { document.getElementById("sg-boot")?.remove(); }, []);
-
   const [canvasReady, setCanvasReady] = useState(false);
   const handleFirstFrame = React.useCallback(() => setCanvasReady(true), []);
   const sceneLoading = loading || vestingLoading || poolLoading || stakingRemnant.loading || !canvasReady;
   const sceneReady = !sceneLoading;
+
+  const onReadyCalledRef = useRef(false);
+  useEffect(() => {
+    if (!sceneLoading && !onReadyCalledRef.current) {
+      onReadyCalledRef.current = true;
+      onReady?.();
+    }
+  }, [sceneLoading, onReady]);
 
   const [showHelp, setShowHelp] = useState(false);
   const [showOrbits, setShowOrbits] = useState(true);
@@ -851,8 +855,6 @@ export default function SolarSystem() {
 
   return (
     <>
-      <SplashScreen loading={sceneLoading} />
-
       <SceneCanvas
         isMobile={isMobile}
         frameInsetRight={desktopPanelInsetRight}

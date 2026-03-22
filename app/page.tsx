@@ -1,7 +1,9 @@
 "use client";
 
 import dynamic from "next/dynamic";
+import React, { useState } from "react";
 import AppStateScreen from "@/components/AppStateScreen";
+import SplashScreen from "@/components/SplashScreen";
 import { CanonicalBridgeProvider, useCanonicalBridge } from "@/hooks/useCanonicalBridge";
 import { HyperlaneBridgeProvider, useHyperlaneBridge } from "@/hooks/useHyperlaneBridge";
 import { StakingRemnantProvider, useStakingRemnant } from "@/hooks/useStakingRemnant";
@@ -13,8 +15,6 @@ import { PoolProvider, usePoolTokens } from "@/hooks/usePoolTokens";
 const SolarSystem = dynamic(() => import("@/components/SolarSystem"), {
   ssr: false,
 });
-
-/* Loading screen removed — SolarSystem handles its own splash overlay */
 
 function DataErrorGate() {
   const wallets = useWallets();
@@ -54,7 +54,22 @@ function DataErrorGate() {
   );
 }
 
-/* ── Exported page (wraps provider) ───────────────────────── */
+/* ── Inner content — inside providers so DataErrorGate can read hooks ── */
+
+function PageContent() {
+  const [sceneReady, setSceneReady] = useState(false);
+  return (
+    <>
+      <SplashScreen loading={!sceneReady} />
+      <div style={{ width: "100vw", height: "100vh" }}>
+        <SolarSystem onReady={() => setSceneReady(true)} />
+      </div>
+      <DataErrorGate />
+    </>
+  );
+}
+
+/* ── Exported page (wraps providers) ──────────────────────── */
 
 export default function Page() {
   return (
@@ -64,10 +79,7 @@ export default function Page() {
           <StakingRemnantProvider>
             <HyperlaneBridgeProvider>
               <CanonicalBridgeProvider>
-                <div style={{ width: "100vw", height: "100vh" }}>
-                  <SolarSystem />
-                </div>
-                <DataErrorGate />
+                <PageContent />
               </CanonicalBridgeProvider>
             </HyperlaneBridgeProvider>
           </StakingRemnantProvider>
