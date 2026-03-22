@@ -17,6 +17,7 @@ import type { SystemMovementSummary } from "@/lib/rankSnapshot";
 import type { BridgeSceneObject } from "@/lib/bridges";
 import type { TransitBeaconSceneObject } from "@/lib/transitBeacon";
 import { usePanelSwap } from "@/hooks/usePanelSwap";
+import { useOverlayState } from "@/hooks/useOverlayState";
 import HudToolbar, { HudBtn } from "./HudToolbar";
 import WalletPanel from "./WalletPanel";
 import BugReportPanel from "./BugReportPanel";
@@ -289,27 +290,6 @@ export default function SystemHud({
   const [photoKeyHints, setPhotoKeyHints] = React.useState(false);
   const [showSceneInfo, setShowSceneInfo] = React.useState(false);
   const [showBugReport, setShowBugReport] = React.useState(false);
-  const [overviewVisible, setOverviewVisible] = React.useState(false);
-  const [overviewMounted, setOverviewMounted] = React.useState(false);
-  const [overviewPhase, setOverviewPhase] = React.useState<"hidden" | "entering" | "visible" | "leaving">("hidden");
-  const overviewDismissedForRef = React.useRef<string | null>(null);
-  const lastOverviewTargetRef = React.useRef<string | null>(null);
-  const overviewHideTimerRef = React.useRef<number | null>(null);
-  const overviewUnmountTimerRef = React.useRef<number | null>(null);
-  const [bridgeOverviewVisible, setBridgeOverviewVisible] = React.useState(false);
-  const [bridgeOverviewMounted, setBridgeOverviewMounted] = React.useState(false);
-  const [bridgeOverviewPhase, setBridgeOverviewPhase] = React.useState<"hidden" | "entering" | "visible" | "leaving">("hidden");
-  const bridgeOverviewDismissedForRef = React.useRef<string | null>(null);
-  const lastBridgeOverviewTargetRef = React.useRef<string | null>(null);
-  const bridgeOverviewHideTimerRef = React.useRef<number | null>(null);
-  const bridgeOverviewUnmountTimerRef = React.useRef<number | null>(null);
-  const [transitBeaconOverviewVisible, setTransitBeaconOverviewVisible] = React.useState(false);
-  const [transitBeaconOverviewMounted, setTransitBeaconOverviewMounted] = React.useState(false);
-  const [transitBeaconOverviewPhase, setTransitBeaconOverviewPhase] = React.useState<"hidden" | "entering" | "visible" | "leaving">("hidden");
-  const transitBeaconOverviewDismissedForRef = React.useRef<string | null>(null);
-  const lastTransitBeaconOverviewTargetRef = React.useRef<string | null>(null);
-  const transitBeaconOverviewHideTimerRef = React.useRef<number | null>(null);
-  const transitBeaconOverviewUnmountTimerRef = React.useRef<number | null>(null);
   const photoShortcutMap = React.useMemo(() => ({
     hud: getShortcutByKey(photoModeShortcuts, "H")?.keys ?? "H",
     exit: getShortcutByKey(photoModeShortcuts, "Esc")?.keys ?? "Esc",
@@ -361,6 +341,24 @@ export default function SystemHud({
   const overviewTargetId = hasDetachedFocus ? null : (displaySystem?.id ?? activeSystemId);
   const selectedBridgeId = selectedBridge?.id ?? null;
   const selectedTransitBeaconId = selectedTransitBeacon?.id ?? null;
+  const overview = useOverlayState({
+    targetId: overviewTargetId,
+    enabled: sceneReady && !isMobile && !hasDetachedFocus && !showHelp && !showNamesList && !showSceneInfo,
+    fadeMs: OVERVIEW_FADE_MS,
+  });
+  const bridgeOverview = useOverlayState({
+    targetId: selectedBridgeId,
+    enabled: !isMobile && !!selectedBridge && !showHelp && !showNamesList && !showSceneInfo,
+    fadeMs: OVERVIEW_FADE_MS,
+  });
+  const transitBeaconOverview = useOverlayState({
+    targetId: selectedTransitBeaconId,
+    enabled: !isMobile && !!selectedTransitBeacon && !showHelp && !showNamesList && !showSceneInfo,
+    fadeMs: OVERVIEW_FADE_MS,
+  });
+  const { visible: overviewVisible, mounted: overviewMounted, phase: overviewPhase } = overview;
+  const { visible: bridgeOverviewVisible, mounted: bridgeOverviewMounted, phase: bridgeOverviewPhase } = bridgeOverview;
+  const { visible: transitBeaconOverviewVisible, mounted: transitBeaconOverviewMounted, phase: transitBeaconOverviewPhase } = transitBeaconOverview;
   const bridgePanelVisible = Boolean(selectedBridge) && !isMobile;
   const transitBeaconPanelVisible = Boolean(selectedTransitBeacon) && !isMobile;
   const activeDesktopPanel = showHelp
@@ -537,282 +535,16 @@ export default function SystemHud({
     photoSimulationMode,
   ]);
 
-  // Reset dismissal when the watched target changes so a new selection auto-shows.
-  React.useEffect(() => {
-    overviewDismissedForRef.current = null;
-  }, [overviewTargetId]);
-
-  React.useEffect(() => {
-    if (overviewHideTimerRef.current !== null) {
-      window.clearTimeout(overviewHideTimerRef.current);
-      overviewHideTimerRef.current = null;
-    }
-    if (overviewUnmountTimerRef.current !== null) {
-      window.clearTimeout(overviewUnmountTimerRef.current);
-      overviewUnmountTimerRef.current = null;
-    }
-
-    if (!sceneReady || isMobile || hasDetachedFocus || showHelp || showNamesList || showSceneInfo
-        || overviewDismissedForRef.current === overviewTargetId) {
-      lastOverviewTargetRef.current = overviewTargetId;
-      setOverviewVisible(false);
-      setOverviewMounted(false);
-      setOverviewPhase("hidden");
-      return;
-    }
-
-    const isRetargetingOverview = Boolean(
-      overviewTargetId
-      && overviewMounted
-      && overviewVisible
-      && lastOverviewTargetRef.current
-      && lastOverviewTargetRef.current !== overviewTargetId,
-    );
-    lastOverviewTargetRef.current = overviewTargetId;
-
-    setOverviewMounted(true);
-    let rafId: number | null = null;
-    if (isRetargetingOverview) {
-      setOverviewPhase("visible");
-      setOverviewVisible(true);
-    } else {
-      rafId = window.requestAnimationFrame(() => {
-        setOverviewPhase("entering");
-        setOverviewVisible(true);
-      });
-    }
-
-    const settleVisibleTimer = window.setTimeout(() => {
-      setOverviewPhase("visible");
-    }, isRetargetingOverview ? 0 : OVERVIEW_FADE_MS);
-
-    overviewHideTimerRef.current = window.setTimeout(() => {
-      setOverviewPhase("leaving");
-      setOverviewVisible(false);
-      overviewHideTimerRef.current = null;
-    }, 8000);
-
-    overviewUnmountTimerRef.current = window.setTimeout(() => {
-      setOverviewMounted(false);
-      setOverviewPhase("hidden");
-      overviewUnmountTimerRef.current = null;
-    }, 8000 + OVERVIEW_FADE_MS);
-
-    return () => {
-      if (rafId !== null) {
-        window.cancelAnimationFrame(rafId);
-      }
-      window.clearTimeout(settleVisibleTimer);
-      if (overviewHideTimerRef.current !== null) {
-        window.clearTimeout(overviewHideTimerRef.current);
-        overviewHideTimerRef.current = null;
-      }
-      if (overviewUnmountTimerRef.current !== null) {
-        window.clearTimeout(overviewUnmountTimerRef.current);
-        overviewUnmountTimerRef.current = null;
-      }
-    };
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [activeSystemId, hasDetachedFocus, isMobile, sceneReady, showHelp, showNamesList, showSceneInfo]);
-
-  React.useEffect(() => {
-    bridgeOverviewDismissedForRef.current = null;
-  }, [selectedBridgeId]);
-
-  React.useEffect(() => {
-    transitBeaconOverviewDismissedForRef.current = null;
-  }, [selectedTransitBeaconId]);
-
-  React.useEffect(() => {
-    if (bridgeOverviewHideTimerRef.current !== null) {
-      window.clearTimeout(bridgeOverviewHideTimerRef.current);
-      bridgeOverviewHideTimerRef.current = null;
-    }
-    if (bridgeOverviewUnmountTimerRef.current !== null) {
-      window.clearTimeout(bridgeOverviewUnmountTimerRef.current);
-      bridgeOverviewUnmountTimerRef.current = null;
-    }
-
-    if (isMobile || !selectedBridge || showHelp || showNamesList || showSceneInfo
-        || bridgeOverviewDismissedForRef.current === selectedBridgeId) {
-      lastBridgeOverviewTargetRef.current = selectedBridgeId;
-      setBridgeOverviewVisible(false);
-      setBridgeOverviewMounted(false);
-      setBridgeOverviewPhase("hidden");
-      return;
-    }
-
-    const isRetargetingBridgeOverview = Boolean(
-      selectedBridgeId
-      && bridgeOverviewMounted
-      && bridgeOverviewVisible
-      && lastBridgeOverviewTargetRef.current
-      && lastBridgeOverviewTargetRef.current !== selectedBridgeId,
-    );
-    lastBridgeOverviewTargetRef.current = selectedBridgeId;
-
-    setBridgeOverviewMounted(true);
-    let rafId: number | null = null;
-    if (isRetargetingBridgeOverview) {
-      setBridgeOverviewPhase("visible");
-      setBridgeOverviewVisible(true);
-    } else {
-      rafId = window.requestAnimationFrame(() => {
-        setBridgeOverviewPhase("entering");
-        setBridgeOverviewVisible(true);
-      });
-    }
-
-    const settleVisibleTimer = window.setTimeout(() => {
-      setBridgeOverviewPhase("visible");
-    }, isRetargetingBridgeOverview ? 0 : OVERVIEW_FADE_MS);
-
-    bridgeOverviewHideTimerRef.current = window.setTimeout(() => {
-      setBridgeOverviewPhase("leaving");
-      setBridgeOverviewVisible(false);
-      bridgeOverviewHideTimerRef.current = null;
-    }, 8000);
-
-    bridgeOverviewUnmountTimerRef.current = window.setTimeout(() => {
-      setBridgeOverviewMounted(false);
-      setBridgeOverviewPhase("hidden");
-      bridgeOverviewUnmountTimerRef.current = null;
-    }, 8000 + OVERVIEW_FADE_MS);
-
-    return () => {
-      if (rafId !== null) {
-        window.cancelAnimationFrame(rafId);
-      }
-      window.clearTimeout(settleVisibleTimer);
-      if (bridgeOverviewHideTimerRef.current !== null) {
-        window.clearTimeout(bridgeOverviewHideTimerRef.current);
-        bridgeOverviewHideTimerRef.current = null;
-      }
-      if (bridgeOverviewUnmountTimerRef.current !== null) {
-        window.clearTimeout(bridgeOverviewUnmountTimerRef.current);
-        bridgeOverviewUnmountTimerRef.current = null;
-      }
-    };
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [selectedBridgeId, isMobile, showHelp, showNamesList, showSceneInfo]);
-
-  React.useEffect(() => {
-    if (transitBeaconOverviewHideTimerRef.current !== null) {
-      window.clearTimeout(transitBeaconOverviewHideTimerRef.current);
-      transitBeaconOverviewHideTimerRef.current = null;
-    }
-    if (transitBeaconOverviewUnmountTimerRef.current !== null) {
-      window.clearTimeout(transitBeaconOverviewUnmountTimerRef.current);
-      transitBeaconOverviewUnmountTimerRef.current = null;
-    }
-
-    if (isMobile || !selectedTransitBeacon || showHelp || showNamesList || showSceneInfo
-        || transitBeaconOverviewDismissedForRef.current === selectedTransitBeaconId) {
-      lastTransitBeaconOverviewTargetRef.current = selectedTransitBeaconId;
-      setTransitBeaconOverviewVisible(false);
-      setTransitBeaconOverviewMounted(false);
-      setTransitBeaconOverviewPhase("hidden");
-      return;
-    }
-
-    const isRetargetingTransitBeaconOverview = Boolean(
-      selectedTransitBeaconId
-      && transitBeaconOverviewMounted
-      && transitBeaconOverviewVisible
-      && lastTransitBeaconOverviewTargetRef.current
-      && lastTransitBeaconOverviewTargetRef.current !== selectedTransitBeaconId,
-    );
-    lastTransitBeaconOverviewTargetRef.current = selectedTransitBeaconId;
-
-    setTransitBeaconOverviewMounted(true);
-    let rafId: number | null = null;
-    if (isRetargetingTransitBeaconOverview) {
-      setTransitBeaconOverviewPhase("visible");
-      setTransitBeaconOverviewVisible(true);
-    } else {
-      rafId = window.requestAnimationFrame(() => {
-        setTransitBeaconOverviewPhase("entering");
-        setTransitBeaconOverviewVisible(true);
-      });
-    }
-
-    const settleVisibleTimer = window.setTimeout(() => {
-      setTransitBeaconOverviewPhase("visible");
-    }, isRetargetingTransitBeaconOverview ? 0 : OVERVIEW_FADE_MS);
-
-    transitBeaconOverviewHideTimerRef.current = window.setTimeout(() => {
-      setTransitBeaconOverviewPhase("leaving");
-      setTransitBeaconOverviewVisible(false);
-      transitBeaconOverviewHideTimerRef.current = null;
-    }, 8000);
-
-    transitBeaconOverviewUnmountTimerRef.current = window.setTimeout(() => {
-      setTransitBeaconOverviewMounted(false);
-      setTransitBeaconOverviewPhase("hidden");
-      transitBeaconOverviewUnmountTimerRef.current = null;
-    }, 8000 + OVERVIEW_FADE_MS);
-
-    return () => {
-      if (rafId !== null) {
-        window.cancelAnimationFrame(rafId);
-      }
-      window.clearTimeout(settleVisibleTimer);
-      if (transitBeaconOverviewHideTimerRef.current !== null) {
-        window.clearTimeout(transitBeaconOverviewHideTimerRef.current);
-        transitBeaconOverviewHideTimerRef.current = null;
-      }
-      if (transitBeaconOverviewUnmountTimerRef.current !== null) {
-        window.clearTimeout(transitBeaconOverviewUnmountTimerRef.current);
-        transitBeaconOverviewUnmountTimerRef.current = null;
-      }
-    };
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [selectedTransitBeaconId, isMobile, showHelp, showNamesList, showSceneInfo]);
 
   const handleInfoToggle = React.useCallback(() => {
     if (infoChipActive) {
-      // Mark current targets as dismissed so auto-overview won't reopen them.
-      overviewDismissedForRef.current = overviewTargetId;
-      bridgeOverviewDismissedForRef.current = selectedBridgeId;
-      transitBeaconOverviewDismissedForRef.current = selectedTransitBeaconId;
-
+      overview.dismiss();
+      overview.forceHide();
+      bridgeOverview.dismiss();
+      bridgeOverview.forceHide();
+      transitBeaconOverview.dismiss();
+      transitBeaconOverview.forceHide();
       setShowSceneInfo(false);
-
-      if (overviewHideTimerRef.current !== null) {
-        window.clearTimeout(overviewHideTimerRef.current);
-        overviewHideTimerRef.current = null;
-      }
-      if (overviewUnmountTimerRef.current !== null) {
-        window.clearTimeout(overviewUnmountTimerRef.current);
-        overviewUnmountTimerRef.current = null;
-      }
-      setOverviewVisible(false);
-      setOverviewMounted(false);
-      setOverviewPhase("hidden");
-
-      if (bridgeOverviewHideTimerRef.current !== null) {
-        window.clearTimeout(bridgeOverviewHideTimerRef.current);
-        bridgeOverviewHideTimerRef.current = null;
-      }
-      if (bridgeOverviewUnmountTimerRef.current !== null) {
-        window.clearTimeout(bridgeOverviewUnmountTimerRef.current);
-        bridgeOverviewUnmountTimerRef.current = null;
-      }
-      setBridgeOverviewVisible(false);
-      setBridgeOverviewMounted(false);
-      setBridgeOverviewPhase("hidden");
-
-      if (transitBeaconOverviewHideTimerRef.current !== null) {
-        window.clearTimeout(transitBeaconOverviewHideTimerRef.current);
-        transitBeaconOverviewHideTimerRef.current = null;
-      }
-      if (transitBeaconOverviewUnmountTimerRef.current !== null) {
-        window.clearTimeout(transitBeaconOverviewUnmountTimerRef.current);
-        transitBeaconOverviewUnmountTimerRef.current = null;
-      }
-      setTransitBeaconOverviewVisible(false);
-      setTransitBeaconOverviewMounted(false);
-      setTransitBeaconOverviewPhase("hidden");
       return;
     }
 
@@ -820,7 +552,7 @@ export default function SystemHud({
     if (showNamesList) onToggleDirectory();
     if (showHelp) onToggleHelp();
     if (showBugReport) setShowBugReport(false);
-  }, [infoChipActive, onToggleDirectory, onToggleHelp, overviewTargetId, selectedBridgeId, selectedTransitBeaconId, showBugReport, showHelp, showNamesList]);
+  }, [infoChipActive, overview, bridgeOverview, transitBeaconOverview, onToggleDirectory, onToggleHelp, showBugReport, showHelp, showNamesList]);
 
   const handleListToggle = React.useCallback(() => {
     if (isDirectoryDisabled) return;
