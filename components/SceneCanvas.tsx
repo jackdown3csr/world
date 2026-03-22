@@ -276,17 +276,36 @@ function ActiveSystemDetector({
   return null;
 }
 
-/** Pre-compile every shader program in the scene graph on mount so the GPU
- *  doesn't stall when distant star systems first enter the camera frustum. */
-function ShaderWarmup() {
+/** Pre-compile every shader program in the scene graph so the GPU doesn't
+ *  stall when distant star systems first enter the camera frustum.
+ *  Uses compileAsync() (KHR_parallel_shader_compile) to avoid blocking the
+ *  main thread. Falls back to synchronous compile on older drivers. */
+function ShaderWarmup({ onReady }: { onReady?: () => void }) {
   const { gl, scene, camera } = useThree();
   const done = useRef(false);
   useEffect(() => {
     if (done.current) return;
     done.current = true;
-    // compile() walks the full scene hierarchy regardless of frustum culling
-    gl.compile(scene, camera);
-  }, [gl, scene, camera]);
+    gl.compileAsync(scene, camera).then(() => {
+      onReady?.();
+    }).catch(() => {
+      // Fallback: synchronous compile if compileAsync fails
+      gl.compile(scene, camera);
+      onReady?.();
+    });
+  }, [gl, scene, camera, onReady]);
+  return null;
+}
+
+/** Fires onReady after the very first rendered WebGL frame so the splash
+ *  screen stays visible until the Canvas has something real to show. */
+function FirstFrameDetector({ onReady }: { onReady?: () => void }) {
+  const done = useRef(false);
+  useFrame(() => {
+    if (done.current) return;
+    done.current = true;
+    onReady?.();
+  });
   return null;
 }
 
@@ -395,6 +414,8 @@ export interface SceneCanvasProps {
   getFlyTarget?: () => THREE.Vector3 | null;
   onHoverWallet?: (info: import('./WalletTooltip').HoveredWalletInfo | null) => void;
   onResetDone: () => void;
+  onShadersReady?: () => void;
+  onFirstFrame?: () => void;
   selectionVersion: number;
 }
 
@@ -432,6 +453,8 @@ export default function SceneCanvas({
   getFlyTarget,
   onHoverWallet,
   onResetDone,
+  onShadersReady,
+  onFirstFrame,
   selectionVersion,
 }: SceneCanvasProps) {
   const [activeSystem, setActiveSystem] = useState<SceneSystemId>(systems[0]?.id ?? "vescrow");
@@ -568,7 +591,8 @@ export default function SceneCanvas({
       dpr={[1, isMobile ? 1.5 : 2]}
     >
       <ambientLight intensity={0.025} />
-      <ShaderWarmup />
+      <ShaderWarmup onReady={onShadersReady} />
+      <FirstFrameDetector onReady={onFirstFrame} />
       <CameraLensController fov={photoFov} />
       <SpriteLabelManager />
       <ActiveSystemDetector systems={systems} onChange={setActiveSystem} />

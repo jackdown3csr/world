@@ -190,7 +190,9 @@ export default function SolarSystem() {
   const [showAllNames, setShowAllNames] = useState(true);
   const [showRenamedOnly, setShowRenamedOnly] = useState(true);
   const [showNamesList, setShowNamesList] = useState(false);
-  const sceneLoading = loading || vestingLoading || poolLoading || stakingRemnant.loading;
+  const [canvasReady, setCanvasReady] = useState(false);
+  const handleFirstFrame = React.useCallback(() => setCanvasReady(true), []);
+  const sceneLoading = loading || vestingLoading || poolLoading || stakingRemnant.loading || !canvasReady;
   const sceneReady = !sceneLoading;
 
   const [showHelp, setShowHelp] = useState(false);
@@ -887,6 +889,7 @@ export default function SolarSystem() {
         }, [cameraTargetId, selectedAddress])}
         onHoverWallet={onHoverWallet}
         onResetDone={() => setResetRequested(false)}
+        onFirstFrame={handleFirstFrame}
       />
 
       {interactionsActive && (
