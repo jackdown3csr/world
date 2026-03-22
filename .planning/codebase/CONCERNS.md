@@ -10,11 +10,6 @@
 - Impact: Changes to UI state coordination become fragile; refactoring requires touching many interdependent handlers. New features compound state complexity.
 - Fix approach: Extract nested overlay logic into separate composable components; consider state machine pattern for mode transitions (photo → fly → orbit); decompose panel swap logic into custom hooks.
 
-**Sparse Linting Configuration:**
-- Issue: ESLint config in `.eslintrc` disables `@typescript-eslint/no-explicit-any`. While intentional, codebase has only 1 `any` type declaration (`components/TransactionFlow.tsx`), suggesting stricter enforcement is feasible.
-- Files: `.eslintrc` (rule override), `components/TransactionFlow.tsx` (line with `any`)
-- Impact: Type safety regression vector; implicit type errors may slip through; makes refactoring riskier.
-- Fix approach: Enable `@typescript-eslint/no-explicit-any` as "warn" and audit usages; replace typed generics where `any` is used for convenience.
 
 **Untyped Webhook Response Parsing:**
 - Issue: API routes (`app/api/hyperlane/route.ts`, `app/api/block/txs/route.ts`, etc.) parse RPC responses with loose typing. Type casts like `as RpcLog[]` are unvalidated; malformed upstream data could corrupt state.
@@ -23,12 +18,6 @@
 - Fix approach: Add Zod or similar schema validation on RPC response before casting; log validation failures; fallback gracefully on malformed data.
 
 ## Known Bugs
-
-**Duplicate Definition of eslintrc Config:**
-- Symptoms: Multiple `.eslintrc` files with conflicting rules at repo level and subdirectories.
-- Files: Multiple eslint config files (detected during exploration)
-- Trigger: ESLint may apply inconsistent rules depending on CWD or IDE configuration.
-- Workaround: Use ESLint flat config format and consolidate into `eslint.config.mjs`.
 
 **Event Listener Cleanup in FreeLookControls:**
 - Symptoms: While cleanup is present (lines 690-701), the `window.blur` listener and canvas pointer capture may not release properly if component unmounts during active drag or touch gesture.
@@ -49,9 +38,9 @@
   - Use secure backend-only endpoints for authenticated operations
 
 **Wallet Provider Assumption:**
-- Risk: `hooks/useWalletConnection.ts` assumes `window.ethereum` exists and is trustworthy (lines 65-78). Malicious code injected into page could impersonate wallet provider.
-- Files: `hooks/useWalletConnection.ts` (lines 65-78), used in `components/SolarSystem.tsx` line 174
-- Current mitigation: Chain ID validation prevents unauthorized network switching (lines 36-62)
+- Risk: `hooks/useWalletConnection.ts` uses `BrowserProvider(eth as never)` without explicit provider origin validation. Malicious browser extensions could impersonate the wallet provider.
+- Files: `hooks/useWalletConnection.ts` (lines 172, 223)
+- Current mitigation: Chain ID validation prevents unauthorized network switching
 - Recommendations:
   - Validate provider origin via content-security-policy headers
   - Warn user when signing sensitive transactions
@@ -205,7 +194,7 @@
 
 **Wallet Connection Error Scenarios Untested:**
 - What's not tested: User rejects chain switch, user rejects wallet connection, RPC returns invalid chain ID, wallet extension crashes mid-request
-- Files: `hooks/useWalletConnection.ts` (lines 36-62, 200-246)
+- Files: `hooks/useWalletConnection.ts` (275 lines total)
 - Risk: UI enters inconsistent state; user sees stale "connected" status while disconnected; signing requests sent to unverified wallet
 - Priority: **High** — security-relevant
 
