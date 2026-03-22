@@ -190,6 +190,9 @@ export default function SolarSystem() {
   const [showAllNames, setShowAllNames] = useState(true);
   const [showRenamedOnly, setShowRenamedOnly] = useState(true);
   const [showNamesList, setShowNamesList] = useState(false);
+  // Remove the static boot cover rendered by layout.tsx before JS loaded.
+  useEffect(() => { document.getElementById("sg-boot")?.remove(); }, []);
+
   const [canvasReady, setCanvasReady] = useState(false);
   const handleFirstFrame = React.useCallback(() => setCanvasReady(true), []);
   const sceneLoading = loading || vestingLoading || poolLoading || stakingRemnant.loading || !canvasReady;
