@@ -111,6 +111,7 @@ export function buildSolarSystem(wallets: WalletEntry[], layoutMode: LayoutMode 
 export { buildVestingSystem } from "./vestingLayout";
 export { buildPoolSystem } from "./poolLayout";
 export { buildStakingRemnantSystem } from "./stakingRemnantLayout";
+export { buildFlambeurSystem } from "./flambeurLayout";
 export type {
   PlanetType,
   PlanetData,

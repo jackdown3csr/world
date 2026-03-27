@@ -17,6 +17,7 @@ const SURFACE_GLSL = {
   cool: { white: "vec3(0.98,0.96,0.90)", yellow: "vec3(0.88,0.90,0.86)", orange: "vec3(0.54,0.72,0.68)", dark: "vec3(0.10,0.20,0.18)", edge: "vec3(0.78,0.84,0.82)", filLo: "vec3(0.60,0.74,0.70)", filHi: "vec3(0.94,0.94,0.88)" },
   dwarf: { white: "vec3(0.96,0.98,1.00)", yellow: "vec3(0.92,0.96,1.00)", orange: "vec3(0.66,0.86,1.00)", dark: "vec3(0.12,0.18,0.35)", edge: "vec3(0.88,0.96,1.00)", filLo: "vec3(0.58,0.78,1.00)", filHi: "vec3(0.95,0.99,1.00)" },
   dying: { white: "vec3(1.00,0.92,0.80)", yellow: "vec3(0.92,0.54,0.28)", orange: "vec3(0.52,0.14,0.08)", dark: "vec3(0.08,0.02,0.02)", edge: "vec3(1.00,0.48,0.20)", filLo: "vec3(0.75,0.20,0.08)", filHi: "vec3(1.00,0.64,0.34)" },
+  flambeur: { white: "vec3(1.00,0.94,0.88)", yellow: "vec3(1.00,0.70,0.19)", orange: "vec3(0.80,0.13,0.00)", dark: "vec3(0.17,0.03,0.03)", edge: "vec3(1.00,0.27,0.07)", filLo: "vec3(0.70,0.10,0.02)", filHi: "vec3(1.00,0.60,0.20)" },
 } as const;
 
 const FLARE_GLSL = {
@@ -24,6 +25,7 @@ const FLARE_GLSL = {
   cool: { white: "vec3(0.98,0.96,0.90)", warm: "vec3(0.82,0.86,0.82)", orange: "vec3(0.54,0.72,0.68)" },
   dwarf: { white: "vec3(0.98,0.99,1.00)", warm: "vec3(0.85,0.94,1.00)", orange: "vec3(0.62,0.82,0.98)" },
   dying: { white: "vec3(1.00,0.90,0.76)", warm: "vec3(0.94,0.42,0.16)", orange: "vec3(0.44,0.08,0.04)" },
+  flambeur: { white: "vec3(1.00,0.92,0.84)", warm: "vec3(1.00,0.60,0.15)", orange: "vec3(0.75,0.10,0.02)" },
 } as const;
 
 const surfaceVert = /* glsl */ `

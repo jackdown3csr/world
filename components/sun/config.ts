@@ -2,7 +2,6 @@ import { SUN_RADIUS } from "@/lib/layout";
 
 export const SUN_PALETTES = {
   warm: {
-    // veGNET — orange/gold
     surface: { white: "#fff8f0", yellow: "#ffe070", orange: "#ff9922", dark: "#8c2800" },
     halo: ["#fffef0", "#fff4c8", "#ffe080", "#ffaa33", "#ff7711"],
     flare: { warm: "#ff9a18", orange: "#ff6610" },
@@ -10,7 +9,6 @@ export const SUN_PALETTES = {
     point: "#fff5e0",
   },
   cool: {
-    // Vesting — ancient ivory-teal giant star
     surface: { white: "#fdf8f0", yellow: "#e0e8e4", orange: "#8abcb8", dark: "#1a2e30" },
     halo: ["#faf6ee", "#e8ede8", "#c2d6d2", "#8ab0ac", "#5a8882"],
     flare: { warm: "#e4ece6", orange: "#8ab8b0" },
@@ -18,7 +16,6 @@ export const SUN_PALETTES = {
     point: "#f4efe4",
   },
   dwarf: {
-    // gUBI pool — compact pristine blue-white young star
     surface: { white: "#fbfdff", yellow: "#dcf3ff", orange: "#89c7ff", dark: "#1d3156" },
     halo: ["#fafdff", "#dff4ff", "#a9dcff", "#63b7ff", "#2e7de0"],
     flare: { warm: "#e4f6ff", orange: "#89d8ff" },
@@ -26,17 +23,23 @@ export const SUN_PALETTES = {
     point: "#f2f9ff",
   },
   dying: {
-    // frozen staking shell — swollen unstable star shedding matter
     surface: { white: "#fff1d8", yellow: "#ff7f3d", orange: "#67160d", dark: "#120304" },
     halo: ["#ff9060", "#ff5a28", "#cf3c1a", "#5c120c", "#220405"],
     flare: { warm: "#ff7030", orange: "#7f190f" },
     label: { name: "#ffd8ba", accent: "#ff8750", sub: "#a56d5f" },
     point: "#ff9a58",
   },
+  flambeur: {
+    surface: { white: "#fff0e0", yellow: "#ffb030", orange: "#cc2200", dark: "#2a0505" },
+    halo: ["#fff0d0", "#ffcc80", "#ff8840", "#cc2200", "#660800"],
+    flare: { warm: "#ff8040", orange: "#cc2200" },
+    label: { name: "#ffcc88", accent: "#ff4411", sub: "#bb7755" },
+    point: "#ff9966",
+  },
 } as const;
 
 export type StarPalette = keyof typeof SUN_PALETTES;
-export type StarVariant = "vescrow" | "vesting" | "dwarf" | "dying" | "generic";
+export type StarVariant = "vescrow" | "vesting" | "dwarf" | "dying" | "flambeur" | "generic";
 export type HaloLayerConfig = {
   scale: number;
   color: string;
@@ -84,16 +87,12 @@ export const VESCROW_PARAMS = {
 
 export function getStarVariant(palette: StarPalette): StarVariant {
   switch (palette) {
-    case "warm":
-      return "vescrow";
-    case "cool":
-      return "vesting";
-    case "dwarf":
-      return "dwarf";
-    case "dying":
-      return "dying";
-    default:
-      return "generic";
+    case "warm":     return "vescrow";
+    case "cool":     return "vesting";
+    case "dwarf":    return "dwarf";
+    case "dying":    return "dying";
+    case "flambeur": return "flambeur";
+    default:         return "generic";
   }
 }
 
@@ -112,17 +111,17 @@ export function getHaloLayers(palette: StarPalette): HaloLayerConfig[] {
       return [
         { scale: 1.18, color: pal.halo[0], alpha: 0.72, falloff: 4.2 },
         { scale: 1.65, color: pal.halo[1], alpha: 0.42, falloff: 3.0 },
-        { scale: 2.6, color: pal.halo[2], alpha: 0.22, falloff: 2.0 },
-        { scale: 4.5, color: pal.halo[3], alpha: 0.1, falloff: 1.4 },
-        { scale: 8.0, color: pal.halo[4], alpha: 0.035, falloff: 0.9 },
+        { scale: 2.6,  color: pal.halo[2], alpha: 0.22, falloff: 2.0 },
+        { scale: 4.5,  color: pal.halo[3], alpha: 0.1,  falloff: 1.4 },
+        { scale: 8.0,  color: pal.halo[4], alpha: 0.035, falloff: 0.9 },
       ];
     case "vescrow":
       return [
         { scale: 1.14, color: pal.halo[0], alpha: 0.95, falloff: 4.2 },
         { scale: 1.55, color: pal.halo[1], alpha: 0.62, falloff: 3.0 },
-        { scale: 2.4, color: pal.halo[2], alpha: 0.34, falloff: 2.2 },
-        { scale: 4.2, color: pal.halo[3], alpha: 0.16, falloff: 1.5 },
-        { scale: 7.5, color: pal.halo[4], alpha: 0.06, falloff: 1.0 },
+        { scale: 2.4,  color: pal.halo[2], alpha: 0.34, falloff: 2.2 },
+        { scale: 4.2,  color: pal.halo[3], alpha: 0.16, falloff: 1.5 },
+        { scale: 7.5,  color: pal.halo[4], alpha: 0.06, falloff: 1.0 },
       ];
     case "dwarf":
       return [
@@ -131,61 +130,60 @@ export function getHaloLayers(palette: StarPalette): HaloLayerConfig[] {
         { scale: 1.28, color: pal.halo[2], alpha: 0.14, falloff: 4.5 },
         { scale: 1.52, color: pal.halo[3], alpha: 0.06, falloff: 3.1 },
       ];
+    case "flambeur":
+      return [
+        { scale: 1.10, color: pal.halo[0], alpha: 0.88, falloff: 4.8 },
+        { scale: 1.48, color: pal.halo[1], alpha: 0.52, falloff: 3.4 },
+        { scale: 2.2,  color: pal.halo[2], alpha: 0.28, falloff: 2.4 },
+        { scale: 3.8,  color: pal.halo[3], alpha: 0.12, falloff: 1.6 },
+        { scale: 6.5,  color: pal.halo[4], alpha: 0.04, falloff: 1.0 },
+      ];
     case "generic":
     default:
       return [
-        { scale: 1.12, color: pal.halo[0], alpha: 0.9, falloff: 4.0 },
+        { scale: 1.12, color: pal.halo[0], alpha: 0.9,  falloff: 4.0 },
         { scale: 1.45, color: pal.halo[1], alpha: 0.55, falloff: 3.0 },
-        { scale: 2.2, color: pal.halo[2], alpha: 0.3, falloff: 2.2 },
-        { scale: 3.8, color: pal.halo[3], alpha: 0.14, falloff: 1.5 },
-        { scale: 7.0, color: pal.halo[4], alpha: 0.05, falloff: 1.0 },
+        { scale: 2.2,  color: pal.halo[2], alpha: 0.3,  falloff: 2.2 },
+        { scale: 3.8,  color: pal.halo[3], alpha: 0.14, falloff: 1.5 },
+        { scale: 7.0,  color: pal.halo[4], alpha: 0.05, falloff: 1.0 },
       ];
   }
 }
 
 export function getLensFlareConfig(palette: StarPalette): { scaleMult: number; opacity: number } {
   switch (getStarVariant(palette)) {
-    case "dying":
-      return { scaleMult: 4.5, opacity: 0.50 };
-    case "dwarf":
-      return { scaleMult: 2.8, opacity: 0.62 };
-    case "vesting":
-      return { scaleMult: 6.5, opacity: 0.55 };
-    case "vescrow":
-      return { scaleMult: 5.5, opacity: 0.9 };
+    case "dying":    return { scaleMult: 4.5, opacity: 0.50 };
+    case "dwarf":    return { scaleMult: 2.8, opacity: 0.62 };
+    case "vesting":  return { scaleMult: 6.5, opacity: 0.55 };
+    case "vescrow":  return { scaleMult: 5.5, opacity: 0.90 };
+    case "flambeur": return { scaleMult: 5.0, opacity: 0.80 };
     case "generic":
-    default:
-      return { scaleMult: 5, opacity: 1 };
+    default:         return { scaleMult: 5,   opacity: 1    };
   }
 }
 
 export function getPointLightConfig(palette: StarPalette): { intensity: number; distance: number; decay: number } {
   switch (getStarVariant(palette)) {
-    case "dying":
-      return { intensity: 18, distance: 11000, decay: 0.14 };
-    case "dwarf":
-      return { intensity: 17, distance: 8200, decay: 0.14 };
-    case "vesting":
-      return { intensity: 24, distance: 14000, decay: 0.08 };
-    case "vescrow":
-      return { intensity: 32, distance: 13000, decay: 0.1 };
+    case "dying":    return { intensity: 18, distance: 11000, decay: 0.14 };
+    case "dwarf":    return { intensity: 17, distance:  8200, decay: 0.14 };
+    case "vesting":  return { intensity: 24, distance: 14000, decay: 0.08 };
+    case "vescrow":  return { intensity: 32, distance: 13000, decay: 0.10 };
+    case "flambeur": return { intensity: 28, distance: 12000, decay: 0.10 };
     case "generic":
-    default:
-      return { intensity: 28, distance: 12000, decay: 0.1 };
+    default:         return { intensity: 28, distance: 12000, decay: 0.10 };
   }
 }
 
 export function getLabelAnchorRadius(palette: StarPalette): number {
   switch (getStarVariant(palette)) {
-    case "dying":
-      return SUN_RADIUS * DYING_PARAMS.gasScale + 56;
-    case "vesting":
-      return SUN_RADIUS * VESTING_PARAMS.atmosphereScale + 48;
-    default:
-      return SUN_RADIUS + 40;
+    case "dying":   return SUN_RADIUS * DYING_PARAMS.gasScale + 56;
+    case "vesting": return SUN_RADIUS * VESTING_PARAMS.atmosphereScale + 48;
+    default:        return SUN_RADIUS + 40;
   }
 }
 
 export function getCmeAlphaMultiplier(palette: StarPalette): number {
-  return palette === "dwarf" ? 0.08 : 0.18;
+  if (palette === "dwarf") return 0.08;
+  if (palette === "flambeur") return 0.15;
+  return 0.18;
 }

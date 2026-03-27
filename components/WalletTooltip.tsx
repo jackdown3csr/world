@@ -1,9 +1,9 @@
 "use client";
 
 import React from "react";
-import type { PoolTokenEntry, WalletEntry, VestingWalletEntry } from "@/lib/types";
+import type { PoolTokenEntry, WalletEntry, VestingWalletEntry, FlambeurEntry } from "@/lib/types";
 
-export type WalletTooltipVariant = "wallet" | "vesting" | "pool";
+export type WalletTooltipVariant = "wallet" | "vesting" | "pool" | "flambeur";
 
 export type HoveredWalletInfo = {
   wallet: WalletEntry;
@@ -27,6 +27,7 @@ export default function WalletTooltip({ wallet, onClose, variant = "wallet", ves
   const resolvedVariant: WalletTooltipVariant = vesting ? "vesting" : variant;
   const isVesting = resolvedVariant === "vesting";
   const pool = resolvedVariant === "pool";
+  const isFlambeur = resolvedVariant === "flambeur";
 
   const lockEndStr =
     !vesting && wallet.lockEnd > 0
@@ -101,7 +102,22 @@ export default function WalletTooltip({ wallet, onClose, variant = "wallet", ves
       }} />
 
       {/* Data rows */}
-      {pool ? (
+      {isFlambeur ? (
+        <>
+          <div style={{ display: "flex", justifyContent: "space-between", gap: 16 }}>
+            <span style={{ color: "#5a7a90", fontSize: 9, letterSpacing: "0.1em", textTransform: "uppercase" }}>swapped</span>
+            <span style={{ color: "#ff7733", fontVariantNumeric: "tabular-nums" }}>{(wallet as FlambeurEntry).totalGubiSwappedFormatted}</span>
+          </div>
+          <div style={{ display: "flex", justifyContent: "space-between", gap: 16 }}>
+            <span style={{ color: "#5a7a90", fontSize: 9, letterSpacing: "0.1em", textTransform: "uppercase" }}>received</span>
+            <span style={{ color: "#c0a050", fontVariantNumeric: "tabular-nums" }}>{(wallet as FlambeurEntry).totalWgnetReceivedFormatted}</span>
+          </div>
+          <div style={{ display: "flex", justifyContent: "space-between", gap: 16 }}>
+            <span style={{ color: "#5a7a90", fontSize: 9, letterSpacing: "0.1em", textTransform: "uppercase" }}>swaps</span>
+            <span style={{ color: "#8ab0c0", fontVariantNumeric: "tabular-nums" }}>{(wallet as FlambeurEntry).swapCount}</span>
+          </div>
+        </>
+      ) : pool ? (
         <>
           <div style={{ display: "flex", justifyContent: "space-between", gap: 16 }}>
             <span style={{ color: "#5a7a90", fontSize: 9, letterSpacing: "0.1em", textTransform: "uppercase" }}>balance</span>

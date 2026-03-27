@@ -34,3 +34,10 @@ jobs:
           UPSTASH_REDIS_REST_TOKEN: ${{ secrets.UPSTASH_REDIS_REST_TOKEN }}
           RPC_URL:                  ${{ secrets.RPC_URL }}
         run: npx tsx scripts/scan-vesting.ts
+
+      - name: Run Flambeur scanner
+        env:
+          UPSTASH_REDIS_REST_URL:   ${{ secrets.UPSTASH_REDIS_REST_URL }}
+          UPSTASH_REDIS_REST_TOKEN: ${{ secrets.UPSTASH_REDIS_REST_TOKEN }}
+          RPC_URL:                  ${{ secrets.RPC_URL }}
+        run: npx tsx scripts/scan-flambeur.ts

@@ -1,3 +1,6 @@
+// components/systemHud/TransitBeaconInfoCard.tsx
+// FEATURE: Always show context description regardless of activeMode
+
 import React from "react";
 import type { PanelSwapState } from "@/hooks/usePanelSwap";
 import type { TrafficPanelItem } from "@/components/TrafficPanel";
@@ -54,25 +57,21 @@ export default function TransitBeaconInfoCard({
           <Metric label="radius" value={`${Math.round(beacon.bodyRadius)} wu`} />
         </div>
 
-        <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginBottom: activeMode === "transit-beacon-info" ? 10 : 0 }}>
+        <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginBottom: 10 }}>
           <Chip label="coords" value={coords} />
           <Chip label="rx" value={rxLed ? "live" : "idle"} />
           <Chip label="eco" value={ecoLed ? "live" : "quiet"} />
           <Chip label="role" value="relay" />
         </div>
 
-        {activeMode === "transit-beacon-info" && (
-          <>
-            <div style={{ height: 1, background: "rgba(255,255,255,0.06)", marginBottom: 10 }} />
-            <div style={{ color: "#6d8798", fontSize: 9, letterSpacing: "0.14em", textTransform: "uppercase", marginBottom: 6 }}>
-              context
-            </div>
-            <div style={{ fontSize: 11, color: "#89a1b4", lineHeight: 1.55 }}>
-              <div>Relay node for traffic whose counterparty is not mapped anywhere in this sector.</div>
-              <div>Cross-chain and off-map routes stage here before resolving to a wallet, bridge, or system.</div>
-            </div>
-          </>
-        )}
+        <div style={{ height: 1, background: "rgba(255,255,255,0.06)", marginBottom: 10 }} />
+        <div style={{ color: "#6d8798", fontSize: 9, letterSpacing: "0.14em", textTransform: "uppercase", marginBottom: 6 }}>
+          context
+        </div>
+        <div style={{ fontSize: 11, color: "#89a1b4", lineHeight: 1.55 }}>
+          <div>Relay node for traffic whose counterparty is not mapped anywhere in this sector.</div>
+          <div>Cross-chain and off-map routes stage here before resolving to a wallet, bridge, or system.</div>
+        </div>
       </div>
     </div>
   );

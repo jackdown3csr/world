@@ -1,14 +1,14 @@
 import type { SolarSystemData } from "./layout";
-import type { WalletEntry, VestingWalletEntry, PoolTokenEntry } from "./types";
+import type { WalletEntry, VestingWalletEntry, PoolTokenEntry, FlambeurEntry } from "./types";
 import type { FaucetStats } from "@/hooks/useFaucet";
 import type { BridgeSceneObject } from "./bridges";
 import type { TransactionFlowEffect } from "./blockExplorer/types";
 export type { TransactionFlowEffect } from "./blockExplorer/types";
 
-export type SceneSystemId = "vescrow" | "vesting" | "gubi-pool" | "staking-remnant";
-export type SceneSystemDetailVariant = "wallet" | "vesting" | "pool";
-export type SceneSystemLayoutVariant = "vescrow" | "vesting" | "none";
-export type SceneSystemPalette = "warm" | "cool" | "dwarf" | "dying";
+export type SceneSystemId = "vescrow" | "vesting" | "gubi-pool" | "staking-remnant" | "flambeur";
+export type SceneSystemDetailVariant = "wallet" | "vesting" | "pool" | "flambeur";
+export type SceneSystemLayoutVariant = "vescrow" | "vesting" | "none" | "flambeur";
+export type SceneSystemPalette = "warm" | "cool" | "dwarf" | "dying" | "flambeur";
 
 export type SceneSystemDecorator =
   | {
@@ -83,9 +83,12 @@ export interface SceneSystemDefinition {
   starPrimaryMetric?: string;
   starSecondaryMetric?: string;
   data: SolarSystemData;
-  entries: Array<WalletEntry | VestingWalletEntry | PoolTokenEntry>;
+  entries: Array<WalletEntry | VestingWalletEntry | PoolTokenEntry | FlambeurEntry>;
   summaryRows: SceneSystemSummaryRow[];
   descriptionLines: string[];
+  /** Optional CTA link rendered below descriptionLines in the info panel */
+  promoUrl?: string;
+  promoLabel?: string;
   decorators?: SceneSystemDecorator[];
   updatedAt?: number;
 }

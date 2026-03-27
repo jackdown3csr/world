@@ -191,7 +191,7 @@ interface HudToolbarProps {
   onToggleLayout?: () => void;
   gnetRanked?: boolean;
   onToggleGnet?: () => void;
-  layoutVariant?: "vescrow" | "vesting" | "none";
+  layoutVariant?: "vescrow" | "vesting" | "flambeur" | "none";
   vestingClaimed?: boolean;
   onToggleVestingClaimed?: () => void;
   mobile?: boolean;

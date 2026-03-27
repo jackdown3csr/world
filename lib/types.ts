@@ -212,3 +212,32 @@ export interface StakingRemnantPayload {
   statusLabel: string;
   rewardStateLabel: string;
 }
+
+/* ── Flambeur / Gubinator swap types ─────────────────────── */
+
+/**
+ * One swapper in the Flambeur / Gubinator system.
+ * Extends WalletEntry; votingPower is repurposed to hold totalGubiSwapped
+ * so the shared moon-sizing helpers use swap volume as the rank metric.
+ */
+export interface FlambeurEntry extends WalletEntry {
+  /** Raw wei string — sum of all gubiIn across all swaps */
+  totalGubiSwapped: string;
+  totalGubiSwappedFormatted: string;
+  /** Raw wei string — sum of all wgnetOut received */
+  totalWgnetReceived: string;
+  totalWgnetReceivedFormatted: string;
+  /** Number of individual swaps performed */
+  swapCount: number;
+  /** Raw wei string — largest single gubiIn across all swaps */
+  biggestSwapGubi: string;
+  biggestSwapGubiFormatted: string;
+}
+
+export interface FlambeurPayload {
+  updatedAt: number;
+  wallets: FlambeurEntry[];
+  /** Raw wei string of WGNET held in the Gubinator reserve */
+  wgnetReserveRaw?: string;
+  wgnetReserveFormatted?: string;
+}

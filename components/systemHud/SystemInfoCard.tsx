@@ -1,3 +1,6 @@
+// components/systemHud/SystemInfoCard.tsx
+// FEATURE: Always show full info content including descriptionLines and promoUrl
+
 import React from "react";
 import type { BlockInfo } from "@/hooks/useBlock";
 import type { SceneSystemDefinition } from "@/lib/sceneSystems";
@@ -30,6 +33,8 @@ export default function SystemInfoCard({
   blockInfo,
   movement,
 }: SystemInfoCardProps) {
+  const hasContext = (system?.descriptionLines.length ?? 0) > 0 || Boolean(system?.promoUrl);
+
   return (
     <div style={{
       background: "linear-gradient(180deg, rgba(3,8,16,0.96), rgba(2,6,14,0.92))",
@@ -106,7 +111,7 @@ export default function SystemInfoCard({
           ))}
         </div>
 
-        <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginBottom: activeMode === "info" ? 10 : 0 }}>
+        <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginBottom: 10 }}>
           {blockInfo && system?.id !== "gubi-pool" && (
             <div style={contextChipStyle}>
               <span style={contextChipLabelStyle}>blk</span>
@@ -122,7 +127,7 @@ export default function SystemInfoCard({
         </div>
 
         {movement && movement.hasSnapshot && (
-          <div style={{ display: "flex", flexWrap: "wrap", alignItems: "center", gap: 6, marginBottom: activeMode === "info" ? 10 : 0 }}>
+          <div style={{ display: "flex", flexWrap: "wrap", alignItems: "center", gap: 6, marginBottom: 10 }}>
             <span style={{ color: "#5d7788", fontSize: 8, letterSpacing: "0.14em", textTransform: "uppercase" }}>movement</span>
             {movement.movedUp > 0 && (
               <span style={movementBadgeStyle("#2a5a3a", "rgba(110,247,167,0.18)", "#6ef7a7")}>
@@ -156,24 +161,50 @@ export default function SystemInfoCard({
         )}
 
         {movement && !movement.hasSnapshot && (
-          <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: activeMode === "info" ? 10 : 0 }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 10 }}>
             <span style={movementBadgeStyle("#2a3a4a", "rgba(114,160,184,0.12)", "#8ab0c8")}>
               first scan
             </span>
           </div>
         )}
 
-        {activeMode === "info" && (
+        {hasContext && (
           <>
             <div style={{ height: 1, background: "rgba(255,255,255,0.06)", marginBottom: 10 }} />
             <div style={{ color: "#6d8798", fontSize: 9, letterSpacing: "0.14em", textTransform: "uppercase", marginBottom: 6 }}>
               context
             </div>
-            <div style={{ fontSize: 11, color: "#89a1b4", lineHeight: 1.55, marginBottom: 8 }}>
+            <div style={{ fontSize: 11, color: "#89a1b4", lineHeight: 1.55, marginBottom: system?.promoUrl ? 8 : 0 }}>
               {system?.descriptionLines.map((line) => (
                 <div key={line}>{line}</div>
               ))}
             </div>
+            {system?.promoUrl && (
+              <a
+                href={system.promoUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                style={{
+                  display: "inline-flex",
+                  alignItems: "center",
+                  gap: 5,
+                  fontSize: 10,
+                  color: system.accent ?? "#7ae4f2",
+                  textDecoration: "none",
+                  letterSpacing: "0.06em",
+                  border: `1px solid ${system.accent ?? "#7ae4f2"}44`,
+                  borderRadius: 4,
+                  padding: "4px 8px",
+                  marginTop: 2,
+                  transition: "background 0.15s",
+                }}
+                onMouseEnter={(e) => { e.currentTarget.style.background = `${system.accent ?? "#7ae4f2"}18`; }}
+                onMouseLeave={(e) => { e.currentTarget.style.background = "transparent"; }}
+              >
+                {system.promoLabel ?? system.promoUrl}
+                <span style={{ fontSize: 8, opacity: 0.7 }}>↗</span>
+              </a>
+            )}
           </>
         )}
       </div>

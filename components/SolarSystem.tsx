@@ -1,6 +1,6 @@
-﻿"use client";
+"use client";
 
-import React, { useMemo, useRef, useCallback, useState, useEffect } from "react";
+import React, { useState, useEffect, useMemo, useRef, useCallback } from "react";
 import type { OrbitControls as OrbitControlsImpl } from "three-stdlib";
 import type { FreeLookHandle } from "./FreeLookControls";
 import type { CameraMode } from "./CameraController";
@@ -16,7 +16,8 @@ import { useIsMobile } from "@/hooks/useIsMobile";
 import { useBlock } from "@/hooks/useBlock";
 import { useFaucet } from "@/hooks/useFaucet";
 import { useRedeemBasket } from "@/hooks/useRedeemBasket";
-import { buildPoolSystem, buildSolarSystem, buildStakingRemnantSystem, buildVestingSystem } from "@/lib/layout";
+import { useFlambeurWallets } from "@/hooks/useFlambeurWallets";
+import { buildPoolSystem, buildSolarSystem, buildStakingRemnantSystem, buildVestingSystem, buildFlambeurSystem } from "@/lib/layout";
 import type { LayoutMode, VestingLayoutMode } from "@/lib/layout";
 import { formatBalance } from "@/lib/formatBalance";
 import { buildPhotoTargetSections, findPhotoTargetById } from "@/lib/photoTargets";
@@ -90,16 +91,19 @@ export default function SolarSystem({ onReady }: { onReady?: () => void }) {
     stats: poolStats,
     vault: poolVault,
   } = usePoolTokens();
-  const hyperlaneBridge = useHyperlaneBridge();
-  const canonicalBridge = useCanonicalBridge();
-  const stakingRemnant = useStakingRemnant();
-  const faucetStats = useFaucet();
+  const hyperlaneBridge  = useHyperlaneBridge();
+  const canonicalBridge  = useCanonicalBridge();
+  const stakingRemnant   = useStakingRemnant();
+  const faucetStats      = useFaucet();
+  const { wallets: flambeurWallets, updatedAt: flambeurUpdatedAt, wgnetReserveFormatted } = useFlambeurWallets();
+
   const [layoutMode, setLayoutMode] = useState<LayoutMode>("solar");
   const [vestingLayoutMode, setVestingLayoutMode] = useState<VestingLayoutMode>("entitled");
-  const solarData = useMemo(() => buildSolarSystem(wallets, layoutMode), [wallets, layoutMode]);
-  const vestingData = useMemo(() => buildVestingSystem(vestingWallets, vestingLayoutMode), [vestingWallets, vestingLayoutMode]);
-  const poolData = useMemo(() => buildPoolSystem(poolTokens), [poolTokens]);
-  const stakingData = useMemo(() => buildStakingRemnantSystem(stakingRemnant.data), [stakingRemnant.data]);
+  const solarData    = useMemo(() => buildSolarSystem(wallets, layoutMode), [wallets, layoutMode]);
+  const vestingData  = useMemo(() => buildVestingSystem(vestingWallets, vestingLayoutMode), [vestingWallets, vestingLayoutMode]);
+  const poolData     = useMemo(() => buildPoolSystem(poolTokens), [poolTokens]);
+  const stakingData  = useMemo(() => buildStakingRemnantSystem(stakingRemnant.data), [stakingRemnant.data]);
+  const flambeurData = useMemo(() => buildFlambeurSystem(flambeurWallets), [flambeurWallets]);
 
   /* ── Aggregate stats for Sun label ── */
   const { totalVotingPower, totalLocked } = useMemo(() => {
@@ -131,6 +135,16 @@ export default function SolarSystem({ onReady }: { onReady?: () => void }) {
     };
   }, [vestingWallets]);
 
+  /* ── Aggregate stats for Flambeur star label ── */
+  const flambeurTotalGubi = useMemo(() => {
+    if (flambeurWallets.length === 0) return "";
+    let total = 0n;
+    for (const w of flambeurWallets) {
+      if (w.totalGubiSwapped && w.totalGubiSwapped !== "0") total += BigInt(w.totalGubiSwapped);
+    }
+    return formatBalance(total.toString(), "gUBI");
+  }, [flambeurWallets]);
+
   /* ── Selection state ── */
   const [selectedAddress, setSelectedAddress] = useState<string | null>(null);
   const [cameraTargetId, setCameraTargetId] = useState<string | null>(null);
@@ -150,7 +164,6 @@ export default function SolarSystem({ onReady }: { onReady?: () => void }) {
     [selectedAddress],
   );
 
-  // Derive selected system ID from the scoped camera target ID.
   const selectedSystemId = useMemo<SceneSystemId | null>(() => {
     if (!cameraTargetId) return null;
     const idx = cameraTargetId.indexOf(":");
@@ -239,8 +252,9 @@ export default function SolarSystem({ onReady }: { onReady?: () => void }) {
     for (const wallet of wallets) entries[wallet.address.toLowerCase()] = "vescrow";
     for (const wallet of vestingWallets) entries[wallet.address.toLowerCase()] = "vesting";
     for (const token of poolTokens) entries[token.address.toLowerCase()] = "gubi-pool";
+    for (const wallet of flambeurWallets) entries[wallet.address.toLowerCase()] = "flambeur";
     return entries;
-  }, [poolTokens, vestingWallets, wallets]);
+  }, [poolTokens, vestingWallets, wallets, flambeurWallets]);
 
   const walletMultiSystemMap = useMemo<Record<string, SceneSystemId[]>>(() => {
     const entries: Record<string, SceneSystemId[]> = {};
@@ -251,8 +265,9 @@ export default function SolarSystem({ onReady }: { onReady?: () => void }) {
     for (const wallet of wallets) push(wallet.address, "vescrow");
     for (const wallet of vestingWallets) push(wallet.address, "vesting");
     for (const token of poolTokens) push(token.address, "gubi-pool");
+    for (const wallet of flambeurWallets) push(wallet.address, "flambeur");
     return entries;
-  }, [poolTokens, vestingWallets, wallets]);
+  }, [poolTokens, vestingWallets, wallets, flambeurWallets]);
 
   /* ── Transaction trails ── */
   const [showTraffic, setShowTraffic] = useState(true);
@@ -272,14 +287,13 @@ export default function SolarSystem({ onReady }: { onReady?: () => void }) {
   }, [recentEvents, walletSystemMap, walletMultiSystemMap]);
 
   /* ── Camera ── */
-  const controlsRef = useRef<OrbitControlsImpl>(null);
-  const freelookRef = useRef<FreeLookHandle>(null);
+  const controlsRef  = useRef<OrbitControlsImpl>(null);
+  const freelookRef  = useRef<FreeLookHandle>(null);
   const screenshotRef = useRef<ScreenshotHandle>(null);
   const [cameraMode, setCameraMode] = useState<CameraMode>("orbit");
   const [flyModeEnabled, setFlyModeEnabled] = useState(false);
   const [showFlightHud, setShowFlightHud] = useState(true);
 
-  // Clear stale hover when interactions become disabled (fly mode, photo mode)
   const interactionsActive = !flyModeEnabled && !photoMode && cameraMode !== "fly";
   const prevInteractionsActive = useRef(interactionsActive);
   useEffect(() => {
@@ -449,6 +463,34 @@ export default function SolarSystem({ onReady }: { onReady?: () => void }) {
         ],
         updatedAt: stakingRemnant.data?.updatedAt,
       },
+      {
+        id: "flambeur",
+        starId: "__star_flambeur__",
+        label: "FLAMBEUR",
+        navLabel: "flambeur",
+        eyebrow: "Gubinator · galactica",
+        accent: "#ff4411",
+        palette: "flambeur",
+        position: [0, -4000, 14000],
+        detailVariant: "flambeur",
+        layoutVariant: "flambeur",
+        directoryMetricLabel: "swapped",
+        starPrimaryMetric: flambeurTotalGubi,
+        starSecondaryMetric: flambeurWallets.length > 0 ? `${flambeurWallets.length} swappers` : "",
+        data: flambeurData,
+        entries: flambeurWallets,
+        summaryRows: [
+          { label: "swappers", value: flambeurWallets.length.toLocaleString() },
+          { label: "gUBI burned", value: flambeurTotalGubi, accent: "#ff4411" },
+          ...(wgnetReserveFormatted ? [{ label: "wgnet reserve", value: wgnetReserveFormatted, accent: "#ffb030" }] : []),
+        ],
+        descriptionLines: [
+          "Swap your gUBI for more WGNET than burning — including the ARCHAI portion, paid out in WGNET.",
+        ],
+        promoUrl: "https://flambeur.xyz/",
+        promoLabel: "flambeur.xyz",
+        updatedAt: flambeurUpdatedAt,
+      },
     ];
   }, [
     stakingData,
@@ -474,6 +516,11 @@ export default function SolarSystem({ onReady }: { onReady?: () => void }) {
     vestingUpdatedAt,
     vestingWallets,
     wallets,
+    flambeurData,
+    flambeurWallets,
+    flambeurTotalGubi,
+    flambeurUpdatedAt,
+    wgnetReserveFormatted,
   ]);
 
   const globalObjects = useMemo<SceneGlobalObject[]>(() => (
@@ -558,6 +605,7 @@ export default function SolarSystem({ onReady }: { onReady?: () => void }) {
       if (systemId === "vesting") return "VESTing";
       if (systemId === "gubi-pool") return "GUBI";
       if (systemId === "staking-remnant") return "UNSTAKE";
+      if (systemId === "flambeur") return "FLAMBEUR";
       return null;
     };
 
@@ -591,11 +639,10 @@ export default function SolarSystem({ onReady }: { onReady?: () => void }) {
       if (event.classification === "gubi-burn") return "GUBI BURN";
       if (event.classification === "wgnet-wrap") return "GNET -> wGNET";
       if (event.classification === "wgnet-unwrap") return "wGNET -> GNET";
-      // generic transfers / contract calls — show BEACON regardless of wallet home system
       if (event.classification === "generic-transfer" || event.classification === "generic-contract-call") return "BEACON";
 
       const fromChip = chipForAddress(event.fromAddress);
-      const toChip = chipForAddress(event.toAddress);
+      const toChip   = chipForAddress(event.toAddress);
 
       if (!fromChip && !toChip) return "BEACON";
       if (fromChip && toChip && fromChip !== toChip) return `${fromChip}>${toChip}`;
@@ -653,15 +700,12 @@ export default function SolarSystem({ onReady }: { onReady?: () => void }) {
       setPinnedWallet(null);
       return;
     }
-    // Parse "systemId:0xaddr" scoped IDs emitted by StarSystem
     const colonIdx = address.indexOf(":");
     const isScoped = colonIdx > 0 && !address.startsWith("__");
-    const rawAddr = isScoped ? address.slice(colonIdx + 1) : address;
+    const rawAddr  = isScoped ? address.slice(colonIdx + 1) : address;
     const scopedId = isScoped ? address : (walletSystemMap[address.toLowerCase()] ? `${walletSystemMap[address.toLowerCase()]}:${address.toLowerCase()}` : undefined);
-    // Look up entry from the specific system that was clicked, so that a wallet
-    // in both vescrow AND vesting gets the correct typed entry (e.g. VestingWalletEntry).
-    const clickedSystemId = isScoped ? address.slice(0, colonIdx) : null;
-    const targetEntries = clickedSystemId
+    const clickedSystemId  = isScoped ? address.slice(0, colonIdx) : null;
+    const targetEntries    = clickedSystemId
       ? (systems.find((s) => s.id === clickedSystemId)?.entries ?? allEntries)
       : allEntries;
     const entry = targetEntries.find((item) => item.address.toLowerCase() === rawAddr.toLowerCase());
@@ -719,7 +763,6 @@ export default function SolarSystem({ onReady }: { onReady?: () => void }) {
   }, [flyModeEnabled]);
 
   const handleEnterPhotoMode = useCallback(() => {
-    // Freeze the current ship-camera view in place for photo mode.
     if (flyModeEnabled || cameraMode === "fly") {
       freelookRef.current?.cancelFlyTo();
       setFlyModeEnabled(false);
@@ -766,7 +809,7 @@ export default function SolarSystem({ onReady }: { onReady?: () => void }) {
   const handleFlyTargetSelect = useCallback((address: string) => {
     const { rawId, scopedId } = resolveTargetScope(address);
     const entry = allEntries.find((item) => item.address.toLowerCase() === rawId.toLowerCase());
-    const body = lookupSceneBody(scopedId.toLowerCase());
+    const body  = lookupSceneBody(scopedId.toLowerCase());
 
     freelookRef.current?.cancelFlyTo();
     setFlyPickerOpen(false);
@@ -838,7 +881,7 @@ export default function SolarSystem({ onReady }: { onReady?: () => void }) {
     if (systemId === "gubi-pool") return;
 
     const system = systems.find((item) => item.id === systemId);
-    const entry = system?.entries.find((item) => item.address.toLowerCase() === addr.toLowerCase());
+    const entry  = system?.entries.find((item) => item.address.toLowerCase() === addr.toLowerCase());
     setStorageWallet((entry as WalletEntry | VestingWalletEntry | undefined) ?? null);
   }, [systems]);
 
@@ -995,4 +1038,3 @@ export default function SolarSystem({ onReady }: { onReady?: () => void }) {
     </>
   );
 }
-

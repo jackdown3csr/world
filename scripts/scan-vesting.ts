@@ -20,6 +20,9 @@
  *   RPC_URL (optional — defaults to Galactica public RPC)
  */
 
+import { config } from "dotenv";
+config({ path: ".env.local" });
+
 import { JsonRpcProvider, Contract, getAddress, isAddress } from "ethers";
 import { Redis } from "@upstash/redis";
 import { formatBalance } from "../lib/formatBalance";

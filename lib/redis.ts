@@ -1,10 +1,10 @@
-import { Redis } from "@upstash/redis";
-
 /**
  * Singleton Upstash Redis client.
  * Supports both direct env (UPSTASH_REDIS_REST_*) and
  * Vercel KV integration env (KV_REST_API_*).
  */
+import { Redis } from "@upstash/redis";
+
 export const redis = new Redis({
   url:   process.env.UPSTASH_REDIS_REST_URL   || process.env.KV_REST_API_URL   || "",
   token: process.env.UPSTASH_REDIS_REST_TOKEN || process.env.KV_REST_API_TOKEN || "",
@@ -46,3 +46,9 @@ export const KEY_CANONICAL_LAST_PROCESSED_BLOCK =
 
 /** Prefix for temporary SIWE-like nonces: auth:nonce:<address> */
 export const KEY_AUTH_NONCE_PREFIX = "auth:nonce:";
+
+/** JSON wrapper: { updatedAt, wallets[] } for the Flambeur / Gubinator swap system */
+export const KEY_FLAMBEUR_PAYLOAD = "flambeur:payload";
+
+/** Stringified block number for incremental Gubinator Swapped event scans */
+export const KEY_FLAMBEUR_LAST_BLOCK = "flambeur:lastProcessedBlock";

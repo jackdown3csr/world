@@ -10,27 +10,29 @@ import { StakingRemnantProvider, useStakingRemnant } from "@/hooks/useStakingRem
 import { WalletProvider, useWallets } from "@/hooks/useWallets";
 import { VestingProvider, useVestingWallets } from "@/hooks/useVestingWallets";
 import { PoolProvider, usePoolTokens } from "@/hooks/usePoolTokens";
+import { FlambeurProvider, useFlambeurWallets } from "@/hooks/useFlambeurWallets";
 
-// three.js must only run client‑side
 const SolarSystem = dynamic(() => import("@/components/SolarSystem"), {
   ssr: false,
 });
 
 function DataErrorGate() {
-  const wallets = useWallets();
-  const vesting = useVestingWallets();
-  const pool = usePoolTokens();
+  const wallets   = useWallets();
+  const vesting   = useVestingWallets();
+  const pool      = usePoolTokens();
   const hyperlane = useHyperlaneBridge();
   const canonical = useCanonicalBridge();
-  const staking = useStakingRemnant();
+  const staking   = useStakingRemnant();
+  const flambeur  = useFlambeurWallets();
 
   const dataError = [
-    { label: "wallet registry", message: wallets.error, retry: wallets.refetch },
-    { label: "vesting registry", message: vesting.error, retry: vesting.refetch },
-    { label: "pool registry", message: pool.error, retry: pool.refetch },
-    { label: "staking telemetry", message: staking.error, retry: staking.refetch },
-    { label: "hyperlane nexus telemetry", message: hyperlane.error, retry: hyperlane.refetch },
+    { label: "wallet registry",            message: wallets.error,   retry: wallets.refetch   },
+    { label: "vesting registry",           message: vesting.error,   retry: vesting.refetch   },
+    { label: "pool registry",              message: pool.error,      retry: pool.refetch      },
+    { label: "staking telemetry",          message: staking.error,   retry: staking.refetch   },
+    { label: "hyperlane nexus telemetry",  message: hyperlane.error, retry: hyperlane.refetch },
     { label: "canonical bridge telemetry", message: canonical.error, retry: canonical.refetch },
+    { label: "flambeur registry",          message: flambeur.error,  retry: flambeur.refetch  },
   ].find((entry) => entry.message);
 
   if (!dataError) return null;
@@ -73,18 +75,20 @@ function PageContent() {
 
 export default function Page() {
   return (
-    <WalletProvider>
-      <VestingProvider>
-        <PoolProvider>
-          <StakingRemnantProvider>
-            <HyperlaneBridgeProvider>
-              <CanonicalBridgeProvider>
-                <PageContent />
-              </CanonicalBridgeProvider>
-            </HyperlaneBridgeProvider>
-          </StakingRemnantProvider>
-        </PoolProvider>
-      </VestingProvider>
-    </WalletProvider>
+    <FlambeurProvider>
+      <WalletProvider>
+        <VestingProvider>
+          <PoolProvider>
+            <StakingRemnantProvider>
+              <HyperlaneBridgeProvider>
+                <CanonicalBridgeProvider>
+                  <PageContent />
+                </CanonicalBridgeProvider>
+              </HyperlaneBridgeProvider>
+            </StakingRemnantProvider>
+          </PoolProvider>
+        </VestingProvider>
+      </WalletProvider>
+    </FlambeurProvider>
   );
 }
