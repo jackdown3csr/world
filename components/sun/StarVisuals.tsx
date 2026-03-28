@@ -6,11 +6,12 @@ import * as THREE from "three";
 
 import { SUN_RADIUS } from "@/lib/layout";
 
-import { DWARF_PARAMS, DYING_PARAMS, type StarPalette, VESCROW_PARAMS, VESTING_PARAMS } from "./config";
+import { DWARF_PARAMS, DYING_PARAMS, FLAMBEUR_PARAMS, type StarPalette, VESCROW_PARAMS, VESTING_PARAMS } from "./config";
 import {
   createDwarfCoronaMaterial,
   createDyingEmberResources,
   createDyingGasEnvelopeMaterial,
+  createFlambeurCoronaMaterial,
   createHaloMaterial,
   createLensFlareMaterial,
   createVescrowCoronaMaterial,
@@ -116,6 +117,18 @@ export function VestingAtmosphereShell({ paused = false }: { paused?: boolean })
   return (
     <mesh renderOrder={-98}>
       <sphereGeometry args={[SUN_RADIUS * VESTING_PARAMS.atmosphereScale, 72, 72]} />
+      <primitive object={mat} attach="material" />
+    </mesh>
+  );
+}
+
+export function FlambeurCoronaShell({ paused = false }: { paused?: boolean }) {
+  const mat = useMemo(() => createFlambeurCoronaMaterial(), []);
+  useAnimatedShaderTime(mat, paused);
+
+  return (
+    <mesh renderOrder={-98}>
+      <sphereGeometry args={[SUN_RADIUS * FLAMBEUR_PARAMS.coronaScale, 72, 72]} />
       <primitive object={mat} attach="material" />
     </mesh>
   );

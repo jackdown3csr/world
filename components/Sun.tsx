@@ -11,6 +11,7 @@ import {
   DwarfCoronaShell,
   DyingEmberField,
   DyingGasEnvelope,
+  FlambeurCoronaShell,
   HaloLayer,
   LensFlare,
   VescrowCoronaShell,
@@ -131,11 +132,12 @@ export default function Sun({
 
         <LensFlare palette={palette} paused={paused} scaleMult={flareConfig.scaleMult} opacity={flareConfig.opacity} />
 
-        {variant === "vescrow" && <VescrowCoronaShell paused={paused} />}
-        {variant === "vesting" && <VestingAtmosphereShell paused={paused} />}
-        {variant === "dwarf" && <DwarfCoronaShell paused={paused} />}
-        {variant === "dying" && <DyingGasEnvelope paused={paused} />}
-        {variant === "dying" && <DyingEmberField paused={paused} />}
+        {variant === "vescrow"   && <VescrowCoronaShell paused={paused} />}
+        {variant === "vesting"   && <VestingAtmosphereShell paused={paused} />}
+        {variant === "dwarf"     && <DwarfCoronaShell paused={paused} />}
+        {variant === "dying"     && <DyingGasEnvelope paused={paused} />}
+        {variant === "dying"     && <DyingEmberField paused={paused} />}
+        {variant === "flambeur"  && <FlambeurCoronaShell paused={paused} />}
 
         {haloLayers.map((layer) => (
           <HaloLayer

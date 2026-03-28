@@ -6,6 +6,7 @@ import { SUN_RADIUS } from "@/lib/layout";
 import {
   DWARF_PARAMS,
   DYING_PARAMS,
+  FLAMBEUR_PARAMS,
   type StarPalette,
   VESCROW_PARAMS,
   VESTING_PARAMS,
@@ -25,7 +26,7 @@ const FLARE_GLSL = {
   cool: { white: "vec3(0.98,0.96,0.90)", warm: "vec3(0.82,0.86,0.82)", orange: "vec3(0.54,0.72,0.68)" },
   dwarf: { white: "vec3(0.98,0.99,1.00)", warm: "vec3(0.85,0.94,1.00)", orange: "vec3(0.62,0.82,0.98)" },
   dying: { white: "vec3(1.00,0.90,0.76)", warm: "vec3(0.94,0.42,0.16)", orange: "vec3(0.44,0.08,0.04)" },
-  flambeur: { white: "vec3(1.00,0.92,0.84)", warm: "vec3(1.00,0.60,0.15)", orange: "vec3(0.75,0.10,0.02)" },
+  flambeur: { white: "vec3(1.00,0.97,0.92)", warm: "vec3(1.00,0.52,0.10)", orange: "vec3(0.82,0.18,0.02)" },
 } as const;
 
 const surfaceVert = /* glsl */ `
@@ -460,6 +461,171 @@ const dyingSurfaceFrag = /* glsl */ `
     col *= 1.5 + hotZone * 0.8 + vDisplacement * 2.0;
 
     gl_FragColor = vec4(col, 1.0);
+  }
+`;
+
+const flambeurSurfaceVert = /* glsl */ `
+  uniform float uTime;
+  uniform float uPulseSpeed;
+  uniform float uPulseAmp;
+  uniform float uSwirlSpeed;
+  varying vec3 vPos;
+  varying vec3 vNorm;
+  varying vec3 vWorldPos;
+  varying float vDisplacement;
+
+  ${NOISE_GLSL}
+
+  void main() {
+    vPos = position;
+    vec3 p = normalize(position);
+
+    float angle = atan(p.y, p.x);
+    float spiral = sin(angle * 4.0 + p.z * 6.0 + uTime * uSwirlSpeed) * 0.5 + 0.5;
+
+    float pulse1 = sin(uTime * uPulseSpeed) * 0.5 + 0.5;
+    float pulse2 = sin(uTime * uPulseSpeed * 1.61 + 1.8) * 0.5 + 0.5;
+    float throb = pulse1 * 0.65 + pulse2 * 0.35;
+
+    float n1 = fbm(p * 3.2 + vec3(uTime * 0.022));
+    float n2 = fbm(p * 6.5 - vec3(uTime * 0.016, 0.0, uTime * 0.013));
+    float turbDisp = (n1 * 0.62 + n2 * 0.38 - 0.5) * 0.075;
+
+    float disp = turbDisp + throb * uPulseAmp + spiral * 0.007;
+    vDisplacement = disp;
+
+    vec3 displaced = position * (1.0 + disp);
+    vNorm = normalize((modelMatrix * vec4(normal, 0.0)).xyz);
+    vWorldPos = (modelMatrix * vec4(displaced, 1.0)).xyz;
+    gl_Position = projectionMatrix * modelViewMatrix * vec4(displaced, 1.0);
+  }
+`;
+
+const flambeurSurfaceFrag = /* glsl */ `
+  uniform float uTime;
+  uniform float uSwirlSpeed;
+  varying vec3 vPos;
+  varying vec3 vNorm;
+  varying vec3 vWorldPos;
+  varying float vDisplacement;
+
+  ${NOISE_GLSL}
+
+  float granule(vec3 p) {
+    vec3 fp = floor(p); vec3 fr = fract(p);
+    float d = 1.0;
+    for(int x=-1;x<=1;x++) for(int y=-1;y<=1;y++) for(int z=-1;z<=1;z++) {
+      vec3 o = vec3(float(x),float(y),float(z));
+      vec3 rp = fp + o;
+      vec3 h = fract(sin(rp * vec3(127.1,311.7,74.7) + rp.yzx * vec3(269.5,183.3,246.1)) * 43758.5);
+      d = min(d, length(fr - o - h));
+    }
+    return d;
+  }
+
+  void main() {
+    vec3 p = normalize(vPos);
+
+    float angle = atan(p.y, p.x);
+    float swirlA = angle + uTime * uSwirlSpeed;
+    float swirlB = angle - uTime * uSwirlSpeed * 0.68 + 2.4;
+
+    vec3 flowA = vec3(cos(swirlA) * 0.018 + uTime * 0.012, sin(swirlA) * 0.018, uTime * 0.016);
+    vec3 flowB = vec3(cos(swirlB) * 0.014, sin(swirlB) * 0.014 - uTime * 0.010, -uTime * 0.013);
+
+    float plasma1 = fbm(p * 2.0 + flowA);
+    float plasma2 = fbm(p * 4.8 + flowB);
+    float plasma3 = fbm(p * 9.5 + flowA * 0.75 - flowB * 0.55);
+    float plasma = plasma1 * 0.45 + plasma2 * 0.35 + plasma3 * 0.20;
+
+    float gran1 = granule(p * 4.8 + flowA * 0.6);
+    float gran2 = granule(p * 11.0 + flowB * 0.45);
+    float cell = mix(gran1, gran2, 0.40);
+    float bright = 1.0 - smoothstep(0.10, 0.44, cell);
+
+    float hotField = fbm(p * 1.7 + vec3(uTime * 0.009, uTime * 0.006, -uTime * 0.007));
+    float hotSpots = smoothstep(0.56, 0.82, hotField) * 0.70;
+
+    vec3 whiteHot   = vec3(1.00, 0.97, 0.92);
+    vec3 vividOrange = vec3(1.00, 0.42, 0.04);
+    vec3 deepOrange  = vec3(0.88, 0.20, 0.02);
+    vec3 darkAmber   = vec3(0.16, 0.04, 0.01);
+    vec3 cinderRim   = vec3(0.72, 0.14, 0.02);
+
+    float hotness = smoothstep(0.28, 0.74, plasma);
+    vec3 col = mix(deepOrange, vividOrange, hotness);
+    col = mix(col, whiteHot, pow(bright, 1.25) * (0.65 + hotness * 0.30));
+    col = mix(col, whiteHot, hotSpots * 0.80);
+    col = mix(col, darkAmber, smoothstep(0.54, 0.36, plasma) * 0.40 * (1.0 - bright * 0.65));
+
+    col += whiteHot * max(vDisplacement, 0.0) * 5.0;
+
+    vec3 viewDir = normalize(cameraPosition - vWorldPos);
+    float mu = max(dot(vNorm, viewDir), 0.0);
+    float limb = 0.38 + 0.62 * pow(mu, 0.24);
+    col *= limb;
+
+    float edge = pow(1.0 - mu, 2.8);
+    col = mix(col, cinderRim, edge * 0.55);
+    col += vividOrange * edge * 0.25;
+
+    col *= 1.45 + hotness * 0.30 + bright * 0.15 + hotSpots * 0.45;
+
+    gl_FragColor = vec4(col, 1.0);
+  }
+`;
+
+export const flambeurCoronaVert = /* glsl */ `
+  uniform float uTime;
+  varying vec3 vNorm;
+  varying vec3 vWorldPos;
+  varying vec3 vLocalPos;
+
+  ${NOISE_GLSL}
+
+  void main() {
+    vec3 p = normalize(position);
+    float ripple = fbm(p * 4.0 + vec3(uTime * 0.020, -uTime * 0.014, uTime * 0.016));
+    float displacement = (ripple - 0.5) * 0.018;
+    vec3 displaced = position * (1.0 + displacement);
+
+    vLocalPos = p;
+    vNorm = normalize((modelMatrix * vec4(normal, 0.0)).xyz);
+    vWorldPos = (modelMatrix * vec4(displaced, 1.0)).xyz;
+    gl_Position = projectionMatrix * modelViewMatrix * vec4(displaced, 1.0);
+  }
+`;
+
+export const flambeurCoronaFrag = /* glsl */ `
+  uniform float uTime;
+  uniform float uOpacity;
+  varying vec3 vNorm;
+  varying vec3 vWorldPos;
+  varying vec3 vLocalPos;
+
+  ${NOISE_GLSL}
+
+  void main() {
+    vec3 viewDir = normalize(cameraPosition - vWorldPos);
+    float mu = abs(dot(normalize(vNorm), viewDir));
+    float rim = 1.0 - mu;
+
+    float angle = atan(vLocalPos.y, vLocalPos.x);
+    float swirl = fbm(vec3(vLocalPos * 5.0) + vec3(uTime * 0.024, -uTime * 0.016, angle));
+    float tendrils = smoothstep(0.32, 0.70, swirl);
+
+    float aura = pow(rim, 2.8) * (0.75 + tendrils * 0.50);
+    float opacity = aura * uOpacity;
+
+    vec3 cinderOrange = vec3(1.00, 0.38, 0.04);
+    vec3 deepFire     = vec3(0.80, 0.12, 0.01);
+    vec3 whiteHot     = vec3(1.00, 0.97, 0.92);
+
+    vec3 col = mix(deepFire, cinderOrange, tendrils);
+    col = mix(col, whiteHot, pow(rim, 5.0));
+    col *= 2.2;
+
+    gl_FragColor = vec4(col, clamp(opacity, 0.0, 1.0));
   }
 `;
 
@@ -921,6 +1087,20 @@ export function createSurfaceMaterial(palette: StarPalette): THREE.ShaderMateria
         depthWrite: true,
         depthTest: true,
       });
+    case "flambeur":
+      return createBaseMaterial({
+        vertexShader: flambeurSurfaceVert,
+        fragmentShader: flambeurSurfaceFrag,
+        uniforms: {
+          uTime: { value: 0 },
+          uPulseSpeed: { value: FLAMBEUR_PARAMS.pulseSpeed },
+          uPulseAmp: { value: FLAMBEUR_PARAMS.pulseAmplitude },
+          uSwirlSpeed: { value: FLAMBEUR_PARAMS.swirlSpeed },
+        },
+        transparent: false,
+        depthWrite: true,
+        depthTest: true,
+      });
     case "generic":
     default:
       return createBaseMaterial({
@@ -972,6 +1152,22 @@ export function createVescrowCoronaMaterial(): THREE.ShaderMaterial {
     uniforms: {
       uTime: { value: 0 },
       uOpacity: { value: VESCROW_PARAMS.coronaOpacity },
+    },
+    blending: THREE.AdditiveBlending,
+    transparent: true,
+    depthWrite: false,
+    depthTest: true,
+    side: THREE.DoubleSide,
+  });
+}
+
+export function createFlambeurCoronaMaterial(): THREE.ShaderMaterial {
+  return createBaseMaterial({
+    vertexShader: flambeurCoronaVert,
+    fragmentShader: flambeurCoronaFrag,
+    uniforms: {
+      uTime: { value: 0 },
+      uOpacity: { value: FLAMBEUR_PARAMS.coronaOpacity },
     },
     blending: THREE.AdditiveBlending,
     transparent: true,

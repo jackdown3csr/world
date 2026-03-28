@@ -191,6 +191,9 @@ export default function CameraController({
         }
       }
       if (externalMode === "fly") {
+        // Cancel any in-progress snap so the camera stays exactly where it is
+        isSnapping.current = false;
+        trackingAddr.current = null;
         freelookRef.current?.syncFromCamera();
       }
     }

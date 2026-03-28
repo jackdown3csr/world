@@ -30,11 +30,11 @@ export const SUN_PALETTES = {
     point: "#ff9a58",
   },
   flambeur: {
-    surface: { white: "#fff0e0", yellow: "#ffb030", orange: "#cc2200", dark: "#2a0505" },
-    halo: ["#fff0d0", "#ffcc80", "#ff8840", "#cc2200", "#660800"],
-    flare: { warm: "#ff8040", orange: "#cc2200" },
-    label: { name: "#ffcc88", accent: "#ff4411", sub: "#bb7755" },
-    point: "#ff9966",
+    surface: { white: "#fff8f0", yellow: "#ff6600", orange: "#cc2200", dark: "#150500" },
+    halo: ["#fff0e0", "#ff8833", "#ee4400", "#991100", "#300500"],
+    flare: { warm: "#ff7722", orange: "#cc3300" },
+    label: { name: "#ffaa55", accent: "#ff5500", sub: "#cc6633" },
+    point: "#ff8844",
   },
 } as const;
 
@@ -73,6 +73,14 @@ export const VESTING_PARAMS = {
   bandIntensity: 0.35,
   atmosphereScale: 1.1,
   atmosphereOpacity: 0.06,
+} as const;
+
+export const FLAMBEUR_PARAMS = {
+  swirlSpeed: 0.32,
+  pulseSpeed: 0.52,
+  pulseAmplitude: 0.020,
+  coronaScale: 1.14,
+  coronaOpacity: 0.11,
 } as const;
 
 export const VESCROW_PARAMS = {
@@ -132,11 +140,11 @@ export function getHaloLayers(palette: StarPalette): HaloLayerConfig[] {
       ];
     case "flambeur":
       return [
-        { scale: 1.10, color: pal.halo[0], alpha: 0.88, falloff: 4.8 },
-        { scale: 1.48, color: pal.halo[1], alpha: 0.52, falloff: 3.4 },
-        { scale: 2.2,  color: pal.halo[2], alpha: 0.28, falloff: 2.4 },
-        { scale: 3.8,  color: pal.halo[3], alpha: 0.12, falloff: 1.6 },
-        { scale: 6.5,  color: pal.halo[4], alpha: 0.04, falloff: 1.0 },
+        { scale: 1.12, color: pal.halo[0], alpha: 0.96, falloff: 5.8 },
+        { scale: 1.58, color: pal.halo[1], alpha: 0.62, falloff: 4.0 },
+        { scale: 2.5,  color: pal.halo[2], alpha: 0.34, falloff: 2.8 },
+        { scale: 4.2,  color: pal.halo[3], alpha: 0.15, falloff: 1.8 },
+        { scale: 7.5,  color: pal.halo[4], alpha: 0.06, falloff: 1.1 },
       ];
     case "generic":
     default:
