@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef, useEffect } from "react";
+import { useRef, useEffect, useLayoutEffect } from "react";
 import { useFrame, useThree } from "@react-three/fiber";
 import * as THREE from "three";
 import type { OrbitControls as OrbitControlsImpl } from "three-stdlib";
@@ -173,7 +173,11 @@ export default function CameraController({
   }
 
   /* ── Sync internal mode when external prop changes (e.g. fly toggle) ── */
-  useEffect(() => {
+  // useLayoutEffect fires synchronously after React commits, BEFORE the next
+  // useFrame (which runs in requestAnimationFrame, after layout effects). This
+  // prevents a snap animation from completing in the "in-between" frame that
+  // would otherwise occur with useEffect (which fires after paint).
+  useLayoutEffect(() => {
     if (externalMode !== mode.current) {
       mode.current = externalMode;
       const ctrl = controlsRef.current;
@@ -198,7 +202,7 @@ export default function CameraController({
       }
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [externalMode]);
+  }, [externalMode]); // useLayoutEffect — see comment above
 
   /* ── Escape key → stop tracking body, return to fly if was flying ── */
   useEffect(() => {
