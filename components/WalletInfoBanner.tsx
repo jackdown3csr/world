@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useRef } from "react";
-import type { PoolTokenEntry, VestingWalletEntry } from "@/lib/types";
+import type { FlambeurEntry, PoolTokenEntry, VestingWalletEntry } from "@/lib/types";
 import type { HoveredWalletInfo } from "./WalletTooltip";
 
 function Metric({ label, value, color }: { label: string; value: string; color: string }) {
@@ -55,10 +55,11 @@ export default function WalletInfoBanner({ info, pinned, onClose }: { info: Hove
   const resolvedVariant = vesting ? "vesting" : variant;
   const isVesting = resolvedVariant === "vesting";
   const isPool = resolvedVariant === "pool";
+  const isFlambeur = resolvedVariant === "flambeur";
   const short = `${wallet.address.slice(0, 6)}\u2026${wallet.address.slice(-4)}`;
 
   const lockEndStr =
-    !isVesting && !isPool && wallet.lockEnd > 0
+    !isVesting && !isPool && !isFlambeur && wallet.lockEnd > 0
       ? new Date(wallet.lockEnd * 1000).toLocaleDateString("en-US", {
           year: "numeric",
           month: "short",
@@ -107,7 +108,13 @@ export default function WalletInfoBanner({ info, pinned, onClose }: { info: Hove
       </div>
 
       {/* Metric columns — vary by system variant */}
-      {isPool ? (
+      {isFlambeur ? (
+        <>
+          <Metric label="swapped"  value={(wallet as FlambeurEntry).totalGubiSwappedFormatted}  color="#ff7733" />
+          <Metric label="received" value={(wallet as FlambeurEntry).totalWgnetReceivedFormatted} color="#c0a050" />
+          <Metric label="swaps"    value={String((wallet as FlambeurEntry).swapCount)}           color="#8ab0c0" />
+        </>
+      ) : isPool ? (
         <>
           <Metric label="balance" value={(wallet as PoolTokenEntry).balanceFormatted} color="#00e5ff" />
           <Metric label="price"   value={(wallet as PoolTokenEntry).priceUSDFormatted} color="#8ab0c0" />

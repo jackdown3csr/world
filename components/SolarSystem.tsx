@@ -713,7 +713,7 @@ export default function SolarSystem({ onReady }: { onReady?: () => void }) {
     wc.setNameInput(entry?.customName || "");
     if (entry) {
       const system = clickedSystemId ?? walletSystemMap[rawAddr.toLowerCase()];
-      setPinnedWallet({ wallet: entry, variant: system === "gubi-pool" ? "pool" : "wallet", vesting: system === "vesting" });
+      setPinnedWallet({ wallet: entry, variant: system === "gubi-pool" ? "pool" : system === "flambeur" ? "flambeur" : "wallet", vesting: system === "vesting" });
     } else {
       setPinnedWallet(null);
     }
