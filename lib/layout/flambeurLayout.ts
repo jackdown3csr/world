@@ -9,8 +9,8 @@ import { distributeMoons, computeMoonVPStats, buildMoonList } from "./moonLayout
 
 /* ── Tier constants ──────────────────────────────────────── */
 const F_PLANET_COUNT = 9;
-const F_FIRST_ORBIT  = SUN_RADIUS * 2.2;
-const F_SURFACE_GAP  = 28.0;
+const F_FIRST_ORBIT  = SUN_RADIUS * 3.4;
+const F_SURFACE_GAP  = 52.0;
 const F_SPEED_MULT   = 1.3;
 
 function flambeurTypeByRank(rank0: number): PlanetType {
