@@ -170,8 +170,8 @@ export function buildBridgeObjects(
       subtitle: "dimensional bridge",
       description:
         hyperlane?.recentTransfers
-          ? "Hybrid relay aperture suspended between the known systems. Hyperlane Nexus traffic between Galactica and Solana now registers here as live dimensional flow in both directions."
-          : "Hybrid relay aperture suspended between the known systems. Scanner is watching the Galactica mailbox for Hyperlane Nexus traffic between Galactica and Solana.",
+          ? "A dimensional rift anchored between Galactica and Solana, held open by the Hyperlane relay network. Traffic is live — messages are crossing in both directions right now."
+          : "A dimensional rift anchored between Galactica and Solana, held open by the Hyperlane relay network. No recent crossings detected; the aperture holds, waiting.",
       routeHint: hyperlane?.routeLabel ?? "Galactica <-> Solana",
       position: [6900, 1650, -2600],
       bodyRadius: 34,
@@ -188,8 +188,8 @@ export function buildBridgeObjects(
       subtitle: "orbit native bridge",
       description:
         canonical?.historicalOutboundTransfers
-          ? "Galactica's native Arbitrum Orbit bridge. Withdrawals leave Galactica, pass through Arbitrum One, and finalize on Ethereum after the normal challenge period. Deposits move the other way from Ethereum or Arbitrum One and usually show up on Galactica within minutes."
-          : "Galactica's native Arbitrum Orbit bridge. Scanner is watching withdrawals from Galactica now; deposits from Ethereum or Arbitrum One usually show up on Galactica within minutes.",
+          ? "Galactica's native passage to Ethereum and Arbitrum One. Withdrawals leave Galactica, traverse Arbitrum One, and settle on Ethereum after the standard challenge window. Deposits flow the other way and usually land within minutes."
+          : "Galactica's native passage to Ethereum and Arbitrum One. No recent outbound traffic in the logs. Deposits from Ethereum or Arbitrum One still clear within minutes when they come.",
       routeHint: canonicalRouteLabel,
       position: [10350, 2480, -6420],
       bodyRadius: 30,

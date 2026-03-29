@@ -331,9 +331,9 @@ export default function SolarSystem({ onReady }: { onReady?: () => void }) {
           { label: "locked", value: totalLocked, accent: "#8ab0c0" },
         ],
         descriptionLines: [
-          "read directly from the vEscrow contract",
-          "veGNET decays as locks approach expiry",
-          "lock amount and lock extension are tracked separately",
+          "wallets that lock GNET here earn veGNET — their weight in governance",
+          "voting power fades as locks age toward expiry",
+          "each body carries two layers: the locked stake, and any extension that prolongs it",
         ],
         decorators: [
           {
@@ -367,9 +367,9 @@ export default function SolarSystem({ onReady }: { onReady?: () => void }) {
           { label: "claimed", value: vestingTotalClaimed, accent: "#8ab0c0" },
         ],
         descriptionLines: [
-          "read directly from RewardDistributor",
-          "ranked by total entitled GNET",
-          "claimed mode highlights realized allocation",
+          "these wallets hold claims against the RewardDistributor — GNET earned but not yet released",
+          "orbit size reflects the full entitled allocation, not what's been drawn",
+          "claimed view shows how much each holder has already taken from their share",
         ],
         decorators: [
           {
@@ -419,9 +419,9 @@ export default function SolarSystem({ onReady }: { onReady?: () => void }) {
           ] : []),
         ],
         descriptionLines: [
-          "read from the gUBI pool API",
-          "token balances come from the pool vault",
-          "planet size and orbit order follow USD weight",
+          "the liquidity vault keeping gUBI in circulation across Galactica",
+          "a planet's mass follows its token's share of the total pool by USD value",
+          "balances are read live from the vault — what you see is what is staked right now",
         ],
         decorators: [
           {
@@ -457,9 +457,9 @@ export default function SolarSystem({ onReady }: { onReady?: () => void }) {
           { label: "state", value: stakingRemnant.data?.statusLabel ?? "sync pending", accent: "#d39b86" },
         ],
         descriptionLines: [
-          "read from the legacy staking shell",
-          "shows remaining staked GNET and the freeze window",
-          "state shows whether exits are still draining the shell",
+          "a dying star — the legacy staking contract, now winding down",
+          "what remains is frozen GNET still waiting for the exit window to open",
+          "state reflects whether the shell is still actively draining",
         ],
         updatedAt: stakingRemnant.data?.updatedAt,
       },
@@ -485,7 +485,8 @@ export default function SolarSystem({ onReady }: { onReady?: () => void }) {
           ...(wgnetReserveFormatted ? [{ label: "wgnet reserve", value: wgnetReserveFormatted, accent: "#ffb030" }] : []),
         ],
         descriptionLines: [
-          "Swap your gUBI for more WGNET than burning — including the ARCHAI portion, paid out in WGNET.",
+          "wallets that routed gUBI through Flambeur rather than burning it outright",
+          "Flambeur extracts more WGNET per gUBI than a direct burn — the ARCHAI portion included, paid out in WGNET",
         ],
         promoUrl: "https://flambeur.xyz/",
         promoLabel: "flambeur.xyz",

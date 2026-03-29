@@ -69,8 +69,8 @@ export default function TransitBeaconInfoCard({
           context
         </div>
         <div style={{ fontSize: 11, color: "#89a1b4", lineHeight: 1.55 }}>
-          <div>Relay node for traffic whose counterparty is not mapped anywhere in this sector.</div>
-          <div>Cross-chain and off-map routes stage here before resolving to a wallet, bridge, or system.</div>
+          <div>A waypoint for flows that have no home in this sector — traffic from chains and contracts not mapped here.</div>
+          <div>Packets stage at the beacon until they resolve to a known wallet, bridge, or system — or don't.</div>
         </div>
       </div>
     </div>
