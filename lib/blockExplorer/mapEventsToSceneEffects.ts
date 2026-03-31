@@ -11,6 +11,7 @@ import { TRANSIT_BEACON_ID } from "@/lib/transitBeacon";
 import {
   ARBSYS_ADDRESS,
   FAUCET_ADDRESS as FAUCET_CONTRACT_ADDRESS,
+  GUBINATOR_ADDRESS,
   GUBI_POOL_VAULT,
   GUBI_RD_ADDRESS,
   HYPERLANE_MAILBOX,
@@ -33,6 +34,7 @@ const CONTRACT_STAR_IDS: Record<string, string> = {
   [GUBI_RD_ADDRESS]:    "__star_gubi_pool__",
   [STAKING_PROXY]:      "__star_staking_remnant__",
   [GUBI_POOL_VAULT]:    "__star_gubi_pool__",
+  [GUBINATOR_ADDRESS]:  "__star_flambeur__",
   [FAUCET_CONTRACT_ADDRESS]: FAUCET_SCENE_ID,
   [ARBSYS_ADDRESS]:     CANONICAL_BRIDGE_SCENE_ID,
   [HYPERLANE_MAILBOX]:  HYPERLANE_BRIDGE_SCENE_ID,
@@ -44,6 +46,7 @@ const CONTRACT_FALLBACK_SYSTEM: Record<string, SceneSystemId> = {
   [GUBI_RD_ADDRESS]:    "gubi-pool",
   [STAKING_PROXY]:      "staking-remnant",
   [GUBI_POOL_VAULT]:    "gubi-pool",
+  [GUBINATOR_ADDRESS]:  "flambeur",
   [FAUCET_CONTRACT_ADDRESS]: "vescrow",
   [ARBSYS_ADDRESS]:     "vescrow",
   [HYPERLANE_MAILBOX]:  "vescrow",
@@ -227,6 +230,37 @@ function mapEvent(
       toId = TRANSIT_BEACON_ID;
       fromSystemId = "gubi-pool";
       toSystemId = UNKNOWN_TRAFFIC_SYSTEM;
+      break;
+    }
+
+    // wallet → Gubinator (flambeur swap: gUBI → wGNET): fan-out to every system
+    // the wallet appears in, mirroring the staking-withdraw / gubi-claim pattern
+    case "flambeur-swap": {
+      const flambeurStar = toContractId; // __star_flambeur__
+      const toSystems = addressMultiSystemMap?.[event.fromAddress.toLowerCase()] ?? [];
+      if (toSystems.length > 0) {
+        return toSystems.map((sys) => ({
+          id: `txflow:${event.id}:flambeur-${sys}`,
+          kind: "transaction-flow" as const,
+          fromId: `${sys}:${event.fromAddress.toLowerCase()}`,
+          toId: flambeurStar,
+          fromSystemId: sys as SceneAnchorSystemId,
+          toSystemId: "flambeur" as SceneAnchorSystemId,
+          startedAt,
+          expiresAt,
+          priority: event.priority,
+          visualVariant: event.visualVariant,
+          classification: event.classification,
+          paletteHint: "ecosystem" as const,
+          txHash: event.txHash,
+          label: event.label,
+        }));
+      }
+      // Wallet not known in any system — transit beacon fallback
+      fromId = TRANSIT_BEACON_ID;
+      toId = flambeurStar;
+      fromSystemId = UNKNOWN_TRAFFIC_SYSTEM;
+      toSystemId = "flambeur";
       break;
     }
 

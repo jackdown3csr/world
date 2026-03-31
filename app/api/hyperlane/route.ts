@@ -4,6 +4,7 @@ import {
   KEY_HYPERLANE_BRIDGE_PAYLOAD,
   KEY_HYPERLANE_LAST_PROCESSED_BLOCK,
 } from "@/lib/redis";
+import { rateLimit, getClientIp, RateLimitError } from "@/lib/rateLimit";
 import {
   decodeProcessTransactionInput,
   buildTransferEntry,
@@ -369,12 +370,22 @@ async function writeStoredState(payload: HyperlaneBridgePayload, latestBlock: nu
   volatileCursor = String(latestBlock);
 }
 
-export async function GET() {
+export async function GET(request: Request) {
   try {
+    const ip = getClientIp(request);
+    await rateLimit(`rl:hyperlane:${ip}`, 10, 60);
     const latestBlock = await getLatestBlockNumber();
+    const { storedPayload, storedCursor } = await readStoredState();
+
+    if (storedPayload && storedCursor && Number.parseInt(storedCursor, 10) >= latestBlock) {
+      return NextResponse.json(storedPayload, {
+        status: 200,
+        headers: { "Cache-Control": "no-store" },
+      });
+    }
+
     const timestampCache = new Map<number, number>();
     const txCache = new Map<string, RpcTransaction | null>();
-    const { storedPayload, storedCursor } = await readStoredState();
 
     const safeStartBlock = Math.max(latestBlock - INITIAL_LOOKBACK_BLOCKS + 1, 0);
     const shouldBootstrap = !storedPayload || storedPayload.transfers.length === 0;
@@ -546,7 +557,13 @@ export async function GET() {
       status: 200,
       headers: { "Cache-Control": "no-store" },
     });
-  } catch {
+  } catch (err) {
+    if (err instanceof RateLimitError) {
+      return NextResponse.json(
+        { error: "Too many requests" },
+        { status: 429, headers: { "Retry-After": String(err.retryAfter) } },
+      );
+    }
     return NextResponse.json(
       { error: "Hyperlane scanner unavailable" },
       { status: 503 },

@@ -25,6 +25,8 @@ export const FAUCET_ADDRESS = "0x522b3595017537d29258f7f770e78aa5de1ec9cb";
 export const SYSTEM_SELF_ADDRESS = "0x00000000000000000000000000000000000a4b05";
 /** gUBI pool vault — users call redeem/burn here, receiving wGNET + ARCHAI */
 export const GUBI_POOL_VAULT = "0x50af2aab1455c1c06b3b8e623549dde437f54eef";
+/** Gubinator — Flambeur swap contract: users swap gUBI → wGNET (Swapped event) */
+export const GUBINATOR_ADDRESS = "0x5b8b96f1828b27165705be802bdcfc79fb8e2cea";
 /** wGNET9 token contract — WETH9-style wrap/unwrap: deposit() wraps GNET→wGNET, withdraw() unwraps wGNET→GNET */
 export const WGNET9_ADDRESS  = "0x690f1eef8aceaad09ac695d9111af081045c6d5b7";
 
@@ -161,6 +163,19 @@ function classify(to: string | null, input: string, value: string): Classificati
     return {
       classification: "gubi-burn",
       label: "GUBI BURN",
+      isEcosystem: true,
+      priority: 2,
+      visualVariant: "trail",
+      sourceKind: "wallet",
+      targetKind: "star",
+    };
+  }
+
+  // ── Flambeur / Gubinator swap (gUBI → wGNET) ──────────
+  if (toLower === GUBINATOR_ADDRESS) {
+    return {
+      classification: "flambeur-swap",
+      label: "gUBI → wGNET",
       isEcosystem: true,
       priority: 2,
       visualVariant: "trail",

@@ -22,6 +22,7 @@ export type BlockExplorerClassification =
   | "wgnet-wrap"
   | "bridge-in"
   | "bridge-out"
+  | "flambeur-swap"
   | "generic-transfer"
   | "generic-contract-call"
   | "unknown";

@@ -4,6 +4,7 @@ import {
   KEY_CANONICAL_BRIDGE_PAYLOAD,
   KEY_CANONICAL_LAST_PROCESSED_BLOCK,
 } from "@/lib/redis";
+import { rateLimit, getClientIp, RateLimitError } from "@/lib/rateLimit";
 import { formatBalance } from "@/lib/formatBalance";
 import type {
   CanonicalBridgePayload,
@@ -261,10 +262,20 @@ function buildForwardRanges(fromBlock: number, toBlock: number) {
   return ranges;
 }
 
-export async function GET() {
+export async function GET(request: Request) {
   try {
+    const ip = getClientIp(request);
+    await rateLimit(`rl:canonical:${ip}`, 10, 60);
     const latestBlock = await getLatestBlockNumber();
     const { storedPayload, storedCursor } = await readStoredState();
+
+    if (storedPayload && storedCursor && Number.parseInt(storedCursor, 10) >= latestBlock) {
+      return NextResponse.json(storedPayload, {
+        status: 200,
+        headers: { "Cache-Control": "no-store" },
+      });
+    }
+
     const timestampCache = new Map<number, number>();
     const txCache = new Map<string, RpcTransaction | null>();
 
@@ -321,7 +332,13 @@ export async function GET() {
       status: 200,
       headers: { "Cache-Control": "no-store" },
     });
-  } catch {
+  } catch (err) {
+    if (err instanceof RateLimitError) {
+      return NextResponse.json(
+        { error: "Too many requests" },
+        { status: 429, headers: { "Retry-After": String(err.retryAfter) } },
+      );
+    }
     return NextResponse.json(
       { error: "Canonical bridge scanner unavailable" },
       { status: 503 },
