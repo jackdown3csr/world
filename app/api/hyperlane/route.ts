@@ -372,10 +372,22 @@ async function writeStoredState(payload: HyperlaneBridgePayload, latestBlock: nu
 
 export async function GET(request: Request) {
   try {
-    const ip = getClientIp(request);
-    await rateLimit(`rl:hyperlane:${ip}`, 10, 60);
-    const latestBlock = await getLatestBlockNumber();
     const { storedPayload, storedCursor } = await readStoredState();
+
+    const ip = getClientIp(request);
+    try {
+      await rateLimit(`rl:hyperlane:${ip}`, 10, 60);
+    } catch (err) {
+      if (err instanceof RateLimitError && storedPayload) {
+        return NextResponse.json(storedPayload, {
+          status: 200,
+          headers: { "Cache-Control": "no-store" },
+        });
+      }
+      throw err;
+    }
+
+    const latestBlock = await getLatestBlockNumber();
 
     if (storedPayload && storedCursor && Number.parseInt(storedCursor, 10) >= latestBlock) {
       return NextResponse.json(storedPayload, {
